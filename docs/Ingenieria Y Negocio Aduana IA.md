@@ -1,63 +1,63 @@
-# 🏛️ ADUANA IA: Ingeniería de Requisitos, Modelo de Negocio GovTech, Plan MVP en 48h (Tridente IA) y Estrategia de Venta al Jurado
+# 🏛️ ADUANA IA: Ingeniería de Requisitos, Modelo de Negocio GovTech, Plan MVP en 48h y Estrategia de Venta al Jurado
 
-> **Documento Maestro de Ejecución y Negocio (v2.0)**  
-> **Evento:** Hackathon UNETI (13-14 de Noviembre) $\rightarrow$ *Venezuela Innova* (26-28 de Noviembre)  
-> **Documentos Base Sincronizados:** `README.md` (Arquitectura v2.0) + `PROMPT_MAESTRO.md` (Agent Kernel v2.0)  
-> **Propósito:** Servir como respaldo formal de ingeniería de software, viabilidad económica/institucional, manual táctico de construcción en 48 horas usando **Claude + ChatGPT + Gemini**, y guion comercial ganador ante el jurado evaluador.
+> **Documento Maestro de Ejecución y Negocio (v2.1 — Cloudflare Edge & TypeScript)**  
+> **Evento:** Hackathon UNETI IA 2026 $\rightarrow$ *Venezuela Innova*  
+> **Documentos Base Sincronizados:** [SPEC.md](../SPEC.md) + [README.md](../README.md) + [PROMPT_MAESTRO.md](../PROMPT_MAESTRO.md)  
+> **Propósito:** Servir como respaldo formal de ingeniería de software (SRS), viabilidad económica/institucional, plan táctico de construcción en 48 horas sobre **Cloudflare (Pages, Pages Functions/Workers, D1, Workers AI y KV)** con **TypeScript estricto**, y guion de defensa ante el jurado evaluador.
 
 ---
 
 ## 📐 PARTE 1: DOCUMENTO DE INGENIERÍA DE REQUISITOS (SRS ADAPTADO A SDD)
 
 ### 1.1 Propósito y Alcance del Sistema
-**Aduana IA** es un sistema intermediario de seguridad, anonimización, explicabilidad matemática y auditoría criptográfica (*AI Governance & Security Gateway*) diseñado para interceptar, sanitizar, evaluar y sellar en tiempo real toda transacción entre usuarios de instituciones públicas/reguladas venezolanas y modelos de Inteligencia Artificial (locales o en nube).
+**Aduana IA** es una pasarela soberana de seguridad, anonimización, explicabilidad matemática y auditoría criptográfica (*AI Security & Governance Gateway*) diseñada para interceptar, sanitizar, evaluar y sellar en tiempo real toda transacción entre usuarios de instituciones públicas/reguladas venezolanas y modelos de Inteligencia Artificial ejecutados en el *Edge* (**Cloudflare Workers AI** o adaptadores institucionales).
 
 ### 1.2 Actores y Perfiles de Usuario (*Stakeholders*)
 
 | Actor | Rol en el Ecosistema | Necesidad Principal | Interfaz que Utiliza |
 | :--- | :--- | :--- | :--- |
-| **Ciudadano Venezolano** | Titular de los datos personales y solicitante del trámite público. | Que sus datos sensibles (Cédula, RIF, salud, ingresos) no se filtren y que su caso se evalúe sin sesgos arbitrarios. | Recibo Criptográfico de Auditoría (Código de verificación / QR). |
-| **Funcionario Analista** | Operador público encargado de evaluar y decidir sobre el trámite (*Human-in-the-Loop*). | Asistencia rápida de IA para resumir casos y un puntaje matemático explicado que respalde su decisión administrativa. | **🖥️ Panel del Funcionario** (Triaje, Explicabilidad SHAP y Decisión Humana). |
-| **Auditor / Contralor** | Inspector de Contraloría Interna, SUSCERTE o Seguridad de la Información. | Comprobar matemáticamente que el historial de decisiones no fue alterado en la base de datos y auditar la resistencia a ataques. | **🔍 Panel de Auditoría y Contraloría** (Verificador Ledger + Benchmark 100 ataques). |
-| **Administrador TI** | Responsable de infraestructura sobre servidores **Canaima GNU/Linux**. | Un binario/servicio ligero ($< 80\text{ MB}$ RAM), sin dependencias propietarias, que opere incluso sin conexión a internet. | API `/api/v1/health/system` y despliegue local unificado. |
+| **Ciudadano Venezolano** | Titular de los datos personales y solicitante del trámite público. | Que sus datos sensibles (Cédula, RIF, salud, ingresos) no se filtren al LLM ni al disco, y contar con un recibo verificable. | Recibo Criptográfico de Auditoría (`citizen_receipt_code`). |
+| **Funcionario Analista** | Operador público encargado de evaluar y decidir sobre el trámite (*Human-in-the-Loop*). | Resúmenes ágiles de trámites asistidos por IA y un puntaje matemático transparente que respalde su decisión administrativa. | **🖥️ Panel del Funcionario** (Triaje, Explicabilidad SHAP y Decisión Humana). |
+| **Auditor / Contralor** | Inspector de Contraloría Interna, SUSCERTE o Seguridad de la Información. | Comprobar matemáticamente que el historial de decisiones en Cloudflare D1 no fue alterado y auditar la resistencia a ataques. | **🔍 Panel de Auditoría y Contraloría** (Verificador Ledger D1 + Benchmark 100 ataques). |
+| **Administrador / DevOps** | Responsable de despliegue e infraestructura serverless en el Edge. | Servicio ligero en **TypeScript**, dentro del presupuesto de **$< 10\text{ ms}$ CPU** del plan gratuito de Cloudflare Workers, sin llaves expuestas en código. | API `/api/v1/health/system`, `wrangler.jsonc` y Cloudflare Secrets. |
 
 ---
 
 ### 1.3 Catálogo de Requisitos Funcionales (RF) Trazables al Pipeline
 
 #### Módulo 0: Consentimiento Informado y Protección de Tasa (Idea #8)
-* **RF-01 (Validación de Consentimiento Explícito):** El sistema debe rechazar con código `BLOCKED_NO_CONSENT` cualquier petición donde `citizen_consent.granted` sea `False` o carezca de propósito declarado (`purpose_code`).
-* **RF-02 (Sello Criptográfico de Consentimiento):** El sistema debe generar un `consent_hash` (`SHA-256`) vinculando el identificador de petición, la marca de tiempo UTC y el propósito aceptado por el ciudadano.
-* **RF-03 (Control de Abuso sin Exposición de Identidad):** El sistema debe limitar la tasa de peticiones por ciudadano utilizando su índice ciego (`blind_citizen_id`) sin almacenar su Cédula en texto plano.
+* **RF-01 (Validación de Consentimiento Explícito):** El sistema debe rechazar con estado `BLOCKED_NO_CONSENT` cualquier petición donde `citizen_consent.granted` sea `false` o carezca de propósito declarado (`purpose_code`).
+* **RF-02 (Sello Criptográfico de Consentimiento):** El sistema debe generar un `consent_hash` (`SHA-256` mediante Web Crypto API `crypto.subtle`) vinculando `request_id`, `timestamp_utc` y `purpose_code`.
+* **RF-03 (Control de Abuso sin Exposición de Identidad):** El sistema debe limitar la tasa de peticiones por ciudadano utilizando su índice ciego (`blind_citizen_id`) en memoria/KV sin almacenar su Cédula en texto plano.
 
-#### Módulo 1: `SHIELD` — Anonimización Soberana y Almacenamiento Restrictivo (Ideas #6 y #8)
-* **RF-04 (Detección y Enmascaramiento Estructurado Nacional):** El sistema debe detectar y sustituir por tokens indexados consistentes (`[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[BANK_1]`, `[EMAIL_1]`) toda Cédula venezolana (`V/E`), RIF (`V/E/J/G/P/C`), teléfono nacional (`0412/0414/0424/0416/0426/0212...`), correo y número de cuenta bancaria de 20 dígitos.
-* **RF-05 (Validación Matemática Módulo 11 SENIAT):** Cuando se detecte un patrón de RIF, el sistema debe ejecutar el algoritmo oficial Módulo 11 del SENIAT (pesos `[4,3,2,7,6,5,4,3,2]`) y registrar en `shield_meta.rif_mod11_verified` la autenticidad matemática del documento.
+#### Módulo 1: `SHIELD` — Anonimización Determinista y Almacenamiento Restrictivo (Ideas #6 y #8)
+* **RF-04 (Detección y Enmascaramiento Estructurado Nacional):** El sistema debe detectar y sustituir por tokens indexados consistentes (`[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[BANK_1]`, `[EMAIL_1]`) toda Cédula venezolana (`V/E`), RIF (`V/E/J/G/P/C`), teléfono nacional (`0412/0414/0424/0416/0426/0212...`), correo y cuenta bancaria de 20 dígitos.
+* **RF-05 (Validación Matemática Módulo 11 SENIAT):** Cuando se detecte un patrón de RIF, el sistema debe ejecutar el algoritmo oficial Módulo 11 del SENIAT (mapeo `{"V":1,"E":2,"J":3,"P":4,"G":5,"C":3}` y vector de 9 pesos `[4,3,2,7,6,5,4,3,2]`) y registrar en `shield_meta.rif_mod11_verified` la autenticidad matemática del documento.
 * **RF-06 (Reconocimiento Léxico Contextual de Salud e Identidad):** El sistema debe enmascarar nombres propios precedidos por marcadores contextuales de trámite y términos clínicos sensibles incluidos en el diccionario local de protección de salud (`[CLINICAL_1]`).
-* **RF-07 (Bóveda Efímera en RAM y Zeroization):** El mapeo entre los tokens (`[CEDULA_1]`) y el valor original (`V-12.345.678`) debe guardarse exclusivamente en `EphemeralVault` en memoria RAM con un $\text{TTL} \le 180\text{ segundos}$ y destruirse mediante `zeroize()` al concluir la petición.
+* **RF-07 (Bóveda Efímera y Zeroization):** El mapeo entre tokens (`[CEDULA_1]`) y el valor original (`V-12.345.678`) debe mantenerse únicamente en memoria volátil de ejecución (destruida al responder) o en **Cloudflare KV** con `expirationTtl: 180` y purga explícita (`zeroize()`), **jamás en Cloudflare D1**.
 
 #### Módulo 2: `GUARD-IN` — Defensa Activa contra Prompt Injection (Idea #18)
-* **RF-08 (Normalización Anti-Evasión):** Antes de inspeccionar el texto, el sistema debe aplicar normalización canónica Unicode (`NFKC`), eliminar caracteres invisibles (*zero-width*) y decodificar cadenas sospechosas en `Base64` o `Hex` embebidas.
-* **RF-09 (Cálculo Determinista de Riesgo Adversario):** El sistema debe evaluar el texto frente a reglas heurísticas y similitud de N-gramas (intentos de *override* de instrucciones, *jailbreak*, *roleplay* malicioso, inyección SQL/comandos y exfiltración de prompt), generando un `risk_score` continuo en $[0.0, 1.0]$ y bloqueando toda entrada que supere el umbral de política ($\ge 0.65$).
-* **RF-10 (Encapsulamiento XML Sandbox y Canary Token Dinámico):** Toda solicitud permitida hacia el LLM debe envolverse en etiquetas estructurales `<instruccion_institucional_inmutable>` y `<entrada_ciudadano>`, inyectando un token único por transacción firmado con HMAC (`[[CANARY-HMAC-XXXXXXXX]]`).
+* **RF-08 (Normalización Anti-Evasión):** Antes de inspeccionar el texto, el sistema debe aplicar `text.normalize("NFKC")`, eliminar caracteres invisibles (*zero-width*) y decodificar cadenas sospechosas en `Base64` o `Hex` embebidas.
+* **RF-09 (Cálculo Determinista de Riesgo Adversario):** El sistema debe evaluar el texto frente a reglas heurísticas y similitud léxica (intentos de *override* de instrucciones, *jailbreak*, *roleplay* malicioso, inyección SQL/comandos y exfiltración de prompt), generando un `risk_score` continuo en $[0.0, 1.0]$ sin usar `Math.random()`, bloqueando entradas por encima del umbral ($\ge 0.65$).
+* **RF-10 (Encapsulamiento XML Sandbox y Canary Token Dinámico):** Toda solicitud permitida hacia el LLM debe envolverse en etiquetas estructurales `<instruccion_institucional_inmutable>` y `<entrada_ciudadano>`, inyectando un token único por transacción firmado con HMAC vía `crypto.subtle` (`[[CANARY-HMAC-XXXXXXXX]]`).
 
-#### Módulo de Interconectividad: `LLMAdapter` y `CircuitBreaker`
-* **RF-11 (Conmutación Agnóstica de Proveedor IA):** El sistema debe permitir procesar el `masked_text` a través de tres conectores intercambiables: (a) Modelo Local Soberano vía Ollama/llama.cpp, (b) API externa compatible con OpenAI, o (c) Motor Institucional Determinista Offline.
-* **RF-12 (Degradación Elegante por Circuit Breaker):** Si el conector del LLM supera un tiempo de espera de `3.5 segundos` o retorna error de red, el `CircuitBreaker` debe conmutar automáticamente al Motor Determinista Offline para garantizar que el funcionario reciba siempre la evaluación matemática de `EXPLICA` y el sellado en `LEDGER`.
+#### Módulo de Interconectividad: `LLMAdapter` (Workers AI) y `CircuitBreaker`
+* **RF-11 (Conmutación Agnóstica de Proveedor IA):** El sistema debe procesar únicamente `masked_text` mediante una interfaz común `LLMAdapter` con soporte para **Cloudflare Workers AI (`env.AI`)** (`@cf/zai-org/glm-4.7-flash` y respaldo `@cf/meta/llama-3.1-8b-instruct`) y el **Motor Institucional Determinista (`OfflineDeterministicAdapter`)**.
+* **RF-12 (Degradación Elegante por Circuit Breaker):** Si Workers AI supera el timeout de `3500 ms`, devuelve error o agota cuota (`10k neurons/día`), el `CircuitBreaker` debe conmutar automáticamente a `OfflineDeterministicAdapter` para garantizar que el funcionario reciba siempre el dictamen matemático de `EXPLICA` y el sellado en `LEDGER`.
 
 #### Módulo 3: `GUARD-OUT` — Inspección de Salida y Prevención de Fugas (Idea #18)
-* **RF-13 (Detección de Fuga de Canary y PII Residual):** El sistema debe inspeccionar la respuesta del LLM y abortar inmediatamente su entrega si contiene total o parcialmente el `canary_token` de la sesión o si detecta algún patrón de PII residual/alucinado.
-* **RF-14 (Sanitización de Salida Segura):** El sistema debe neutralizar cualquier etiqueta ejecutable (`<script>`, `onload=`, `javascript:`) y marcar con advertencia respuestas que contengan afirmaciones normativas sin respaldo en el contexto institucional.
+* **RF-13 (Detección de Fuga de Canary y PII Residual):** El sistema debe inspeccionar la respuesta del LLM y abortar su entrega si contiene total o parcialmente el `canary_token` de la sesión o si detecta cualquier patrón de PII residual/alucinado.
+* **RF-14 (Sanitización de Salida Segura y Aviso de IA):** El sistema debe neutralizar etiquetas ejecutables (`<script>`, `onload=`, `javascript:`), marcar afirmaciones sin respaldo institucional e indicar explícitamente en la respuesta (`ai_generated_notice: true`) cuándo el resumen fue generado por IA.
 
-#### Módulo 4: `LEDGER` — Registro Criptográfico Inmutable (Idea #17)
-* **RF-15 (Encadenamiento SHA-256 y Doble Sello HMAC):** Cada transacción finalizada (aprobada o bloqueada por seguridad) debe registrarse como un bloque secuencial $i$ cuyo `block_hash` dependa criptográficamente de `prev_hash` ($H_{i-1}$), `payload_hash`, `timestamp_utc` y `blind_citizen_id`, acompañado de una firma `hmac_signature` generada con la llave maestra del servidor en memoria.
-* **RF-16 (Auditoría Completa y Detección Quirúrgica de Sabotaje):** El sistema debe proveer una función `verify_chain()` que recalcule todos los hashes y firmas HMAC desde el bloque génesis ($i=0$) hasta el bloque actual, identificando el `block_index` exacto y el tipo de alteración si un solo carácter fue modificado en SQLite.
-* **RF-17 (Simulador de Sabotaje en Vivo y Recibo Ciudadano):** El sistema debe incluir en el Panel de Auditoría un control de demostración para alterar un registro histórico en la base de datos y comprobar en vivo la alerta de corrupción, además de emitir un código de recibo criptográfico (`citizen_receipt_code`) por cada trámite.
+#### Módulo 4: `LEDGER` — Registro Criptográfico Inmutable en Cloudflare D1 (Idea #17)
+* **RF-15 (Encadenamiento SHA-256 y Doble Sello HMAC):** Cada transacción finalizada debe registrarse en la tabla `ledger_blocks` de **Cloudflare D1 (`env.DB`)** como un bloque secuencial $i$ cuyo `block_hash` dependa criptográficamente de `prev_hash` ($H_{i-1}$), `payload_hash`, `timestamp_utc` y `blind_citizen_id`, acompañado de `hmac_signature` calculada con `env.LEDGER_HMAC_KEY` (almacenada en Cloudflare Secrets).
+* **RF-16 (Auditoría Completa y Detección Quirúrgica de Sabotaje):** El sistema debe proveer `verifyChain()` en `/api/v1/ledger/verify` que recalcule hashes y firmas HMAC con `crypto.subtle` desde el bloque génesis hasta el último bloque, identificando el `corrupted_block_index` exacto y el motivo (`HASH_MISMATCH`, `PREV_HASH_LINK_BROKEN` o `HMAC_SIGNATURE_FORGED`).
+* **RF-17 (Simulador de Sabotaje en Vivo y Recibo Ciudadano):** El sistema debe incluir en el Panel de Contraloría un endpoint controlado de demostración (`/api/v1/ledger/tamper-sim`) para alterar un registro histórico de prueba en D1 y evidenciar en vivo la detección criptográfica, además de emitir `citizen_receipt_code` por trámite.
 
 #### Módulo 5: `EXPLICA` — Modelo Matemático White-Box y Human-in-the-Loop (Idea #5)
-* **RF-18 (Evaluación Tabular con Regresión Logística Real):** El sistema debe calcular la probabilidad de prioridad/elegibilidad del trámite mediante la función sigmoide $P(y=1\mid\mathbf{x}) = \frac{1}{1+e^{-(\beta_0 + \sum \beta_j x_j)}}$ utilizando coeficientes reales entrenados de forma determinista sobre `synthetic_tramites.csv`, sin emplear generadores aleatorios (`random()`).
-* **RF-19 (Desglose de Pesos y Valores SHAP Lineales):** El sistema debe exponer para cada variable del trámite tanto su aporte directo ($\beta_j x_j$) como su valor SHAP lineal centrado respecto a la media poblacional ($\phi_j = \beta_j(x_j - \mu_j)$), verificando que la suma algebraica reconstruya el *logit* $z$ con error $< 10^{-9}$.
-* **RF-20 (Soberanía de Decisión Humana con Justificación de Override):** El sistema debe exigir la confirmación del funcionario antes de sellar el dictamen; si el funcionario contradice la recomendación matemática del modelo (`human_override = True`), el sistema debe exigir una justificación textual ($\ge 20$ caracteres) que queda grabada de forma inmutable en el `LEDGER`.
+* **RF-18 (Evaluación Tabular con Regresión Logística Determinista):** El sistema debe calcular la probabilidad de prioridad/elegibilidad del trámite mediante la función sigmoide $P(y=1\mid\mathbf{x}) = \frac{1}{1+e^{-(\beta_0 + \sum \beta_j x_j)}}$ utilizando coeficientes $\beta$ y medias $\mu$ calibrados de forma determinista sobre `data/synthetic_tramites.csv` e embebidos como constantes auditables en TypeScript (cero `Math.random()`).
+* **RF-19 (Desglose de Pesos y Valores SHAP Lineales):** El sistema debe exponer para cada variable del trámite su aporte directo ($\beta_j x_j$) y su valor SHAP lineal centrado respecto a la media poblacional ($\phi_j = \beta_j(x_j - \mu_j)$), verificando que la suma algebraica reconstruya el *logit* $z$ con error $< 10^{-9}$.
+* **RF-20 (Soberanía de Decisión Humana con Justificación de Override):** El sistema debe exigir confirmación del funcionario antes de sellar el dictamen (`PRIORIDAD_ALTA`, `REVISION_ESTANDAR`, `RECAUDOS_INCOMPLETOS`); si el funcionario sobrescribe la recomendación matemática (`human_override = true`), se exige una justificación escrita ($\ge 20$ caracteres) que queda grabada en D1.
 
 ---
 
@@ -65,12 +65,12 @@
 
 | Código | Categoría | Especificación Medible y Verificable |
 | :---: | :--- | :--- |
-| **RNF-01** | **Latencia de Pasarela** | El tiempo acumulado de procesamiento de seguridad y auditoría (`SHIELD` + `GUARD-IN` + `GUARD-OUT` + `EXPLICA` + `LEDGER`, excluyendo el tiempo de generación del LLM externo) debe ser **$< 60\text{ ms}$** en el percentil 95. |
-| **RNF-02** | **Cero PII en Disco** | **0 bytes** de Cédulas, RIFs, teléfonos o nombres originales pueden escribirse en archivos SQLite (`.db`, `-wal`, `-shm`), archivos JSON o salidas de log (`stdout`/`stderr`). |
-| **RNF-03** | **Compatibilidad Canaima** | Ejecución 100% nativa sobre **Canaima GNU/Linux (Debian)** con Python 3.10+, consumo de RAM en reposo **$< 80\text{ MB}$** y arranque en frío **$< 300\text{ ms}$**. |
-| **RNF-04** | **Autonomía Offline-First** | La interfaz web y todos los módulos del pipeline deben operar al **100% sin conexión a internet**, sin llamadas a CDNs externos de CSS, fuentes o librerías JS. |
-| **RNF-05** | **Efectividad Adversaria** | Tasa de Mitigación (**TPR**) $\ge 88\%$ y Tasa de Falsos Positivos (**FPR**) $\le 4\%$ medida automáticamente sobre el benchmark auditable de $N=100$ prompts. |
-| **RNF-06** | **Endurecimiento SQLite** | Activación obligatoria de `PRAGMA journal_mode=WAL;`, `PRAGMA synchronous=FULL;`, `PRAGMA secure_delete=ON;` y Triggers SQL `BEFORE UPDATE/DELETE` en la tabla de bloques. |
+| **RNF-01** | **Presupuesto CPU Edge** | El procesamiento de seguridad, matemática `EXPLICA` y verificación criptográfica (`SHIELD` + `GUARD-IN` + `GUARD-OUT` + `EXPLICA` + `LEDGER` hashing, excluyendo I/O de red/D1/Workers AI) debe ejecutarse dentro del límite de **$< 10\text{ ms}$ de CPU** por invocación del plan gratuito de Cloudflare Workers. |
+| **RNF-02** | **Cero PII en D1 y Logs** | **0 bytes** de Cédulas, RIFs, teléfonos o nombres originales pueden persistirse en tablas de Cloudflare D1 ni imprimirse en logs (`console.log`/`console.error`). |
+| **RNF-03** | **Arquitectura Serverless Edge** | Implementación 100% en **TypeScript estricto (`strict: true`)** sobre **Cloudflare Pages + Pages Functions / Workers**, usando Web Crypto API (`crypto.subtle`) sin dependencias nativas pesadas ni servidores GPU dedicados. |
+| **RNF-04** | **Frontend Autónomo Sin CDNs** | La interfaz web en `static/` debe servir CSS y JS locales sin llamadas a CDNs externos de estilos, fuentes o librerías. |
+| **RNF-05** | **Efectividad Adversaria** | Tasa de Mitigación (**TPR**) $\ge 88\%$ y Tasa de Falsos Positivos (**FPR**) $\le 4\%$ medida automáticamente sobre `data/attack_benchmark.json` ($N=100$ prompts). |
+| **RNF-06** | **Endurecimiento D1 y Secretos** | Tabla `ledger_blocks` definida en `schema.sql` con restricciones *Append-Only* (`BEFORE UPDATE/DELETE` triggers SQLite validados en `wrangler d1 execute`) y llaves maestras (`LEDGER_HMAC_KEY`, `INSTITUTION_SALT`) gestionadas exclusivamente vía `wrangler secret put` / `.dev.vars`. |
 
 ---
 
@@ -78,14 +78,14 @@
 
 Un jurado de hackathon (y especialmente el jurado de *Venezuela Innova*) no solo evalúa que el código funcione: evalúa **si el proyecto es sostenible, escalable y resuelve un dolor económico e institucional real**.
 
-### 2.1 El Caso de Negocio: ¿Por qué el Estado y la Banca Venezolana necesitan comprar/adoptar Aduana IA hoy?
+### 2.1 El Caso de Negocio: ¿Por qué el Estado y la Banca Venezolana necesitan adoptar Aduana IA hoy?
 
 Actualmente, las instituciones públicas y empresas reguladas en Venezuela enfrentan una **paradoja paralizante** frente a la Inteligencia Artificial:
-1. **Si prohíben la IA:** Pierden productividad, mantienen colas lentas en atención ciudadana y sus propios empleados terminan usando cuentas personales gratuitas de ChatGPT/Claude desde sus teléfonos móviles, **filtrando datos críticos del Estado sin ningún control (*Shadow AI*)**.
-2. **Si contratan IA en la nube directamente:** Violan la Ley de Infogobierno, exponen datos personales protegidos por el Art. 60 de la Constitución y gastan miles de dólares en tokens procesando peticiones repetitivas o ataques.
-3. **Si intentan montar LLMs gigantes propios desde cero:** Requieren granjas de GPUs de decenas de miles de dólares que no están disponibles en la mayoría de los ministerios, gobernaciones ni universidades.
+1. **Si prohíben la IA:** Pierden productividad, mantienen colas lentas en atención ciudadana y sus propios empleados terminan usando cuentas personales gratuitas desde sus teléfonos móviles, **filtrando datos críticos del Estado sin ningún control (*Shadow AI*)**.
+2. **Si conectan formularios directo a LLMs externos sin pasarela:** Violan el principio de *Habeas Data* (CRBV Art. 60), exponen PII ciudadano, quedan vulnerables a *Prompt Injection* y pagan cómputo procesando spam o ataques.
+3. **Si intentan comprar granjas de GPUs propias desde cero:** Requieren inversiones de decenas de miles de dólares fuera del alcance de alcaldías, hospitales o universidades.
 
-> **La Solución Económica de Aduana IA:** Aduana IA permite que cualquier ministerio, alcaldía, universidad, banco o clínica use **modelos ligeros locales en hardware existente (Canaima)** o **APIs híbridas de bajo costo** con **100% de seguridad jurídica, cero fugas de datos y auditoría de nivel contraloría desde el día 1**.
+> **La Solución Económica de Aduana IA:** Al construirse como una pasarela ultraligera en **TypeScript sobre arquitectura Edge (Cloudflare Workers + D1 + Workers AI)** y estándares web abiertos (**GNU GPL v3**), cualquier organismo puede desplegar pilotos inmediatos a **costo inicial cero** sobre infraestructura serverless o adaptar el mismo repositorio mediante la interfaz `StorageRepository` y `LLMAdapter` hacia centros de datos institucionales propios con **cero fugas de datos y auditoría de nivel contraloría desde el día 1**.
 
 ---
 
@@ -93,150 +93,155 @@ Actualmente, las instituciones públicas y empresas reguladas en Venezuela enfre
 
 | Segmento | Clientes Objetivo en Venezuela | Dolor Específico que Resuelve Aduana IA |
 | :--- | :--- | :--- |
-| **1. Sector Público Social y Trámites (B2G)** | Ministerios (Salud, Educación Universitaria, Trabajo, Alimentación), IVSS, SAIME, SENIAT, SAREN, Gobernaciones y Alcaldías. | Triaje rápido de solicitudes ciudadanas con priorización matemática justa (`EXPLICA`), protección de datos soberanos (`SHIELD`) y auditoría anticorrupción (`LEDGER`). |
-| **2. Sector Financiero y Asegurador (B2B Regulado)** | Banca Pública (Banco de Venezuela, Bicentenario, Tesoro) y Banca Privada Nacional (Banesco, Mercantil, Provincial, BNC), Aseguradoras. | Cumplimiento estricto de normativas **SUDEBAN** al usar IA en atención de reclamos, análisis de crédito explicable (`EXPLICA`) y enmascaramiento de cuentas de 20 dígitos y RIFs. |
-| **3. Sector Salud y Universitario (B2G / B2B)** | Red Hospitalaria, Clínicas privadas, UNETI y Universidades Nacionales. | Protección de historias clínicas sensibles antes de usar asistentes diagnósticos o administrativos y asignación transparente de becas/cupos. |
+| **1. Sector Público Social y Trámites (B2G)** | Ministerios (Salud, Educación Universitaria, Trabajo, Alimentación), IVSS, SAIME, SENIAT, SAREN, Gobernaciones y Alcaldías. | Triaje rápido de solicitudes ciudadanas con priorización matemática justa (`EXPLICA`), protección de datos (`SHIELD`) y auditoría anticorrupción (`LEDGER` D1). |
+| **2. Sector Financiero y Asegurador (B2B Regulado)** | Banca Pública y Banca Privada Nacional, Aseguradoras. | Cumplimiento de controles de privacidad **SUDEBAN** al usar IA en atención de reclamos, análisis explicable (`EXPLICA`) y enmascaramiento de cuentas de 20 dígitos y RIFs. |
+| **3. Sector Salud y Universitario (B2G / B2B)** | Red Hospitalaria, Clínicas privadas, UNETI y Universidades Nacionales. | Protección de historias clínicas sensibles antes de generar resúmenes asistidos por IA y asignación transparente de becas o cupos. |
 
 ---
 
-### 2.3 Modelo de Sostenibilidad e Ingresos (100% Compatible con la Ley de Infogobierno)
+### 2.3 Modelo de Sostenibilidad e Ingresos (Compatible con la Ley de Infogobierno)
 
-Dado que la **Ley de Infogobierno de Venezuela** establece el uso de Software Libre y estándares abiertos en la Administración Pública, un modelo basado en "vender licencias cerradas por usuario al Estado" sería rechazado por un jurado conocedor. **Aduana IA utiliza un Modelo Dual Open-Core Soberano (estilo Red Hat / Canonical / GitLab):**
+Dado que la **Ley de Infogobierno de Venezuela** establece el uso de Software Libre y estándares abiertos en la Administración Pública, el repositorio base se publica bajo **GNU GPL v3** y se sostiene mediante un **Modelo Dual Open-Core**:
 
 1. **Línea 1 — Núcleo Abierto Soberano (*GovTech Open Standard*):**
-   - El motor base de Aduana IA es auditable y libre para entidades académicas y pilotos estatales, eliminando barreras burocráticas de adopción y posicionándolo como el **estándar nacional recomendado por CNTI / SUSCERTE**.
-2. **Línea 2 — Contratos de Implantación, Soporte Crítico y Calibración Institucional (B2G):**
-   - Cobro por servicios especializados de ingeniería: despliegue en centros de datos institucionales sobre Canaima, integración con bases de datos legadas (Postgres/Oracle), y **entrenamiento a medida de modelos `EXPLICA`** específicos para las reglas de negocio de cada ministerio.
+   - Motor base auditable y libre (`GNU GPL v3`) para universidades y pilotos estatales, alineado con lineamientos de interoperabilidad **CNTI / SUSCERTE**.
+2. **Línea 2 — Contratos de Implantación, Integración y Calibración Institucional (B2G):**
+   - Servicios especializados de ingeniería: integración de `StorageRepository` con bases de datos institucionales existentes, despliegue en nube privada o Edge dedicado, y **calibración a medida de modelos `EXPLICA`** según las reglas de negocio de cada ministerio.
 3. **Línea 3 — Suscripción de Inteligencia de Amenazas (*Aduana Threat-Feed*):**
-   - Actualización mensual automatizada de reglas heurísticas `GUARD-IN` contra nuevos vectores de *Jailbreak* y actualización de diccionarios regulatorios de `SHIELD`.
+   - Actualización periódica de reglas heurísticas `GUARD-IN` contra nuevos vectores de *Jailbreak* y actualización de diccionarios regulatorios de `SHIELD`.
 4. **Línea 4 — Licenciamiento Enterprise SLA para Banca, Seguros y Clínicas Privadas (B2B):**
-   - Suscripción anual por nodo/instancia (*On-Premise Enterprise*) para bancos y aseguradoras privadas que requieren soporte 24/7, paneles de cumplimiento SUDEBAN y alta disponibilidad. **El flujo de caja del sector privado financia la evolución continua de la plataforma pública.**
+   - Soporte 24/7, alta disponibilidad, paneles de cumplimiento normativo y auditoría extendida para el sector financiero y de salud privado, financiando la evolución continua de la plataforma pública.
 
 ---
 
-### 2.4 Impacto Cuantificable (Métricas de Retorno de Inversión para el Pitch)
+### 2.4 Impacto Cuantificable (Objetivos de Valor para el Pitch)
 
 | Indicador de Impacto | Sin Aduana IA (Uso Directo / Manual) | Con Aduana IA Desplegada | Beneficio Neto Demostrable |
 | :--- | :---: | :---: | :--- |
-| **Exposición de PII Ciudadano a Terceros** | $100\%$ de los datos enviados en claro | **$0\%$** (Enmascarado en $< 20\text{ ms}$) | Cumplimiento legal absoluto (CRBV Art. 60). |
-| **Costo de Infraestructura para Correr el Gateway** | Requiere servidores GPU costosos | **$< 80\text{ MB}$ RAM en Canaima CPU** | Funciona en el 100% del parque tecnológico actual del Estado. |
-| **Ahorro en Consumo de Tokens / Cómputo LLM** | Paga por ataques, spam y prompts fallidos | **Ahorro del $35\% - 60\%$** | `SHIELD` y `GUARD-IN` filtran ataques y abuso antes de tocar el LLM. |
-| **Tiempo de Auditoría de Contraloría sobre Decisiones** | Semanas revisando expedientes manuales | **$< 50\text{ ms}$** (`verify_chain()`) | Detección instantánea de cualquier alteración o desvío humano. |
+| **Exposición de PII Ciudadano al LLM** | $100\%$ de los datos enviados en claro | **$0\%$** (Tokenizado en $< 20\text{ ms}$) | Resguardo efectivo de privacidad (CRBV Art. 60). |
+| **Costo de Arranque del MVP / Piloto** | Requiere servidores dedicados o GPUs | **\$0 inicial** (Cloudflare Free Tier, `< 10 ms` CPU) | Adopción inmediata sin fricción de infraestructura. |
+| **Ahorro en Consumo de Cómputo IA** | Paga por ataques, spam y prompts fallidos | **Reducción estimada $35\% - 60\%$** | `SHIELD` y `GUARD-IN` bloquean abuso antes de invocar `env.AI`. |
+| **Tiempo de Auditoría de Contraloría** | Semanas revisando expedientes manuales | **Milisegundos** (`/api/v1/ledger/verify`) | Detección instantánea de cualquier alteración o *override*. |
 
 ---
 
-## ⚡ PARTE 3: PLAN DE CONSTRUCCIÓN DEL MVP EN 48 HORAS USANDO EL "TRIDENTE IA" (CLAUDE + CHATGPT + GEMINI)
+## ⚡ PARTE 3: PLAN DE CONSTRUCCIÓN DEL MVP EN 48 HORAS SOBRE CLOUDFLARE (SPEC PRIMERO)
 
-Para construir un sistema de esta solidez en solo **2 días (48 horas de Hackathon)** sin caos ni errores de integración, el equipo utilizará una estrategia de **Orquestación Especializada de 3 IAs**, asignando a cada modelo exactamente aquello en lo que supera a los demás.
+Para construir un sistema sólido en **48 horas** sin errores de integración entre compañeros y asistentes IA (**Antigravity + Claude + ChatGPT + Gemini**), todo código se genera estrictamente bajo el flujo SDD definido en [SPEC.md](../SPEC.md) y [PROMPT_MAESTRO.md](../PROMPT_MAESTRO.md).
 
-### 3.1 División Estratégica del Trabajo entre Claude, ChatGPT y Gemini
+### 3.1 División Estratégica del Trabajo (Orquestación de Herramientas IA)
 
-| IA Asignada | Rol en el Hackathon | Por qué es la mejor para esta tarea | Entregables Exactos que debe generar |
-| :--- | :--- | :--- | :--- |
-| **🟣 Claude (3.5 / 3.7 Sonnet)** | **Arquitecto Backend, Criptografía y Tests SDD** | Es el modelo más preciso escribiendo código Python modular limpio, respetando `@dataclass(frozen=True)`, lógica criptográfica (`hashlib`, `hmac`, `sqlite3`) y pruebas `pytest` sin inventar librerías inexistentes. | `core/context.py`, `core/ephemeral_vault.py`, `stage1_shield.py` (con Módulo 11 SENIAT), `stage2_guard_in.py`, `stage3_guard_out.py`, `stage4_ledger.py`, `stage5_explica.py`, `app.py` y toda la carpeta `tests/`. |
-| **🟢 ChatGPT (GPT-4o / o3-mini)** | **Red Teamer, Generador de Datos Sintéticos y Diseñador Frontend Offline** | Excelente generando JSONs estructurados creativos (ataques de inyección en español venezolano y trámites realistas) y maquetando interfaces HTML5/CSS/JS interactivas muy visuales en un solo archivo. | `data/attack_benchmark.json` (los 100 prompts), `data/synthetic_tramites.csv` (datos de entrenamiento coherentes), `static/index.html`, `static/styles.css` (100% local sin CDN) y `static/app.js`. |
-| **🔵 Gemini (1.5 Pro / 2.5 Pro)** | **Auditor de Contexto Global, Integrador y Director de Pitch** | Su enorme ventana de contexto permite subirle **todos los archivos del proyecto a la vez** para detectar errores de integración, verificar que `static/app.js` consuma exactamente los campos de `AduanaPacket` de `app.py` y redactar las especificaciones `specs/`. | Archivos `specs/01..05.spec.md`, revisión cruzada de extremo a extremo (*Bug Hunting* de integración), verificación de cero fugas de PII y refinamiento del guion de defensa en vivo. |
-
----
-
-### 3.2 Regla de Oro para que el Código de las 3 IAs Encaje en 0 Segundos
-
-Antes de pedirle cualquier cosa a **Claude**, **ChatGPT** o **Gemini**, el miembro del equipo debe pegar en el primer mensaje:
-1. El **Bloque de la Parte 1 y Parte 2** de `PROMPT_MAESTRO.md` (que contiene el contrato JSON `AduanaPacket` v2.0 y las `@dataclass` de `core/context.py`).
-2. La instrucción explícita: *"Prohibido cambiar los nombres de las llaves del JSON `AduanaPacket`. Tu código debe consumir o devolver exactamente estas llaves"*.
+| Herramienta / Rol | Especialidad en el Hackathon | Entregables Exactos que Debe Generar |
+| :--- | :--- | :--- |
+| **🟣 Antigravity / Claude** | **Arquitecto TypeScript, Criptografía Edge, D1 y Tests SDD** | `wrangler.jsonc`, `schema.sql`, `core/config.ts`, `core/context.ts`, `core/ephemeral_vault.ts`, `pipeline/stage1_shield.ts` (Módulo 11 SENIAT), `pipeline/stage2_guard_in.ts`, `pipeline/stage3_guard_out.ts`, `pipeline/stage4_ledger.ts` (D1 + `crypto.subtle`), `pipeline/stage5_explica.ts`, `pipeline/llm_adapter.ts` (`Workers AI` + `CircuitBreaker`), `functions/api/v1/*.ts` y suite `tests/*.test.js` (`node --test`). |
+| **🟢 ChatGPT** | **Red Teamer, Datos Sintéticos y UI Cloudflare Pages** | `data/attack_benchmark.json` (100 prompts: 50 trámites benignos + 50 ataques en español venezolano), `data/synthetic_tramites.csv` (casos sociales coherentes para calibrar pesos de `EXPLICA`), `static/index.html`, `static/styles.css` (local sin CDNs) y `static/app.js`. |
+| **🔵 Gemini** | **Auditor de Contexto Global, Integración y Pitch** | Revisión cruzada de que `static/app.js` consuma exactamente las llaves JSON de `AduanaPacket` v2.0 devueltas por `functions/api/v1/*`, redacción de `specs/01..05.spec.md`, verificación de cero `Math.random()` / cero PII en D1 y pulido del guion de 3 minutos. |
 
 ---
 
-### 3.3 Cronograma Táctico de 48 Horas (Minuto a Minuto para el Equipo)
+### 3.2 Regla de Oro para Cero Colisiones en el Equipo
 
-#### 🗓️ DÍA 1 (Viernes 13 de Noviembre): El Motor Criptográfico, Matemático y Datos Reales
-
-* **Bloque 1 (Horas 0 a 3) — Congelación de Contrato y Kernel Base:**
-  * **Acción con Claude (Gatillo 0):** Generar `core/config.py`, `core/context.py` (`AduanaPacket` inmutable) y `core/ephemeral_vault.py` (bóveda en RAM con TTL de 180s y `zeroize()`).
-  * **Acción con ChatGPT:** Generar `data/synthetic_tramites.csv` (200 filas de trámites sociales venezolanos con correlación lógica real entre vulnerabilidad, carga familiar y prioridad) y `data/attack_benchmark.json` (50 consultas benignas de SAIME/IVSS/Salud/Becas + 50 ataques de Prompt Injection, DAN, Base64 y fuga de Canary).
-  * **Hito de Control (Hora 3):** `pytest tests/test_ca05_restrictive_db.py` pasa en verde.
-
-* **Bloque 2 (Horas 3 a 8) — Construcción Paralela de las Etapas 1, 2 y 3 (`SHIELD` + `GUARDIÁN`):**
-  * **Integrante A con Claude (Gatillo 1):** Construye `pipeline/stage1_shield.py` con Regex venezolano, validador matemático **Módulo 11 SENIAT** para RIF, diccionario clínico `frozenset` y generación de `blind_citizen_id` HMAC. Corre `pytest tests/test_ca01_shield.py`.
-  * **Integrante B con Claude (Gatillo 2):** Construye `pipeline/stage2_guard_in.py` (normalización `NFKC`, decodificador Base64 preventivo, heurísticas + N-gramas, delimitadores XML y Canary HMAC dinámico) y `pipeline/stage3_guard_out.py` + `run_security_benchmark()`. Corre `pytest tests/test_ca02_guardian.py` verificando $\text{TPR} \ge 88\%$.
-  * **Hito de Control (Hora 8):** `SHIELD` y `GUARDIÁN` procesan textos reales en $< 20\text{ ms}$ cada uno.
-
-* **Bloque 3 (Horas 8 a 14) — Construcción Paralela de Etapas 4 y 5 (`LEDGER` + `EXPLICA`):**
-  * **Integrante A con Claude (Gatillo 3):** Construye `pipeline/stage4_ledger.py` sobre SQLite con `WAL`, `secure_delete=ON`, Triggers SQL de inmutabilidad, encadenamiento `SHA-256` + firma `HMAC-SHA256`, `verify_chain()` y `simulate_tampering(block_id)`. Corre `pytest tests/test_ca03_ledger.py`.
-  * **Integrante B con Claude (Gatillo 4):** Construye `pipeline/stage5_explica.py` entrenando la Regresión Logística determinista al arrancar, calculando probabilidad sigmoide, pesos $\beta_j x_j$ y **Valores SHAP Lineales** $\phi_j = \beta_j(x_j - \mu_j)$, más la validación de *Human Override*. Corre `pytest tests/test_ca04_explica.py`.
-  * **Hito de Control (Hora 14 - Cierre Día 1):** Las 5 etapas del pipeline existen en Python puro y pasan sus pruebas unitarias en consola sobre Canaima GNU/Linux.
+Antes de pedir cualquier archivo a un asistente de código:
+1. Cargar [SPEC.md](../SPEC.md) y [PROMPT_MAESTRO.md](../PROMPT_MAESTRO.md) (y mantener `.cursorrules` en raíz).
+2. Exigir explícitamente: *"Respeta exactamente los tipos `readonly` de `core/context.ts`, las llaves JSON de `AduanaPacket` v2.0 y las APIs estándar de Cloudflare Workers (`env.DB`, `env.AI`, `env.KV`, `crypto.subtle`) dentro de 10 ms CPU"*.
 
 ---
 
-#### 🗓️ DÍA 2 (Sábado 14 de Noviembre): Interconectividad, Interfaz de Alto Impacto y Pulido de Demo
+### 3.3 Cronograma Táctico de 48 Horas
 
-* **Bloque 4 (Horas 14 a 18) — Conectores Multi-Modelo, Circuit Breaker y API FastAPI:**
-  * **Acción con Claude (Gatillos 5 y 6 backend):** Construir `pipeline/llm_adapter.py` (con `LocalOllamaAdapter`, `OpenAICompatibleAdapter` y `OfflineDeterministicAdapter` + `CircuitBreaker` a 3.5s) y el orquestador `app.py` con todos los endpoints REST (`/api/v1/gateway/process`, `/api/v1/ledger/verify`, `/api/v1/ledger/tamper-sim`, `/api/v1/metrics/benchmark`, `/api/v1/health/system`).
-  * **Hito de Control (Hora 18):** El servidor FastAPI levanta con `uvicorn app:app` y responde en Swagger/cURL en modo 100% desconectado de internet.
+#### 🗓️ DÍA 1: Especificación, Base D1 y Motor del Pipeline en TypeScript
 
-* **Bloque 5 (Horas 18 a 26) — Construcción del Panel Dual Offline-First (El Efecto "WOW" Visual):**
-  * **Acción con ChatGPT:** Pasar las respuestas JSON exactas de los endpoints de `app.py` y pedir un dashboard gubernamental de alta estética institucional en `static/index.html`, `static/styles.css` y `static/app.js` (tema oscuro/institucional sobrio, sin CDNs externos) que incluya:
-    1. **Selector Rápido de Casos de Demo (1 Clic):** Botones preconfigurados para el jurado (*"Cargar Trámite Médico Legítimo con PII"*, *"Lanzar Ataque Prompt Injection DAN"*, *"Lanzar Ataque Ofuscado Base64"*).
-    2. **Rayos-X del Pipeline en Vivo:** Tarjetas animadas que se iluminan en secuencia (`SHIELD` $\rightarrow$ `GUARD-IN` $\rightarrow$ `LLM` $\rightarrow$ `GUARD-OUT` $\rightarrow$ `EXPLICA` $\rightarrow$ `LEDGER`) mostrando los milisegundos de cada etapa y comparando el texto original vs. el texto con `[CEDULA_1]` y `[RIF_1]`.
-    3. **Gráfico Horizontal de Barras SHAP en `EXPLICA`:** Barras verdes para variables que suman prioridad y rojas para las que restan, más los botones de **Confirmar Recomendación** o **Sobrescribir con Justificación**.
-    4. **Consola de Contraloría Interactiva:** Visualizador de bloques encadenados con hashes truncados, botón rojo **"⚡ Simular Sabotaje en Base de Datos"**, botón **"🔍 Verificar Integridad Criptográfica"** y medidor visual del **Benchmark de 100 Ataques**.
+* **Bloque 1 (Horas 0 a 3) — Contrato, Wrangler y Esquema D1 (Gatillo 0):**
+  * **Acción:** Crear `wrangler.jsonc`, `schema.sql` (`ledger_blocks`), `core/config.ts`, `core/context.ts` (`AduanaPacket` v2.0 en TypeScript) y `core/ephemeral_vault.ts`.
+  * **Acción paralela de datos:** Generar `data/synthetic_tramites.csv` y `data/attack_benchmark.json` (50 consultas benignas + 50 ataques de Prompt Injection, DAN, Base64/Hex y fuga de Canary).
+  * **Hito de Control (Hora 3):** `wrangler d1 execute aduana-db --local --file=schema.sql` aplicado y `node --test tests/test_ca05_restrictive_db.test.js` en verde.
 
-* **Bloque 6 (Horas 26 a 34) — Auditoría Global con Gemini y Pruebas de Estrés Sin Internet:**
-  * **Acción con Gemini:** Subir todos los archivos `.py`, `.html`, `.js` y `.json` a una sesión de Gemini Pro y ejecutar el prompt: *"Audita la consistencia total entre los nombres de campos en `app.py` y `static/app.js`, verifica que todos los tests `CA-01` a `CA-06` pasen, genera los documentos formales en `specs/01..05.spec.md` y verifica que no exista ni una sola llamada a internet o `random()`"*.
-  * **Prueba de Fuego (*Air-Gap Test*):** Apagar el Wi-Fi de la laptop Canaima, reiniciar el servicio desde cero, correr `pytest -v` (todo en verde en $< 2\text{ segundos}$) y ejecutar las 3 demos en el navegador.
+* **Bloque 2 (Horas 3 a 8) — Etapas 1, 2 y 3: `SHIELD` + `GUARDIÁN` (Gatillos 1 y 2):**
+  * **Integrante A:** Implementa `pipeline/stage1_shield.ts` (Regex venezolano, Módulo 11 SENIAT con 9 pesos `[4,3,2,7,6,5,4,3,2]`, diccionario clínico, tokens `[CEDULA_1]`/`[RIF_1]` y `blind_citizen_id` HMAC vía `crypto.subtle`). Ejecuta `node --test tests/test_ca01_shield.test.js`.
+  * **Integrante B:** Implementa `pipeline/stage2_guard_in.ts` (normalización `NFKC`, decodificación Base64/Hex, heurísticas, XML Sandbox, Canary HMAC dinámico) + `pipeline/stage3_guard_out.ts` + `runSecurityBenchmark()`. Ejecuta `node --test tests/test_ca02_guardian.test.js` verificando $\text{TPR} \ge 88\%$ y $\text{FPR} \le 4\%$.
+  * **Hito de Control (Hora 8):** `SHIELD` y `GUARDIÁN` pasan sus pruebas en `< 5 ms` CPU.
 
-* **Bloque 7 (Horas 34 a 48) — *Code Freeze*, Ensayo Cronometrado de 3 Minutos y Preparación de Mesa:**
-  * **Prohibido tocar el código después de la Hora 38.** Las últimas horas se dedican exclusivamente a ensayar el pitch de 3 minutos con cronómetro y dejar en pantalla dos pestañas listas: la interfaz web de Aduana IA y una terminal mostrando los tests SDD pasando al 100%.
+* **Bloque 3 (Horas 8 a 14) — Etapas 4 y 5: `LEDGER` D1 + `EXPLICA` (Gatillos 3 y 4):**
+  * **Integrante A:** Implementa `pipeline/stage4_ledger.ts` sobre `StorageRepository` / **Cloudflare D1 (`env.DB`)** con encadenamiento SHA-256 + HMAC (`env.LEDGER_HMAC_KEY`), `verifyChain()` (`HASH_MISMATCH`, `PREV_HASH_LINK_BROKEN`, `HMAC_SIGNATURE_FORGED`) y `simulateTampering(blockIndex)`. Ejecuta `node --test tests/test_ca03_ledger.test.js`.
+  * **Integrante B:** Calibra los pesos deterministas $\beta$ y medias $\mu$ sobre `data/synthetic_tramites.csv`, los fija en `pipeline/stage5_explica.ts`, implementa sigmoide + **Valores SHAP Lineales** $\phi_j = \beta_j(x_j - \mu_j)$ y validación de *Human Override* ($\ge 20$ caracteres). Ejecuta `node --test tests/test_ca04_explica.test.js`.
+  * **Hito de Control (Hora 14 - Cierre Día 1):** Las 5 etapas en TypeScript pasan sus pruebas unitarias en consola con `node --test`.
+
+---
+
+#### 🗓️ DÍA 2: Workers AI, Pages Functions, Interfaz Dual y Despliegue en Vivo
+
+* **Bloque 4 (Horas 14 a 18) — Workers AI, Circuit Breaker y Pages Functions (Gatillos 5 y 6 backend):**
+  * **Acción:** Implementar `pipeline/llm_adapter.ts` (`WorkersAIAdapter` usando `env.AI.run('@cf/zai-org/glm-4.7-flash', ...)` + `OfflineDeterministicAdapter` + `CircuitBreaker` de 3.5s) y los endpoints en `functions/api/v1/` (`/api/v1/gateway/process`, `/api/v1/shield/inspect`, `/api/v1/ledger/verify`, `/api/v1/ledger/tamper-sim`, `/api/v1/metrics/benchmark`, `/api/v1/health/system`).
+  * **Hito de Control (Hora 18):** `npm run dev` (`wrangler pages dev static`) levanta localmente y responde en `http://127.0.0.1:8787/api/v1/health/system` usando D1 y Workers AI emulados/remotos.
+
+* **Bloque 5 (Horas 18 a 26) — Construcción del Panel Dual en `static/` (Pages):**
+  * **Acción:** Construir `static/index.html`, `static/styles.css` (100% local, cero CDNs externos) y `static/app.js` consumiendo `functions/api/v1/*`:
+    1. **Selector Rápido de Casos de Demo (1 Clic):** botones para *"Trámite Médico Legítimo con PII"*, *"Ataque Prompt Injection DAN"* y *"Ataque Ofuscado Base64"*.
+    2. **Rayos-X del Pipeline en Vivo:** tarjetas secuenciales (`SHIELD` $\rightarrow$ `GUARD-IN` $\rightarrow$ `Workers AI` $\rightarrow$ `GUARD-OUT` $\rightarrow$ `EXPLICA` $\rightarrow$ `LEDGER D1`) comparando entrada cruda vs. texto enmascarado (`[CEDULA_1]`, `[RIF_1]`) y mostrando aviso de contenido generado por IA.
+    3. **Gráfico Horizontal de Barras SHAP en `EXPLICA`:** contribuciones positivas y negativas, más botones de **Confirmar Recomendación** o **Sobrescribir con Justificación** ($\ge 20$ caracteres).
+    4. **Consola de Contraloría Interactiva:** bloques encadenados de D1, botón **"⚡ Simular Sabotaje en D1"**, botón **"🔍 Verificar Integridad Criptográfica"** y ejecutor en vivo del **Benchmark de 100 Ataques**.
+
+* **Bloque 6 (Horas 26 a 34) — Auditoría Global y Despliegue en Producción Cloudflare:**
+  * **Acción de auditoría:** Revisión cruzada de contratos JSON entre `functions/api/v1/*` y `static/app.js`, verificación de cero `Math.random()`, cero PII en D1 (`wrangler d1 execute aduana-db --remote --command "SELECT * FROM ledger_blocks LIMIT 5;"`) y `specs/01..05.spec.md` completos.
+  * **Despliegue real según Manual:**
+    1. `wrangler d1 execute aduana-db --remote --file=schema.sql`
+    2. `wrangler secret put LEDGER_HMAC_KEY` y `wrangler secret put INSTITUTION_SALT`
+    3. `wrangler pages deploy static --project-name aduana-ia`
+    4. Verificación en navegador incógnito, consola F12 limpia, móvil y `wrangler tail`.
+    5. Actualizar Demo y Video en `README.md` y en **`https://hackathon-uneti-ia.pages.dev/remoto`**.
+
+* **Bloque 7 (Horas 34 a 48) — *Code Freeze* y Ensayo Cronometrado de 3 Minutos:**
+  * **Congelar código tras la Hora 38.** Dedicar el cierre exclusivamente a ensayar la demo en vivo sobre la URL pública `*.pages.dev` y mantener lista la terminal con `node --test` en verde.
 
 ---
 
 ## 🏆 PARTE 4: ESTRUCTURA DE VENTA Y PITCH GANADOR PARA EL JURADO
 
-En un hackathon, el 70% de los equipos muestra "diapositivas con promesas" o un chatbot genérico conectado a una API que falla si el Wi-Fi del salón está lento. **Aduana IA gana porque muestra ingeniería real, criptografía verificable en vivo y soberanía tecnológica en 180 segundos.**
+Mientras otros equipos muestran diapositivas o un wrapper frágil de chat, **Aduana IA presenta una arquitectura verificable en vivo sobre Cloudflare Pages, Workers (TypeScript), D1 y Workers AI, construida bajo Spec-Driven Development desde `SPEC.md`.**
 
-### 4.1 La Estructura Psicológica de Venta en 4 Actos (3 Minutos Exactos)
+### 4.1 Guion de Demostración en Vivo (3 Minutos Exactos)
 
-#### 🔥 Acto 1: El Gancho de Impacto Nacional (0:00 a 0:30) — *El Problema que Nadie Está Viendo*
+#### 🔥 Acto 1: El Gancho de Impacto Nacional (0:00 a 0:30) — *El Problema Real*
 > **Qué decir:**  
-> *"Buenas tardes, jurado. Hoy mismo, mientras estamos en este hackathon, cientos de funcionarios y profesionales en Venezuela están pegando expedientes con Cédulas de Identidad, RIFs, diagnósticos médicos y datos presupuestarios en IAs externas para redactar informes más rápido. Quieren ser eficientes, pero sin querer están entregando la soberanía de datos del país, exponiéndose a ataques de inyección de prompts y tomando decisiones públicas sobre cajas negras que ninguna Contraloría puede auditar.*  
-> *No podemos prohibir la IA, pero tampoco podemos usarla a ciegas. Por eso creamos **Aduana IA**: la primera pasarela soberana de gobernanza, seguridad Zero-Trust y auditoría criptográfica para la IA pública venezolana, corriendo 100% nativa sobre **Canaima GNU/Linux**."*
+> *"Buenas tardes, jurado. Hoy mismo, funcionarios y analistas están pegando expedientes con Cédulas, RIFs y diagnósticos médicos directamente en inteligencias artificiales externas. Quieren agilizar trámites, pero sin querer exponen la privacidad ciudadana, quedan vulnerables a ataques de Prompt Injection y dependen de cajas negras imposibles de auditar.*  
+> *No podemos prohibir la IA, pero tampoco usarla a ciegas. Por eso construimos **Aduana IA**: una pasarela Zero-Trust corriendo en **Cloudflare Workers, D1 y Workers AI** que protege cada dato antes de tocar el modelo, explica matemáticamente la prioridad y sella cada decisión en un Ledger verificable."*
 
 #### 🛡️ Acto 2: Demo 1 — Privacidad Soberana y Justicia Matemática (0:30 a 1:25) — *SHIELD + EXPLICA*
-> **Qué hacer en pantalla:** Haz clic en el botón **"Caso 1: Trámite de Salud con Datos Reales"** y presiona **Procesar por Aduana IA**.  
+> **Qué hacer en pantalla:** Haz clic en **"Caso 1: Trámite de Salud con Datos Reales"** y presiona **Procesar por Aduana IA**.  
 > **Qué decir mientras se ilumina el pipeline:**  
-> *"Vean esto en vivo: una ciudadana solicita prioridad para un insumo médico e incluye su Cédula, su RIF, su teléfono y su diagnóstico. En solo **4 milisegundos**, nuestra primera etapa, **SHIELD**, valida matemáticamente el RIF con el **algoritmo Módulo 11 del SENIAT**, enmascara toda la información sensible con tokens reversibles solo en memoria RAM —**cero datos personales tocan jamás el disco duro**— y envía al modelo únicamente texto sanitizado.*  
-> *Al mismo tiempo, **EXPLICA** no usa números al azar ni cajas negras: ejecuta una **Regresión Logística auditable con valores SHAP lineales** que le muestra al funcionario exactamente cuántos puntos aporta la vulnerabilidad económica y la carga familiar. El modelo recomienda, pero **el funcionario tiene siempre la última palabra**, y si decide contradecir al modelo, el sistema le exige justificar por qué."*
+> *"Vean esto en vivo en nuestra URL pública: una ciudadana solicita prioridad médica e incluye su Cédula, RIF, teléfono y diagnóstico. En pocos milisegundos, **SHIELD** valida el RIF con el **algoritmo Módulo 11 del SENIAT**, sustituye los identificadores por tokens (`[CEDULA_1]`, `[RIF_1]`) y genera un índice ciego HMAC —**cero datos personales reales salen hacia Workers AI ni se guardan en D1**.*  
+> *Luego, nuestra interfaz marca claramente el resumen generado por `@cf/zai-org/glm-4.7-flash`, mientras **EXPLICA** calcula la prioridad mediante una **Regresión Logística determinista con valores SHAP lineales**. La IA resume y recomienda, pero **el funcionario humano tiene siempre la decisión final**, y si decide contradecir al modelo, el sistema le exige justificarlo por escrito."*
 
 #### 🚨 Acto 3: Demo 2 — Defensa Activa y Métricas Honestas (1:25 a 2:10) — *EL GUARDIÁN*
 > **Qué hacer en pantalla:** Haz clic en **"Caso 2: Ataque Prompt Injection + Intento de Fuga"** y luego en **"Ejecutar Benchmark de 100 Vectores"**.  
 > **Qué decir:**  
-> *"¿Qué pasa si un atacante intenta manipular la IA inyectando órdenes ocultas o texto codificado en Base64 para aprobarse un trámite sin cumplir los requisitos? Nuestro **Guardián de doble capa (`Guard-In` y `Guard-Out`)** normaliza el texto, detecta el patrón adversario e inyecta un **Canary Token criptográfico dinámico** por transacción. El ataque es neutralizado antes de causar daño.*  
-> *Y como en ingeniería seria no pedimos fe ciega ni prometemos un 100% mágico, incluimos un **Benchmark Auditable en vivo con 100 casos reales**: aquí mismo el jurado puede ver nuestra tasa real de mitigación superior al 88% con menos de 4% de falsos positivos ejecutada en milisegundos."*
+> *"¿Qué ocurre si un atacante intenta inyectar instrucciones ocultas o código Base64 para manipular la respuesta o extraer el prompt del sistema? Nuestro **Guardián (`Guard-In` y `Guard-Out`)** normaliza el texto con NFKC, evalúa el riesgo sin funciones aleatorias e inyecta un **Canary Token HMAC dinámico** por transacción, bloqueando la fuga al instante.*  
+> *Para no pedir fe ciega, incluimos un **Benchmark Auditable de 100 casos reales** ejecutable aquí mismo, mostrando nuestra tasa real de mitigación ($\text{TPR} \ge 88\%$) y falsos positivos ($\text{FPR} \le 4\%$)."*
 
-#### 🔗 Acto 4: Demo 3 y Cierre — El Golpe Maestro de Inmutabilidad (2:10 a 3:00) — *LEDGER INMUTABLE*
-> **Qué hacer en pantalla:** Cambia al **Panel de Contraloría**, muestra la cadena en **VERDE**, haz clic en **"⚡ Simular Sabotaje en Base de Datos"** y luego en **"🔍 Auditar Cadena Criptográfica"** (la pantalla pasa a **ROJO** señalando el bloque exacto).  
-> **Qué decir para cerrar con broche de oro:**  
-> *"Finalmente, cada decisión queda sellada en nuestro **Ledger Inmutable con doble sello: encadenamiento SHA-256 más firma HMAC de servidor**, entregándole un recibo criptográfico al ciudadano. ¿Qué ocurre si mañana alguien con acceso de administrador entra directo al archivo SQLite e intenta cambiar un dictamen de 'Rechazado' a 'Aprobado'? Hagámoslo ahora mismo en vivo... Al auditar la cadena, en menos de 20 milisegundos **Aduana IA detecta el sabotaje con precisión quirúrgica en el bloque exacto**.*  
-> *Desarrollado bajo metodología **SDD estricta**, con **cero dependencias de internet**, menos de 80 MB de RAM en **Canaima GNU/Linux** y listo para proteger desde una alcaldía hasta la banca nacional. Con **Aduana IA**, Venezuela no solo consume Inteligencia Artificial: la gobierna con soberanía, ética y seguridad verificable. Muchas gracias."*
+#### 🔗 Acto 4: Demo 3 y Cierre — Inmutabilidad en Cloudflare D1 (2:10 a 3:00) — *LEDGER D1*
+> **Qué hacer en pantalla:** Cambia al **Panel de Contraloría**, muestra la cadena en **VERDE**, haz clic en **"⚡ Simular Sabotaje en D1"** y luego en **"🔍 Verificar Integridad Criptográfica"** (cambia a **ROJO** señalando el bloque exacto).  
+> **Qué decir para cerrar:**  
+> *"Finalmente, cada transacción queda sellada en **Cloudflare D1** con **doble sello: encadenamiento SHA-256 más firma HMAC-SHA256** cuya llave vive aislada en Cloudflare Secrets, emitiendo un recibo verificable al ciudadano. ¿Qué pasa si alguien con acceso directo a la base de datos intenta alterar un dictamen histórico? Simulémoslo ahora... Al auditar la cadena con Web Crypto API, **Aduana IA detecta el sabotaje con precisión quirúrgica en el bloque exacto y señala la causa**.*  
+> *Especificado primero en `SPEC.md`, ejecutándose en TypeScript sobre el Edge con degradación elegante si el modelo falla y código abierto bajo GPL v3. Muchas gracias."*
 
 ---
 
-### 4.2 Argumentos Ganadores según el Perfil de cada Miembro del Jurado
+### 4.2 Argumentos Clave según el Perfil del Jurado
 
-| Perfil del Jurado | Qué es lo que más valora | Tu frase clave para convencerlo |
+| Perfil del Jurado | Qué Valora | Frase Clave de Defensa |
 | :--- | :--- | :--- |
-| **👨‍💻 El Ingeniero / Ciber-seguridad** | Rigor técnico, que no sea un "wrapper de ChatGPT" con `if/else` falsos ni `random()`. | *"Implementamos validación real Módulo 11 SENIAT, normalización Unicode NFKC contra evasión visual, valores SHAP lineales exactos ($\phi_j = \beta_j(x_j - \mu_j)$) y doble sello SHA-256 + HMAC con `PRAGMA secure_delete=ON` en SQLite. Aquí tienes nuestra suite de `pytest` corriendo en vivo."* |
-| **🏛️ El Institucional / Académico (UNETI / Estado)** | Soberanía tecnológica, cumplimiento legal, ética y que funcione en la infraestructura real del país. | *"Cumplimos los artículos 28 y 60 de la Constitución y la Ley de Infogobierno: ningún dato personal se graba en disco ni sale en claro fuera de la institución, corre en Canaima GNU/Linux con 80 MB de RAM y funciona incluso sin internet gracias a nuestro Circuit Breaker."* |
-| **📈 El Estratega / *Venezuela Innova*** | Escalabilidad nacional, modelo de sostenibilidad y facilidad de adopción en múltiples sectores. | *"Aduana IA no reemplaza los sistemas actuales del Estado ni de la Banca; se coloca delante como una pasarela enchufable en 10 minutos, ahorrando hasta un 60% en costos de cómputo y abriendo un modelo sostenible de soporte institucional y licenciamiento bancario SUDEBAN."* |
+| **👨‍💻 Ingeniero / Ciberseguridad** | Rigor técnico, que no sea un wrapper con `if/else` falsos ni `Math.random()`. | *"Validación real Módulo 11 SENIAT, normalización Unicode NFKC, valores SHAP lineales exactos ($\phi_j = \beta_j(x_j - \mu_j)$) y doble sello SHA-256 + HMAC con `crypto.subtle` en Cloudflare Workers/D1 dentro del límite de 10 ms CPU."* |
+| **🏛️ Institucional / Ética IA** | Cumplimiento de `SPEC.md`, privacidad ciudadana, explicabilidad y control humano. | *"Alineado con los Arts. 28 y 60 de la Constitución y la Ley de Infogobierno: ningún dato personal viaja a Workers AI ni se graba en D1, marcamos las salidas de IA y el humano siempre decide con trazabilidad de overrides."* |
+| **📈 Estratega / *Venezuela Innova*** | Escalabilidad, costo de despliegue y modelo sostenible. | *"Arranca a costo cero en Cloudflare Free Tier y, gracias a `StorageRepository` y `LLMAdapter`, se enchufa delante de sistemas existentes con un modelo sostenible de implantación B2G y licenciamiento SLA para banca y salud."* |
 
 ---
 
-### 4.3 Checklist de Victoria (15 Minutos Antes de que el Jurado Llegue a tu Mesa)
+### 4.3 Checklist Final de Demo (15 Minutos Antes de Evaluar)
 
-1. **Modo Offline Verificado:** Comprueba que la interfaz carga todos sus estilos, iconos y gráficos con el Wi-Fi desconectado (por si la red del salón colapsa durante la evaluación).
-2. **Base de Datos Limpia con 5 Bloques Iniciales:** Ten pre-cargados 4 o 5 trámites variados en el `LEDGER` (aprobados, rechazados y un intento de ataque bloqueado) para que la cadena criptográfica ya luzca poblada e interesante desde el primer segundo.
-3. **Terminal Abierta en Segundo Plano:** Deja una ventana de terminal visible con la ejecución reciente de `pytest -v` mostrando los 6 criterios de aceptación (`CA-01` a `CA-06`) en **`PASSED (100%)`**. Si un juez técnico pregunta *"¿Cómo sé que esto sigue SDD?"*, le muestras la terminal en 2 segundos.
+1. **Despliegue Público Verificado:** Confirmar la URL en `*.pages.dev` en pestaña incógnito y revisar `wrangler tail` sin errores 5xx ni logs con PII.
+2. **Cadena D1 Poblada:** Tener 4 o 5 trámites variados ya sellados en `ledger_blocks` remoto (aprobados, con override justificado y un ataque bloqueado) para que la auditoría luzca viva desde el primer segundo.
+3. **Suite de Pruebas SDD Lista:** Tener una terminal con la ejecución reciente de `node --test` mostrando `CA-01` a `CA-06` en verde, y `SPEC.md` abierto si el jurado pregunta por la declaración de uso de IA.
 4. **Roles del Equipo en el Pitch:**
-   - **Vocero Principal (Storyteller):** Lleva el hilo conductor de los 3 minutos sin leer texto de la pantalla.
-   - **Operador de Consola (Piloto de Demo):** Ejecuta los clics exactos en el momento en que el vocero los menciona (Caso 1 $\rightarrow$ Ataque + Benchmark $\rightarrow$ Sabotaje Ledger).
-   - **Defensor Técnico / Criptográfico:** Listo para responder al instante las preguntas de arquitectura, fórmulas matemáticas de `EXPLICA` y almacenamiento restrictivo.
+   - **Vocero Principal:** Conduce los 3 minutos sin leer la pantalla.
+   - **Piloto de Demo:** Ejecuta los clics exactos (Caso 1 $\rightarrow$ Ataque + Benchmark $\rightarrow$ Sabotaje D1 + Verificación).
+   - **Defensor Técnico:** Responde preguntas sobre criptografía `crypto.subtle`, límites de Workers/D1 y fórmulas de `EXPLICA`.

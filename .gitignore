@@ -18,13 +18,6 @@ dist/
 *.sqlite
 *.sqlite3
 
-# Python (si se usan scripts auxiliares offline)
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.venv/
-venv/
-
 # Logs
 *.log
 logs/
