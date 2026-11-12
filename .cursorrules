@@ -1,0 +1,11 @@
+# REGLAS INQUEBRANTABLES DE INGENIERÍA — ADUANA IA (CLOUDFLARE + SDD)
+
+1. SPEC PRIMERO (REGLA DE ORO): Lee `SPEC.md` y `PROMPT_MAESTRO.md` antes de escribir código. No generes código sin actualizar primero `specs/<etapa>.spec.md` y definir su test en `tests/`.
+2. STACK OFICIAL CLOUDFLARE: Todo código de producción corre en TypeScript/JS sobre Cloudflare Pages + Pages Functions / Workers + Cloudflare D1 (`env.DB`) + Workers AI (`env.AI`, `@cf/zai-org/glm-4.7-flash`) + Web Crypto API (`crypto.subtle`). Prohibido generar backend Python/FastAPI para el MVP.
+3. PRESUPUESTO EDGE: Mantener CPU de pipeline < 5 ms (límite free de Workers: 10 ms/invocación). Sin librerías pesadas ni compilación nativa compleja.
+4. ZERO-PLAINTEXT-PII EN D1 Y LOGS: Nunca persistir `raw_input` ni PII real en Cloudflare D1 ni imprimirlo en `console.log`/`console.error`. Usar `blind_citizen_id` (HMAC-SHA256) y `EphemeralVault` (RAM / KV con TTL <= 180s).
+5. CONTRATO ÚNICO: Respetar exactamente los nombres de campos del JSON `AduanaPacket` v2.0 y los tipos `readonly` de `core/context.ts`, además de los tokens `[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[CLINICAL_1]`.
+6. CERO `Math.random()`: Ningún score de riesgo (`GUARD-IN`) ni probabilidad/SHAP (`EXPLICA`) puede usar funciones aleatorias. RIF venezolano validado con Módulo 11 SENIAT (pesos `[4,3,2,7,6,5,4,3,2]`).
+7. ÉTICA IA Y OFFLINE-FIRST UI: Enviar solo texto anonimizado a `env.AI`, etiquetar contenido generado por IA en UI, exigir decisión humana (con justificación >= 20 chars en override) y prohibir CDNs externos en `static/`.
+8. SECRETOS: Nunca hardcodear claves HMAC o sales. Usar `wrangler secret put` y `.dev.vars`.
+

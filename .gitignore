@@ -1,0 +1,37 @@
+# Node / Cloudflare / Frontend build
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+.dev.vars.*
+
+# Secretos y entorno local
+.env
+.env.*
+*.pem
+*.key
+
+# Bases de datos locales SQLite/D1
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Python (si se usan scripts auxiliares offline)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Logs
+*.log
+logs/
+
+# Editores y SO
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

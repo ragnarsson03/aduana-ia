@@ -1,0 +1,33 @@
+{
+  "name": "aduana-ia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pasarela soberana de gobernanza Zero-Trust, anonimización PII, defensa contra Prompt Injection, explicabilidad White-Box y auditoría criptográfica sobre Cloudflare.",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "wrangler pages dev static",
+    "deploy": "wrangler pages deploy static"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ragnarsson03/aduana-ia.git"
+  },
+  "keywords": [
+    "ai-governance",
+    "prompt-injection",
+    "pii-anonymization",
+    "explainable-ai",
+    "cloudflare-workers",
+    "cloudflare-d1",
+    "zero-trust"
+  ],
+  "license": "GPL-3.0-only",
+  "bugs": {
+    "url": "https://github.com/ragnarsson03/aduana-ia/issues"
+  },
+  "homepage": "https://github.com/ragnarsson03/aduana-ia#readme"
+}
