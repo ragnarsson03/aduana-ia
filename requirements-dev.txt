@@ -1,0 +1,7 @@
+# Herramientas de desarrollo y pruebas (no se despliegan)
+-r requirements.txt
+pytest>=8.2.0,<10.0.0
+ruff>=0.6.0
+mypy>=1.10.0
+bandit>=1.7.9
+pip-audit>=2.7.0

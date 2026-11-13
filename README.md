@@ -72,10 +72,12 @@ Inicia la pasarela como servicio API de alta concurrencia impulsado por **Litest
 # Iniciar servidor Litestar
 python -m app.server
 # O utilizando el runner Granian directamente:
-granian --interface asgi app.server:app --host 0.0.0.0 --port 8000
+granian --interface asgi --factory --workers 1 app.server:create_app --host 127.0.0.1 --port 8000
 ```
+- **Seguridad:** escucha solo en loopback; un host remoto exige `ADUANA_ALLOW_REMOTE=1` (más TLS y autenticación). `workers=1` es obligatorio (bóveda, llaves y rate-guard viven en el proceso). Las rutas `/api/v1/*` exigen `X-Aduana-Token` (`ADUANA_API_TOKEN` o generado al arrancar).
+- **Llaves:** con `ADUANA_MASTER_KEY` (hex, ≥ 32 bytes) el ledger es persistente y verificable entre reinicios; sin ella, llave y ledger efímeros (modo demo). `ADUANA_DEMO_MODE=1` habilita `/api/v1/ledger/tamper-sim` (siempre sobre copia en RAM).
 - **Panel Web Unificado:** abre `http://127.0.0.1:8000` en tu navegador.
-- **Documentación OpenAPI 3.1 en vivo:** visita `http://127.0.0.1:8000/schema`.
+- **Documentación OpenAPI:** deshabilitada (su UI cargaba CDNs externos; incompatible con Air-Gapped).
 
 ### Modo B: Aplicación de Escritorio Nativa (PyWebView)
 Para funcionarios en estaciones de trabajo de ministerios o alcaldías (Windows 10/11 o Linux) sin requerir navegador abierto ni configuraciones de red:
