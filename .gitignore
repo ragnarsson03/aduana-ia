@@ -1,17 +1,25 @@
-# Node / Cloudflare / Frontend build
-node_modules/
-.wrangler/
-dist/
-.dev.vars
-.dev.vars.*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Secretos y entorno local
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Secretos y variables locales
 .env
 .env.*
 *.pem
 *.key
 
-# Bases de datos locales SQLite/D1
+# Bases de datos SQLite locales y journals WAL/SHM
 *.db
 *.db-wal
 *.db-shm

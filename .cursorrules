@@ -1,11 +1,19 @@
-# REGLAS INQUEBRANTABLES DE INGENIERÍA — ADUANA IA (CLOUDFLARE + SDD)
+# REGLAS INQUEBRANTABLES DE INGENIERÍA — ADUANA IA (PYTHON 2026 + SDD)
 
-1. SPEC PRIMERO (REGLA DE ORO): Lee `SPEC.md` y `PROMPT_MAESTRO.md` antes de escribir código. No generes código sin actualizar primero `specs/<etapa>.spec.md` y definir su test en `tests/`.
-2. STACK OFICIAL CLOUDFLARE: Todo código de producción corre en TypeScript/JS sobre Cloudflare Pages + Pages Functions / Workers + Cloudflare D1 (`env.DB`) + Workers AI (`env.AI`, `@cf/zai-org/glm-4.7-flash`) + Web Crypto API (`crypto.subtle`). Prohibido generar backend Python/FastAPI para el MVP.
-3. PRESUPUESTO EDGE: Mantener CPU de pipeline < 5 ms (límite free de Workers: 10 ms/invocación). Sin librerías pesadas ni compilación nativa compleja.
-4. ZERO-PLAINTEXT-PII EN D1 Y LOGS: Nunca persistir `raw_input` ni PII real en Cloudflare D1 ni imprimirlo en `console.log`/`console.error`. Usar `blind_citizen_id` (HMAC-SHA256) y `EphemeralVault` (RAM / KV con TTL <= 180s).
-5. CONTRATO ÚNICO: Respetar exactamente los nombres de campos del JSON `AduanaPacket` v2.0 y los tipos `readonly` de `core/context.ts`, además de los tokens `[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[CLINICAL_1]`.
-6. CERO `Math.random()`: Ningún score de riesgo (`GUARD-IN`) ni probabilidad/SHAP (`EXPLICA`) puede usar funciones aleatorias. RIF venezolano validado con Módulo 11 SENIAT (pesos `[4,3,2,7,6,5,4,3,2]`).
-7. ÉTICA IA Y OFFLINE-FIRST UI: Enviar solo texto anonimizado a `env.AI`, etiquetar contenido generado por IA en UI, exigir decisión humana (con justificación >= 20 chars en override) y prohibir CDNs externos en `static/`.
-8. SECRETOS: Nunca hardcodear claves HMAC o sales. Usar `wrangler secret put` y `.dev.vars`.
-
+1. SPEC PRIMERO (REGLA DE ORO): Lee `SPEC.md` y `PROMPT_MAESTRO.md` antes de generar código. Cada entrega debe satisfacer su especificación formal en `specs/` y sus pruebas unitarias en `tests/` (`CA-01` a `CA-06`).
+2. STACK MODERNO PYTHON 2026 (PROHIBIDO FASTAPI): Todo backend se construye sobre LITESTAR 2.10+ con `msgspec`/`pydantic v2` y servidor Granian/Litestar-CLI. Prohibido usar FastAPI (arquitectura legacy de 2018).
+3. APLICACIÓN DE ESCRITORIO Y SERVIDOR DUAL:
+   - Servidor: `app/server.py` con Litestar exponiendo la API `/api/v1/*` y sirviendo `static/`.
+   - Escritorio: `app/desktop.py` con PyWebView 5.1+ abriendo una ventana nativa de escritorio en Windows 10/11 y Linux con < 60 MB de RAM y sin Electron.
+4. TODA LA CRIPTOGRAFÍA EN EL BACKEND:
+   - Librería estándar pura de Python (`hashlib`, `hmac`, `secrets`, `unicodedata`).
+   - Doble sello: encadenamiento canónico SHA-256 (`prev_hash` -> `block_hash`) y firma HMAC-SHA256 con llave rotativa en RAM.
+   - Algoritmo oficial SENIAT Módulo 11 para RIF con 9 pesos `[4, 3, 2, 7, 6, 5, 4, 3, 2]` y prefijos `V=1, E=2, J=3, P=4, G=5, C=3`.
+   - Canary tokens dinámicos HMAC por transacción: `[[CANARY-HMAC-XXXXXXXX]]`.
+   - Índice ciego HMAC irreversible (`blind_citizen_id`).
+5. ALMACENAMIENTO RESTRICTIVO (ZERO-PLAINTEXT-PII ON DISK):
+   - `raw_input` y mapa de tokens viven exclusivamente en `EphemeralVault` en RAM con TTL de 180s y purga explícita `zeroize()`. Jamás tocan disco ni logs.
+   - Base de datos SQLite3 endurecida con `PRAGMA journal_mode=WAL;`, `PRAGMA synchronous=FULL;`, `PRAGMA secure_delete=ON;` y triggers SQL `BEFORE UPDATE/DELETE` con `RAISE(ABORT)`.
+   - Protocolo abstracto `StorageRepositoryProtocol` compatible con PostgreSQL institucional.
+6. CERO RANDOM(): Prohibido `random()` o `Math.random()`. En `EXPLICA` usar regresión logística determinista y valores SHAP lineales exactos ($\phi_j = \beta_j(x_j - \mu_j)$) con error de reconstrucción $< 10^{-9}$. Decisión humana vinculante (override exige $\ge 20$ caracteres).
+7. FRONTEND LOCAL-FIRST: Cero CDNs externos en `static/`. Debe operar al 100% desconectado de internet (Air-Gapped).

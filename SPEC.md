@@ -1,102 +1,102 @@
 # SPEC — Aduana IA: Pasarela Soberana de Gobernanza Zero-Trust
 
-> **Estado:** Especificación inicial aprobada antes de implementar código (Regla de Oro SDD — Hackathon UNETI IA 2026).
-
-## 1. Problema
-La adopción acelerada de Modelos de Lenguaje (LLMs) en organismos públicos y procesos administrativos en Venezuela expone datos ciudadanos protegidos (Cédula de Identidad, RIF, números telefónicos, cuentas bancarias de 20 dígitos y diagnósticos médicos) cuando expedientes completos se envían sin control a APIs externas o herramientas personales (*Shadow AI*). Esta práctica compromete la confidencialidad y el principio de *Habeas Data* (CRBV Arts. 28 y 60).
-
-Adicionalmente, el uso directo de IA generativa en trámites sociales o administrativos introduce tres fallas operativas críticas: 1) vulnerabilidad ante ataques de *Prompt Injection* o *Jailbreak* capaces de manipular respuestas o exfiltrar instrucciones internas, 2) opacidad algorítmica ("caja negra") que impide justificar ante una contraloría por qué se priorizó un expediente sobre otro, y 3) registros de auditoría mutables que pueden ser alterados internamente sin dejar rastro criptográfico.
-
-## 2. Usuarios
-- **Ciudadanos:** Solicitantes de trámites sociales o administrativos que requieren consentimiento explícito, protección de su PII y un comprobante verificable de procesamiento.
-- **Funcionarios Públicos:** Analistas que utilizan la pasarela como apoyo de resumen y priorización matemática transparente, manteniendo siempre la decisión vinculante (*Human-in-the-Loop*).
-- **Contraloría / Auditores:** Supervisores internos o de seguridad (CNTI / SUSCERTE) encargados de verificar la integridad matemática del Ledger en D1 y auditar métricas de mitigación adversaria.
-
-## 3. Alcance del MVP
-- **SÍ hará (48h):**
-  - Pipeline secuencial en TypeScript sobre Cloudflare Pages Functions / Workers: `Consent` → `SHIELD` → `GUARD-IN` → `Workers AI (con Fallback Determinista)` → `GUARD-OUT` → `EXPLICA` → `LEDGER`.
-  - Interfaz dual local-first en Cloudflare Pages (`Panel del Funcionario` y `Panel de Contraloría / Auditoría`) sin dependencias de CDNs externos.
-  - Persistencia inmutable (*Append-Only*) en Cloudflare D1 con detección de sabotaje SHA-256 + HMAC y benchmark reproducible de 100 prompts (`data/attack_benchmark.json`).
-- **NO hará (fuera de alcance del MVP):**
-  - Integración directa en producción con bases de datos legadas del SAIME, SENIAT o IVSS (se emplearán casos y datasets sintéticos auditables).
-  - Despliegue de modelos LLM auto-hospedados con GPU dedicada en el Hackathon (se usará Cloudflare Workers AI con respaldo determinista offline).
-
-## 4. Requisitos funcionales
-- **RF0 (Consentimiento y Tasa):** Rechazar con estado `BLOCKED_NO_CONSENT` toda solicitud sin consentimiento explícito (`granted === true` y `purpose_code`), generando `consent_hash` SHA-256 y aplicando límite de tasa usando `blind_citizen_id`.
-- **RF1 (`SHIELD`):** Detectar y enmascarar de forma determinista Cédulas venezolanas, RIFs (validando dígito verificador Módulo 11 SENIAT con pesos `[4,3,2,7,6,5,4,3,2]`), teléfonos nacionales, cuentas de 20 dígitos, correos y términos clínicos sensibles mediante tokens consistentes (`[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[CLINICAL_1]`) sin escribir PII en texto plano en D1.
-- **RF2 (`GUARD-IN` y `GUARD-OUT`):** Normalizar texto con Unicode `NFKC`, remover caracteres *zero-width*, inspeccionar cargas codificadas (`Base64`/`Hex`), calcular un `risk_score` determinista, aislar el texto en delimitadores XML e inyectar un `canary_token` HMAC dinámico por transacción; verificar en `GUARD-OUT` que no existan fugas del Canary, PII residual ni etiquetas XSS.
-- **RF3 (`EXPLICA` White-Box + Human-in-the-Loop):** Evaluar la prioridad del trámite mediante Regresión Logística determinista (coeficientes estáticos $\beta$ y medias $\mu$ sin `Math.random()`), devolviendo probabilidad sigmoide, contribuciones $\beta_j x_j$ y valores SHAP lineales $\phi_j = \beta_j(x_j - \mu_j)$, exigiendo justificación escrita ($\ge 20$ caracteres) si el funcionario sobrescribe la recomendación.
-- **RF4 (`LEDGER` D1 Inmutable):** Registrar cada transacción en Cloudflare D1 encadenada con SHA-256 (`prev_hash` → `block_hash`) y firmada con `HMAC-SHA256` (secreto en Cloudflare Secrets), proveyendo verificación completa de cadena y un modo controlado de simulación de sabotaje para demostración de auditoría.
-
-## 5. Criterios de aceptación
-- **CA-01 (`SHIELD`):** Dado un texto mixto con Cédula, RIF válido Módulo 11, teléfono venezolano, cuenta bancaria de 20 dígitos y diagnóstico clínico, cuando pase por `SHIELD`, entonces el 100% de los identificadores estructurados quedan tokenizados (`[CEDULA_1]`, `[RIF_1]`, etc.), se genera `blind_citizen_id` HMAC y el mapa de reversión no se persiste en D1 (`< 20 ms`).
-- **CA-02 (`GUARD-IN` / `GUARD-OUT`):** Dado el benchmark `data/attack_benchmark.json` (50 consultas benignas + 50 ataques de inyección/jailbreak/ofuscación), cuando se ejecute `run_security_benchmark()`, entonces alcanza $\text{TPR} \ge 88\%$, $\text{FPR} \le 4\%$ y bloquea el 100% de fugas del Canary dinámico (`< 25 ms` por prompt).
-- **CA-03 (`LEDGER`):** Dada una alteración manual en cualquier fila histórica de `ledger_blocks` en D1 (incluso recalculando `block_hash` sin la llave secreta HMAC), cuando se invoque `/api/v1/ledger/verify`, entonces retorna `is_valid: false`, el `corrupted_block_index` exacto y el motivo (`HASH_MISMATCH`, `PREV_HASH_LINK_BROKEN` o `HMAC_SIGNATURE_FORGED`).
-- **CA-04 (`EXPLICA`):** Dado cualquier vector de entrada $\mathbf{x}$, cuando `EXPLICA` calcule $P(y=1 \mid \mathbf{x})$, entonces $\left|(\beta_0 + \sum \beta_j x_j) - z\right| < 10^{-9}$ y cero uso de `Math.random()`.
-- **CA-05 (`Zero-Plaintext-PII`):** Dado el procesamiento de 20 trámites con PII simulado, cuando se inspeccionen los registros persistidos en D1 y los logs de ejecución, entonces existen 0 ocurrencias de Cédulas, RIFs, teléfonos o nombres originales en texto plano.
-- **CA-06 (`Resiliencia`):** Dado un fallo o timeout de Workers AI, cuando el *Circuit Breaker* conmute al adaptador determinista offline, entonces el sistema entrega la evaluación matemática de `EXPLICA` y sella el bloque en D1 sin interrumpir la atención.
-
-## 6. Arquitectura
-- **Frontend:** Cloudflare Pages (`static/` con HTML5, CSS local y Vanilla JS modular, sin CDNs externos).
-- **Backend:** Cloudflare Pages Functions (`functions/api/` en TypeScript, Web Crypto API `crypto.subtle`, consumo estricto dentro del presupuesto de `10 ms` CPU por invocación en Workers Free).
-- **Base de datos:** Cloudflare D1 (`schema.sql`, SQLite serverless en el edge para `ledger_blocks`).
-- **IA:** Cloudflare Workers AI (`env.AI`) con respaldo determinista institucional ante fallos o cuota agotada.
-- **Servicios Cloudflare usados:** Pages, Pages Functions / Workers, D1, Workers AI, KV (opcional para tokens efímeros con `expirationTtl: 180`) y Secrets (`wrangler secret put`).
-
-## 7. Modelo de datos
-Tabla principal en Cloudflare D1 (`ledger_blocks` en `schema.sql`):
-- `block_index` (`INTEGER PRIMARY KEY`)
-- `request_id` (`TEXT NOT NULL UNIQUE`)
-- `timestamp_utc` (`TEXT NOT NULL`)
-- `blind_citizen_id` (`TEXT NOT NULL` — Hash HMAC-SHA256 irreversible)
-- `payload_hash` (`TEXT NOT NULL` — SHA-256 del paquete sanitizado)
-- `prev_hash` (`TEXT NOT NULL` — Enlace al `block_hash` del bloque anterior)
-- `block_hash` (`TEXT NOT NULL` — SHA-256 canónico del bloque)
-- `hmac_signature` (`TEXT NOT NULL` — Sello HMAC-SHA256 con secreto de servidor)
-- `security_verdict` (`TEXT NOT NULL` — `CLEAN` / `BLOCKED_*`)
-- `model_recommendation` (`TEXT NOT NULL`)
-- `human_decision` (`TEXT NOT NULL`)
-- `human_override` (`INTEGER NOT NULL DEFAULT 0`)
-- `override_justification` (`TEXT`)
-- `citizen_receipt_code` (`TEXT NOT NULL`)
-
-## 8. Uso de IA (obligatorio)
-- **¿Qué modelo usas?** `@cf/zai-org/glm-4.7-flash` vía Cloudflare Workers AI (con respaldo configurable `@cf/meta/llama-3.1-8b-instruct` y adaptador determinista offline).
-- **¿Para qué lo usas?** Redacción de resúmenes institucionales y estructuración preliminar de contexto a partir de solicitudes ciudadanas ya anonimizadas.
-- **¿Qué datos le envías?** ÚNICAMENTE texto sanitizado por `SHIELD` (ej. `"La ciudadana [CEDULA_1] solicita apoyo médico por [CLINICAL_1]..."`). CERO PII real.
-- **¿Cómo mitigas sesgos?** Desacoplando el LLM generativo del puntaje de prioridad: la evaluación cuantitativa la ejecuta exclusivamente `EXPLICA` mediante Regresión Logística White-Box determinista sobre variables estandarizadas.
-- **¿Cómo explicas sus decisiones al usuario?** Mediante el desglose gráfico y numérico de contribuciones directas ($\beta_j x_j$) y valores SHAP lineales ($\phi_j = \beta_j(x_j - \mu_j)$) en el Panel del Funcionario, junto con etiqueta explícita de contenido asistido por IA.
-- **¿Qué hace la IA y qué hace el humano?** La IA resume el expediente sanitizado y `EXPLICA` emite una recomendación matemática fundada; el funcionario humano toma la decisión vinculante (confirmar o sobrescribir con justificación obligatoria $\ge 20$ caracteres registrada en el Ledger).
-
-## 9. Ética y privacidad
-- **Datos personales tratados:** Cédula, RIF, teléfono, cuenta bancaria de 20 dígitos, correo y condiciones clínicas sensibles (tratados únicamente de forma transitoria en memoria de ejecución / KV efímero con TTL máximo de 180s).
-- **Consentimiento:** Validación obligatoria del consentimiento ciudadano (`granted: true`, `purpose_code`) antes de ejecutar el pipeline, generando `consent_hash` auditable.
-- **Retención:** Política *Zero-Plaintext-PII* en disco y en D1. El mapa de reversión se destruye al finalizar la transacción; D1 conserva únicamente índices ciegos HMAC y hashes SHA-256.
-- **Riesgos identificados y mitigación:**
-  - *Exfiltración hacia LLM:* mitigado con `SHIELD` antes de invocar `env.AI`.
-  - *Prompt Injection / Fuga de sistema:* mitigado con normalización `NFKC`, scoring heurístico, sandbox XML y Canary HMAC verificado en `GUARD-OUT`.
-  - *Sabotaje interno de base de datos:* mitigado con cadena SHA-256 + doble firma HMAC y verificación íntegra en `/api/v1/ledger/verify`.
-
-## 10. Métricas de éxito
-- Detección de PII estructurado venezolano: **100% Recall** en `CA-01`, `< 20 ms`.
-- Defensa contra Prompt Injection en benchmark de 100 casos: **TPR $\ge 88\%$**, **FPR $\le 4\%$**, `< 25 ms`.
-- Error de reconstrucción del *logit* en `EXPLICA`: **$< 10^{-9}$** sin llamadas aleatorias.
-- Detección de alteración en cadena D1 (`LEDGER`): **100% detección** con identificación exacta de bloque y causa.
-- Presupuesto de ejecución en Edge: procesamiento de seguridad y auditoría dentro del límite de **10 ms CPU** del plan gratuito de Cloudflare Workers.
+> **Estado:** Especificación Formal SDD v3.0 (Python 2026 — Litestar + PyWebView Desktop + Criptografía Pura).  
+> **Normativa de Referencia:** CRBV Arts. 28 y 60, Ley de Infogobierno, Ley Especial contra Delitos Informáticos, Lineamientos CNTI / SUSCERTE.
 
 ---
 
-## Declaración Obligatoria de Uso de IA (Paso 0.2)
+## 1. Problema
+La adopción acelerada de Modelos de Lenguaje (LLMs) en ministerios, gobernaciones y entes públicos en Venezuela expone datos ciudadanos protegidos (Cédula de Identidad, RIF, teléfonos, cuentas bancarias de 20 dígitos y diagnósticos clínicos) cuando expedientes completos se envían sin control a APIs externas o herramientas personales (*Shadow AI*). Esta práctica compromete la confidencialidad y el principio de *Habeas Data* (CRBV Arts. 28 y 60).
 
-| Pregunta | Respuesta |
+Adicionalmente, el uso directo de IA generativa en trámites introduce tres fallas críticas:
+1. **Manipulación adversaria (*Prompt Injection / Jailbreak*):** inyección de instrucciones para alterar dictámenes o exfiltrar directrices internas.
+2. **Opacidad algorítmica ("caja negra"):** asignación de prioridades en becas o salud sin justificación matemática auditable por Contraloría.
+3. **Vulnerabilidad de registros de auditoría:** bases de datos mutables donde un administrador o intruso puede alterar historiales sin detección criptográfica inmediata.
+
+---
+
+## 2. Usuarios
+- **Ciudadanos:** Titulares de datos personales que exigen consentimiento explícito, anonimización irreversible y comprobante criptográfico de trámite (`citizen_receipt_code`).
+- **Funcionarios Públicos (Analistas):** Operadores que utilizan la pasarela en su estación de trabajo (**Aplicación de Escritorio** o **Portal Web**) para recibir resúmenes de IA sobre datos ya anonimizados y un dictamen explicable transparente, manteniendo la decisión final (*Human-in-the-Loop*).
+- **Contraloría / Auditores (SUSCERTE / CNTI):** Inspectores que auditan la cadena criptográfica inmutable en tiempo real y verifican la resistencia adversaria contra inyección de prompts.
+- **Administradores TI:** Responsables de desplegar el **Servidor Litestar** (on-premise en Linux/Windows Server) o distribuir el ejecutable de **Escritorio PyWebView** en estaciones Windows 10/11.
+
+---
+
+## 3. Alcance del MVP
+- **SÍ hará:**
+  - **Servidor Backend Moderno en Python 2026:** Motor asíncrono sobre **Litestar** con serialización ultra-rápida `msgspec`/`pydantic v2` y servidor **Granian** (o Uvicorn), reemplazando arquitecturas legacy de FastAPI.
+  - **Aplicación de Escritorio Nativa:** Lanzador y ventana nativa de escritorio mediante **PyWebView** sin sobrecarga de Electron, con interfaz local offline-first (< 60 MB RAM).
+  - **Criptografía Pura y Almacenamiento Restrictivo:** Bóveda efímera en memoria RAM (`EphemeralVault`) con TTL de 180s y destrucción criptográfica (`zeroize`), índice ciego HMAC (`blind_citizen_id`), doble sello `SHA-256` encadenado + `HMAC-SHA256` de servidor, y algoritmo oficial SENIAT Módulo 11 para RIF.
+  - **Defensa Multicapa (Guardián):** Normalización canónica Unicode `NFKC`, eliminación de caracteres *zero-width*, sandbox XML, y *Canary Tokens* dinámicos HMAC por transacción.
+  - **Explicabilidad White-Box:** Regresión Logística determinista con cálculo exacto de valores SHAP lineales ($\phi_j = \beta_j(x_j - \mu_j)$) y supervisión humana vinculante (*Human-in-the-Loop* con override justificado $\ge 20$ caracteres).
+  - **Persistencia Endurecida:** Motor SQLite3 con directivas `WAL`, `synchronous=FULL`, `secure_delete=ON` y triggers SQL `BEFORE UPDATE/DELETE` de inmutabilidad (con interfaz abstracta compatible con PostgreSQL institucional).
+- **NO hará:**
+  - Integración directa en producción con bases de datos en vivo de SAIME o SENIAT (se validará con datasets sintéticos auditables).
+  - Descarga obligatoria de pesos LLM de 500 MB en tiempo de arranque (incluye modo fallback institucional determinista 100% offline).
+
+---
+
+## 4. Requisitos Funcionales (RF)
+- **RF0 (Consentimiento y Rate-Guard):** Rechazar con código `BLOCKED_NO_CONSENT` peticiones sin consentimiento explícito (`granted=True`, `purpose_code`), calculando `consent_hash` SHA-256 y limitando tasa por `blind_citizen_id`.
+- **RF1 (`SHIELD` — Anonimización Soberana):** Enmascarar Cédulas, RIFs (validando dígito verificador Módulo 11 SENIAT con pesos `[4,3,2,7,6,5,4,3,2]`), teléfonos nacionales, cuentas bancarias de 20 dígitos y patologías sensibles con tokens coherentes (`[CEDULA_1]`, `[RIF_1]`, etc.) sin persistir PII en disco.
+- **RF2 (`GUARD-IN` y `GUARD-OUT` — Defensa Activa):** Normalizar texto con `NFKC`, bloquear evasiones Base64/Hex, calcular `risk_score` determinista, encapsular en XML inmutable con Canary HMAC dinámico, y verificar en salida que no exista fuga de Canary, PII residual ni etiquetas ejecutables XSS.
+- **RF3 (`EXPLICA` — Explicabilidad White-Box):** Calcular probabilidad sigmoide $P(y=1\mid\mathbf{x}) = \frac{1}{1+e^{-z}}$ y valores SHAP lineales sin invocar `random()`, exigiendo confirmación del funcionario o justificación escrita ($\ge 20$ caracteres) si hay override.
+- **RF4 (`LEDGER` — Trazabilidad Inmutable):** Registrar bloques encadenados con SHA-256 y firma HMAC-SHA256 del servidor, proveyendo auditoría completa en `/api/v1/ledger/verify` con detección exacta de manipulación (`HASH_MISMATCH`, `PREV_HASH_LINK_BROKEN`, `HMAC_SIGNATURE_FORGED`) y emisión de recibo ciudadano.
+
+---
+
+## 5. Criterios de Aceptación (CA-01 a CA-06)
+- **CA-01 (`SHIELD`):** Enmascara el 100% de identificadores estructurados venezolanos en $< 20\text{ ms}$, valida Módulo 11 SENIAT, genera `blind_citizen_id` HMAC y almacena el mapa de reversión exclusivamente en RAM.
+- **CA-02 (`GUARDIÁN`):** Sobre el benchmark local de 100 prompts (`data/attack_benchmark.json`), alcanza $\text{TPR} \ge 88\%$, $\text{FPR} \le 4\%$ en $< 25\text{ ms}$ por prompt y neutraliza el 100% de intentos de fuga de Canary.
+- **CA-03 (`LEDGER`):** Ante la alteración de un solo bit en la base de datos (incluso recalculando hashes SHA-256 sin la clave HMAC en RAM), `/api/v1/ledger/verify` retorna `is_valid=False`, el `corrupted_block_index` exacto y el motivo de fallo en $< 50\text{ ms}$.
+- **CA-04 (`EXPLICA`):** Para cualquier vector $\mathbf{x}$, retorna $P(y=1\mid\mathbf{x})$, contribuciones $\beta_j x_j$ y valores SHAP lineales $\phi_j$ reconstruyendo el *logit* $z$ con error $< 10^{-9}$ y cero uso de `random()`.
+- **CA-05 (`Zero-Plaintext-PII`):** Tras procesar 20 trámites simulados, una auditoría binaria del archivo `.db` y logs comprueba **0 bytes** de Cédulas, RIFs o teléfonos en texto plano.
+- **CA-06 (`Resiliencia y Desktop`):** Ante caída o timeout del LLM externo, el *Circuit Breaker* conmuta en $< 100\text{ ms}$ al generador institucional determinista, sellando el trámite tanto en modo Servidor Litestar como en la App de Escritorio PyWebView.
+
+---
+
+## 6. Arquitectura Técnica (Python 2026)
+
+| Componente | Tecnología Seleccionada | Justificación Técnica |
+|---|---|---|
+| **Servidor API Web** | **Litestar 2.10+** (ASGI) + **Granian** / Uvicorn | Framework Python de última generación (2026): tipado estricto nativo, OpenAPI 3.1, inyección de dependencias desacoplada y rendimiento superior sin la deuda técnica de FastAPI 2018. |
+| **Serialización / Contratos** | **msgspec / Pydantic v2** (`@dataclass(slots=True, frozen=True)`) | Serialización estructurada en C/Rust hasta 10x más rápida que Pydantic v1, consumo de RAM reducido en 40%. |
+| **Aplicación de Escritorio** | **PyWebView 5.1+** (Native Webview) | Empaqueta la interfaz del funcionario en una ventana nativa de escritorio (Windows 10/11 y Linux) sin Electron ni compilación pesada (< 60 MB RAM). |
+| **Criptografía Backend** | Python Standard Library (`hashlib`, `hmac`, `secrets`, `unicodedata`) | Cero dependencias binarias externas complejas: SHA-256 canónico, HMAC-SHA256 con llave rotativa en RAM y normalización NFKC. |
+| **Base de Datos** | **SQLite3 Endurecido** (`WAL`, `secure_delete`, Triggers SQL) / **PostgreSQL** | Modo local portable con triggers `BEFORE UPDATE/DELETE` de inmutabilidad y abstracción `StorageRepositoryProtocol` para escalar a PostgreSQL institucional. |
+| **Interfaz de Usuario** | **HTML5 + CSS Moderno + Vanilla JS Modular** | Servida por Litestar en web y embebida por PyWebView en escritorio, 100% autónoma sin CDNs externos (Air-Gapped). |
+
+---
+
+## 7. Modelo de Datos (`ledger_blocks`)
+Esquema de la tabla inmutable en SQLite3 / PostgreSQL:
+- `block_index` (`INTEGER PRIMARY KEY`)
+- `request_id` (`TEXT NOT NULL UNIQUE`)
+- `timestamp_utc` (`TEXT NOT NULL`)
+- `blind_citizen_id` (`TEXT NOT NULL` — HMAC-SHA256 irreversible de la Cédula)
+- `payload_hash` (`TEXT NOT NULL` — SHA-256 del contenido sanitizado)
+- `prev_hash` (`TEXT NOT NULL` — Enlace al `block_hash` anterior)
+- `block_hash` (`TEXT NOT NULL` — Hash canónico del bloque)
+- `hmac_signature` (`TEXT NOT NULL` — Sello HMAC-SHA256 generado con la clave maestra en RAM)
+- `security_verdict` (`TEXT NOT NULL` — `CLEAN` / `BLOCKED_INJECTION` / etc.)
+- `model_recommendation` (`TEXT NOT NULL` — `PRIORIDAD_ALTA` / `REVISION_ESTANDAR` / etc.)
+- `human_decision` (`TEXT NOT NULL`)
+- `human_override` (`INTEGER NOT NULL DEFAULT 0`)
+- `override_justification` (`TEXT`)
+- `citizen_receipt_code` (`TEXT NOT NULL UNIQUE`)
+
+---
+
+## 8. Uso de IA y Ética Algorítmica (Declaración Oficial)
+
+| Pregunta Obligatoria | Declaración Técnica Oficial |
 |---|---|
-| ¿Usas IA en tu solución? | Sí |
-| ¿Qué modelo y por qué? | `@cf/zai-org/glm-4.7-flash` vía Cloudflare Workers AI por su baja latencia en el edge, seguimiento de instrucciones en español y disponibilidad en el plan gratuito del hackathon (con respaldo `@cf/meta/llama-3.1-8b-instruct` y modo determinista). |
-| ¿Qué problema resuelve la IA? | Asiste al funcionario resumiendo y estructurando solicitudes ciudadanas largas de forma rápida sin reemplazar el criterio humano ni el cálculo matemático. |
-| ¿Qué datos procesa? | Exclusivamente texto previamente anonimizado por `SHIELD` (tokens `[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[CLINICAL_1]`). Nunca recibe Cédulas, RIFs ni datos personales reales. |
-| ¿Cómo evitas sesgos? | El LLM tiene prohibido decidir prioridades o aprobar trámites; el puntaje proviene de un modelo lineal auditado (`EXPLICA`) con pesos fijos y transparentes, sin variables protegidas discriminatorias ni `Math.random()`. |
-| ¿Cómo explicas las decisiones? | Cada puntaje muestra sus pesos directos ($\beta_j x_j$) y valores SHAP lineales ($\phi_j$) en el Panel del Funcionario, y la interfaz identifica explícitamente la salida generada por IA. |
-| ¿Qué decides tú y qué decide la IA? | La IA resume texto sanitizado y `EXPLICA` propone una recomendación; el funcionario humano decide aprobar, revisar o hacer *override* justificado (decisión final vinculante). |
-| ¿Usaste IA para programar? | Sí (bajo metodología SDD: especificación primero, contratos tipados, código y verificación por criterios de aceptación). |
-| ¿Qué herramientas? | Antigravity, Claude, ChatGPT y Gemini. |
-
+| **¿Usas IA en tu solución?** | Sí (con arquitectura híbrida soberana). |
+| **¿Qué modelo usas y por qué?** | Conector triple desacoplado: 1) Modelos locales en intranet institucional vía Ollama/llama.cpp (`Qwen2.5-1.5B`, `Llama-3.2-1B`), 2) Nubes híbridas compatibles con OpenAI API, y 3) Adaptador determinista offline institucional ante fallos de conectividad. |
+| **¿Qué problema resuelve la IA?** | Asiste al funcionario resumiendo expedientes extensos y redactando respuestas orientativas, operando exclusivamente sobre texto previamente anonimizado. |
+| **¿Qué datos procesa?** | Únicamente texto sanitizado por `SHIELD` (`[CEDULA_1]`, `[RIF_1]`, `[PHONE_1]`, `[CLINICAL_1]`). Cero PII en texto plano llega al LLM. |
+| **¿Cómo evitas sesgos?** | El LLM no decide prioridades. La evaluación cuantitativa la realiza el módulo matemático `EXPLICA` con Regresión Logística White-Box sobre variables objetivas y coeficientes fijos, sin `random()`. |
+| **¿Cómo explicas las decisiones?** | Cada cálculo desglosa contribuciones directas ($\beta_j x_j$) y valores SHAP lineales ($\phi_j$) en la interfaz, con aviso visible de contenido asistido por IA. |
+| **¿Qué hace la IA y qué hace el humano?** | La máquina propone una recomendación fundada; el funcionario humano toma la decisión administrativa vinculante, registrando justificación obligatoria en caso de override. |
+| **¿Usaste IA para programar?** | Sí, bajo metodología SDD estricta (especificación viva en `specs/`, contratos tipados, implementación modular y pruebas unitarias `pytest` por cada criterio de aceptación). |

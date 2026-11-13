@@ -14,7 +14,7 @@
 Tienes toda la razón sobre la realidad operativa: aunque en el papel la Ley de Infogobierno y las bases del hackathon mencionen **Canaima GNU/Linux**, en la vida real el **90% de los escritorios de ministerios, alcaldías, bancos y empresas en Venezuela usan Windows 10 o Windows 11**, y sus servidores son una mezcla de **Windows Server**, Linux o **Hostings en la nube**.
 
 ### 1.1 Cómo manejamos la dualidad "Windows Real vs. Requisito Canaima del Hackathon"
-- **Tecnología 100% Agnóstica de Sistema Operativo:** Como **Aduana IA** está construido sobre Python 3.10+ estándar (`FastAPI`, `SQLite3`, `hashlib`, `hmac`, `pathlib`) y una interfaz web HTML5/JS limpia sin dependencias de sistema operativo, **el mismo código exacto corre de forma nativa en Windows 10/11/Server (con un doble clic en un archivo `iniciar_aduana.bat` o ejecutable `.exe`) y en Canaima GNU/Linux**.
+- **Tecnología 100% Agnóstica de Sistema Operativo:** Como **Aduana IA** está construido sobre Python 3.11+ moderno (`Litestar`, `PyWebView`, `SQLite3`, `hashlib`, `hmac`, `pathlib`) y una interfaz web/escritorio limpia sin dependencias de sistema operativo, **el mismo código exacto corre de forma nativa en Windows 10/11/Server (con un doble clic en un archivo `iniciar_escritorio.bat` o ejecutable `.exe`) y en Canaima GNU/Linux**.
 - **Qué decirle al jurado:** *"Diseñamos Aduana IA para cumplir al 100% con el estándar soberano de Canaima GNU/Linux sin librerías cerradas, pero siendo realistas con el parque tecnológico actual del país, también corre de forma nativa en cualquier computadora con **Windows 10, Windows 11 o Windows Server** consumiendo menos de 80 MB de RAM."*
 
 ### 1.2 Cómo integrarlo sin que tengan que reescribir sus sistemas actuales

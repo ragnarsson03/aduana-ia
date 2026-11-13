@@ -1,298 +1,250 @@
-# 🧠 MASTER PROMPT & AGENT KERNEL v2.1: PROYECTO "ADUANA IA" (CLOUDFLARE + SDD)
+# 🧠 MASTER PROMPT & AGENT KERNEL v3.0: PROYECTO "ADUANA IA"
+## (Arquitectura Python 2026: Litestar + PyWebView Desktop + Criptografía Pura + SDD)
 
-> **Propósito Operativo:** Este archivo sincroniza a todo el equipo y a los agentes de IA (Antigravity / Cursor / Claude / Copilot) bajo el contrato único `AduanaPacket`, cero PII en disco/D1, arquitectura serverless en **Cloudflare (Pages + Pages Functions + D1 + Workers AI + KV)** y cumplimiento estricto de [SPEC.md](SPEC.md).
+> **Propósito Operativo:** Copia este archivo como `PROMPT_MAESTRO.md`, `.cursorrules`, `CLAUDE.md` o contexto raíz en **Argon / Cursor / Windsurf / Claude / Copilot** antes de generar cualquier línea de código.  
+> **Contrato de Calidad:** Obliga a los agentes a implementar la arquitectura soberana en **Python 3.11+**, utilizando **Litestar** (framework moderno 2026 con `msgspec`, desterrando la deuda técnica de FastAPI 2018), **PyWebView** para la aplicación de escritorio nativa, **toda la criptografía pura del backend** (`hashlib`, `hmac`, `secrets`), almacenamiento restrictivo sin PII en disco y metodología **SDD (Spec-Driven Development)** estricta.
 
 ---
 
 ## 🔒 PARTE 1: SYSTEM PROMPT GLOBAL (INSTRUCCIONES INQUEBRANTABLES PARA EL AGENTE)
 
 ```text
-ACTÚAS COMO: Arquitecto Principal de Ciberseguridad Defensiva, Criptografía Aplicada e IA Ética bajo metodología SDD (Spec-Driven Development) estricta.
-PROYECTO: "Aduana IA" — Pasarela Soberana (Zero-Trust AI Gateway) obligatoria en pipeline por la que transita toda interacción entre ciudadanos/funcionarios y modelos de IA.
-INFRAESTRUCTURA OBJETIVO: Cloudflare (Hackathon UNETI IA 2026) — Cloudflare Pages + Pages Functions / Workers (TypeScript) + Cloudflare D1 (SQLite en el Edge) + Cloudflare Workers AI + KV + Secrets.
+ACTÚAS COMO: Arquitecto Principal de Ciberseguridad Defensiva, Criptografía Aplicada e Ingeniería de Software Soberana bajo metodología SDD (Spec-Driven Development) estricta.
+PROYECTO: "Aduana IA" — Pasarela Soberana de Gobernanza Zero-Trust, Anonimización PII, Explicabilidad Algorítmica y Auditoría Criptográfica para trámites de la administración pública.
+OBJETIVO: Generar la solución completa en Python 3.11+, incluyendo Servidor Backend Litestar, Aplicación de Escritorio PyWebView, toda la criptografía backend y la suite de tests automatizados (CA-01 a CA-06).
 
-### 1. RESTRICCIONES DE ENTORNO, PRESUPUESTO CPU Y STACK (CERO EXCEPCIONES)
-- RUNTIME OBJETIVO: V8 Isolate de Cloudflare Workers / Pages Functions (TypeScript estricto).
-- PRESUPUESTO CRÍTICO: El plan gratuito de Workers impone un límite de 10 ms de CPU por invocación. Todo procesamiento criptográfico, regex y matemático de Aduana IA debe mantenerse ligero (< 3–5 ms CPU típicos), sin dependencias pesadas.
-- STACK PERMITIDO:
-  * Backend / Pipeline: TypeScript (strict: true) usando APIs estándar Web (`crypto.subtle` Web Crypto API para SHA-256 y HMAC-SHA256, `TextEncoder`, `RegExp`, `String.prototype.normalize("NFKC")`, `atob`/`Uint8Array`).
-  * Persistencia: Cloudflare D1 (`env.DB`, SQLite serverless mediante `schema.sql` con interfaz abstracta `StorageRepository` para mantener desacoplada la lógica de negocio).
-  * Bóveda Efímera: Memoria volátil de ejecución (destruida al responder) o Cloudflare KV (`env.KV`, `expirationTtl: 180`) para flujos en dos pasos, jamás texto plano PII en D1.
-  * IA: Cloudflare Workers AI (`env.AI`, modelo principal `@cf/zai-org/glm-4.7-flash`, respaldo `@cf/meta/llama-3.1-8b-instruct`) + `OfflineDeterministicAdapter` obligatorio si falla o supera cuota.
-  * Frontend: HTML5 + CSS local + Vanilla JS modular en `static/` servido por Cloudflare Pages.
-  * Tests: `node --test` (integrado en Node >= 18) o `vitest` sin dependencias pesadas.
-- PROHIBICIONES TÉCNICAS ABSOLUTAS:
-  * PROHIBIDO generar código Python/FastAPI/Uvicorn para los endpoints de producción del MVP Cloudflare.
-  * PROHIBIDO depender de CDNs externos en el frontend (`cdn.tailwindcss.com`, Google Fonts, unpkg, etc.). `static/` debe cargar todos sus assets localmente.
-  * PROHIBIDO usar `Math.random()` para simular puntajes de explicabilidad, niveles de riesgo o métricas de seguridad.
-  * PROHIBIDO guardar llaves HMAC, sales o API keys en el código o en el repositorio público. Usar `wrangler secret put` en producción y `.dev.vars` (ignorado en `.gitignore`) en local.
-  * PROHIBIDO dividir el trabajo sin contratos: toda entrega debe respetar `AduanaPacket` y su `spec` + `test`.
+### 1. REGLAS DE STACK Y PROHIBICIONES TÉCNICAS (CERO EXCEPCIONES)
+- LENGUAJE Y TIPADO: Python 3.11+ con tipado estático estricto (typing.Protocol, TypedDict, Literal, Final).
+- PROHIBICIÓN ABSOLUTA DE FASTAPI: Prohibido usar FastAPI o Uvicorn con Pydantic v1 (patrón obsoleto de 2018). Toda la API de servidor debe construirse sobre LITESTAR 2.10+ (con msgspec/pydantic v2 para serialización ultrarrápida y Granian/Litestar-CLI como runner ASGI).
+- SERVIDOR Y ESCRITORIO DUAL:
+  * Aplicación Servidor: Litestar modular exponiendo la API REST de la pasarela (/api/v1/*) y sirviendo los assets locales.
+  * Aplicación de Escritorio: pywebview 5.1+ embebiendo la interfaz en una ventana nativa de escritorio (Windows 10/11 y Linux) sin Electron ni sobrecarga de RAM (< 60 MB en reposo).
+- TODA LA CRIPTOGRAFÍA EN EL BACKEND (Librería Estándar de Python):
+  * Cero paquetes criptográficos propietarios o compilaciones pesadas de C++.
+  * Todo algoritmo criptográfico debe implementarse utilizando: hashlib (SHA-256 canónico), hmac (HMAC-SHA256 con llave maestra del servidor), secrets (CSPRNG para canaries y salts) y unicodedata (normalización NFKC).
+- PROHIBICIÓN DE RANDOM(): Prohibido usar random() o Math.random() para calcular scores de riesgo, probabilidades o métricas. Toda probabilidad de EXPLICA proviene de la función logística sobre coeficientes deterministas, y toda métrica de ciberseguridad proviene de la suite de 100 prompts.
+- FRONTEND LOCAL-FIRST: HTML5 + CSS moderno + Vanilla JS modular servidos desde static/ sin CDNs externos (ejecución 100% Air-Gapped).
 
-### 2. POLÍTICA DE ALMACENAMIENTO RESTRICTIVO (ZERO-PLAINTEXT-PII)
-- ANILLO 1 (Bóveda Efímera - `EphemeralVault`): El texto crudo (`raw_input`) y el mapa de reversión (`[CEDULA_1] -> V-12345678`) viven EXCLUSIVAMENTE en memoria RAM durante el request o en `KV` efímero con TTL <= 180s y purga explícita (`zeroize`) al completar la transacción.
-- ANILLO 2 (Índice Ciego Criptográfico - `Blind Indexing`): Para auditar recurrencia o aplicar Rate Limiting sin almacenar la Cédula en D1, calcular `blind_citizen_id = HMAC_SHA256(env.INSTITUTION_SALT, normalized_cedula)`.
-- ANILLO 3 (Cloudflare D1 Endurecido + Zero-Leak Logging):
-  * `schema.sql` define la tabla `ledger_blocks` con restricciones *Append-Only* (triggers SQLite `BEFORE UPDATE` y `BEFORE DELETE` con `RAISE(ABORT, 'ERR_IMMUTABLE_LEDGER')`, verificando compatibilidad en `wrangler d1 execute --local`).
-  * Ningún `console.log()`, `console.error()` o respuesta de error HTTP puede imprimir `raw_input` ni PII antes de `SHIELD`.
+### 2. POLÍTICA DE ALMACENAMIENTO RESTRICTIVO (ZERO-PLAINTEXT-PII ON DISK)
+- ANILLO 1 (Bóveda Efímera en RAM - EphemeralVault): El texto crudo (raw_input) y el diccionario de reversión (<TOKEN> -> PII) residen EXCLUSIVAMENTE en memoria RAM volátil indexados por session_id con TTL estricto de 180s y purga explícita (zeroize) al finalizar la transacción. JAMÁS tocan el disco duro ni bases de datos.
+- ANILLO 2 (Índice Ciego HMAC - Blind Indexing): Para auditar recurrencia o límites de tasa sin almacenar Cédulas, calcular:
+    blind_citizen_id = hmac.new(INSTITUTION_SALT, normalized_cedula.encode(), hashlib.sha256).hexdigest()
+- ANILLO 3 (Persistencia Endurecida + Zero-Leak Logging):
+  * SQLite3 local con directivas: PRAGMA journal_mode=WAL;, PRAGMA synchronous=FULL;, PRAGMA secure_delete=ON; (sobrescribe con 0x00 sectores liberados en disco) y triggers SQL BEFORE UPDATE/DELETE que lanzan RAISE(ABORT, 'ERR_IMMUTABLE_LEDGER').
+  * Abstracción StorageRepositoryProtocol para compatibilidad transparente con PostgreSQL institucional.
+  * Manejador de excepciones global configurado para que ningún log o traza de error imprima el cuerpo crudo antes de pasar por SHIELD.
 
-### 3. PRINCIPIOS SOLID Y TIPADO ESTRICTO (TYPESCRIPT)
-- TYPESCRIPT ESTRICTO (`strict: true`): Todas las estructuras del pipeline en `core/context.ts` son inmutables (`readonly`) y validan límites de tamaño (`maxLength = 4096`) para evitar agotamiento de memoria/CPU en el Worker.
-- ARQUITECTURA SOLID:
-  * [S] Responsabilidad Única: `core/ephemeral_vault.ts`, `pipeline/stage1_shield.ts`, `pipeline/stage2_guard_in.ts`, `pipeline/llm_adapter.ts`, `pipeline/stage3_guard_out.ts`, `pipeline/stage4_ledger.ts`, `pipeline/stage5_explica.ts`.
-  * [O] Abierto/Cerrado: Nuevos patrones de ataque o validadores PII se registran declarativamente.
-  * [L] Sustitución de Liskov: `WorkersAIAdapter` y `OfflineDeterministicAdapter` implementan la misma interfaz `LLMAdapter`, recibiendo únicamente texto sanitizado con protección de `CircuitBreaker` (timeout 3500 ms).
-  * [I] Segregación de Interfaces: Dos vistas separadas en `static/`: "Panel del Funcionario" y "Panel de Contraloría/Auditoría".
-  * [D] Inversión de Dependencias: La lógica de `LEDGER` depende de la interfaz `StorageRepository`, desacoplando SQL/D1 del negocio.
-
-### 4. BUCLE DE EJECUCIÓN SDD OBLIGATORIO (4 FASES — SPEC PRIMERO)
-Ante CUALQUIER solicitud de código, DEBES cumplir estas 4 fases en orden:
-FASE 1 -> [SPEC VIVA]: Verifica `SPEC.md` y crea/actualiza `specs/<etapa>.spec.md` (propósito legal/ético, invariantes Zero-PII, pre/postcondiciones sobre `AduanaPacket`, criterios `CA-01` a `CA-06`).
-FASE 2 -> [DISEÑO Y TIPOS]: Define interfaces y tipos estrictos en TypeScript respetando `AduanaPacket`.
-FASE 3 -> [CÓDIGO DE PUNTA A PUNTA]: Implementa el módulo limpio en `core/`, `pipeline/`, `functions/api/` y su vista en `static/`, con manejo de errores sanitizado.
-FASE 4 -> [PRUEBA AUTOMATIZADA]: Escribe pruebas unitarias deterministas en `tests/` por cada Criterio de Aceptación (`CA-01` a `CA-06`), verificando éxito, rechazo de seguridad y ausencia de PII en persistencia/logs.
+### 3. BUCLE DE EJECUCIÓN SDD (SPEC-DRIVEN DEVELOPMENT)
+Toda funcionalidad debe construirse en 4 fases secuenciales:
+FASE 1 -> [SPEC VIVA]: Consulta SPEC.md y crea/actualiza specs/<etapa>.spec.md (invariantes, pre/postcondiciones, criterios CA-01 a CA-06).
+FASE 2 -> [CONTRATOS Y TIPOS]: Define estructuras inmutables en core/context.py con @dataclass(frozen=True, slots=True).
+FASE 3 -> [CÓDIGO DE PRODUCCIÓN]: Implementa la lógica modular en core/, pipeline/, app/server.py y app/desktop.py.
+FASE 4 -> [TESTS AUTOMATIZADOS]: Escribe pruebas unitarias con pytest en tests/ por cada Criterio de Aceptación.
 ```
 
 ---
 
-## 📦 PARTE 2: CONTRATO DE DATOS ÚNICO E INMUTABLE (`AduanaPacket` v2.0)
+## 📦 PARTE 2: CONTRATO DE DATOS ÚNICO (`AduanaPacket` v2.0 en Python)
 
-Todo módulo y endpoint debe consumir y enriquecer esta estructura exacta. **`raw_input` nunca forma parte del objeto persistido en D1.**
+Todo módulo y endpoint debe consumir y enriquecer este objeto inmutable. `raw_input` nunca forma parte del estado serializado a disco.
 
-### 2.1 Representación JSON de Intercambio y Auditoría
+### 2.1 Definición Tipada en Python (`core/context.py`)
 
-```json
-{
-  "request_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "timestamp_utc": "2026-11-13T14:30:00.123Z",
-  "trace_context": {
-    "institution_id": "MIN-SALUD-VE-01",
-    "operator_id": "FUNC-8842",
-    "operator_role": "ANALISTA_TRIAJE_SOCIAL",
-    "environment_mode": "CLOUDFLARE_EDGE"
-  },
-  "citizen_consent": {
-    "granted": true,
-    "purpose_code": "EVALUACION_PRIORIDAD_TRAMITE_SOCIAL",
-    "timestamp_utc": "2026-11-13T14:29:59Z",
-    "consent_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  },
-  "ephemeral_vault_status": {
-    "vault_key": "vault:f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "ttl_seconds": 180,
-    "persisted_to_disk": false,
-    "zeroized_on_complete": true
-  },
-  "masked_text": "Solicito apoyo urgente de insumo médico. Soy [CEDULA_1], RIF [RIF_1], teléfono [PHONE_1], diagnosticado con [CLINICAL_1].",
-  "shield_meta": {
-    "blind_citizen_id": "hmac_sha256_9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-    "pii_count": 4,
-    "detected_types": ["CEDULA_VE", "RIF_MOD11_VE", "PHONE_VE", "CLINICAL_SENSITIVE"],
-    "rif_mod11_verified": true,
-    "validation_passed": true,
-    "latency_ms": 1.8
-  },
-  "guard_in": {
-    "allowed": true,
-    "normalized_nfkc": true,
-    "encoding_evasion_detected": false,
-    "risk_score": 0.08,
-    "canary_token": "[[CANARY-HMAC-7F3A9B2C]]",
-    "xml_sandbox_applied": true,
-    "matched_patterns": [],
-    "policy_status": "CLEAN",
-    "latency_ms": 1.4
-  },
-  "llm_exchange": {
-    "adapter_mode": "WORKERS_AI_GLM47",
-    "ai_generated_notice": true,
-    "circuit_breaker_state": "CLOSED",
-    "circuit_breaker_tripped": false,
-    "prompt_sent_hash": "sha256_del_xml_sandboxed_prompt_sin_pii",
-    "raw_response": "Resumen institucional del caso para [CEDULA_1]: cumple recaudos preliminares...",
-    "latency_ms": 340.5
-  },
-  "guard_out": {
-    "allowed": true,
-    "canary_leaked": false,
-    "residual_pii_detected": false,
-    "xss_or_code_injected": false,
-    "unverified_claims_flag": false,
-    "sanitized_response": "Resumen institucional del caso para [CEDULA_1]: cumple recaudos preliminares...",
-    "latency_ms": 0.9
-  },
-  "explica": {
-    "model_type": "whitebox_logistic_regression_v2",
-    "logit_z": 1.516,
-    "probability_score": 0.8199,
-    "intercept_b0": -1.250,
-    "feature_values": {
-      "vulnerabilidad_economica": 0.85,
-      "carga_familiar": 3.0,
-      "urgencia_medica": 0.90,
-      "antiguedad_dias": 45.0,
-      "consistencia_documental": 1.0
-    },
-    "feature_contributions_bx": {
-      "vulnerabilidad_economica": 1.190,
-      "carga_familiar": 0.750,
-      "urgencia_medica": 0.630,
-      "antiguedad_dias": 0.096,
-      "consistencia_documental": 0.100
-    },
-    "linear_shap_values": {
-      "vulnerabilidad_economica": 0.490,
-      "carga_familiar": 0.350,
-      "urgencia_medica": 0.420,
-      "antiguedad_dias": 0.036,
-      "consistencia_documental": 0.020
-    },
-    "logit_reconstruction_error": 0.0,
-    "model_recommendation": "PRIORIDAD_ALTA",
-    "human_decision": "PRIORIDAD_ALTA",
-    "human_override": false,
-    "override_justification": null
-  },
-  "ledger": {
-    "block_index": 42,
-    "prev_hash": "00008a9f4b2e1d7c6a5b4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c",
-    "payload_hash": "9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b",
-    "block_hash": "3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e",
-    "hmac_signature": "7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c",
-    "citizen_receipt_code": "ADUANA-BLK42-3F2E1D0C",
-    "chain_verified": true
-  }
-}
-```
+```python
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Dict, List, Literal, Optional, Final
 
-### 2.2 Contrato de Tipos en TypeScript (`core/context.ts`)
+PolicyStatus = Literal[
+    "CLEAN",
+    "BLOCKED_INJECTION",
+    "BLOCKED_CANARY_LEAK",
+    "BLOCKED_NO_CONSENT",
+    "BLOCKED_PII_LEAK"
+]
 
-```ts
-export type PolicyStatus =
-  | "CLEAN"
-  | "BLOCKED_INJECTION"
-  | "BLOCKED_CANARY_LEAK"
-  | "BLOCKED_NO_CONSENT"
-  | "BLOCKED_PII_LEAK";
+RecommendationType = Literal[
+    "PRIORIDAD_ALTA",
+    "REVISION_ESTANDAR",
+    "RECAUDOS_INCOMPLETOS",
+    "BLOQUEADO_SEGURIDAD"
+]
 
-export type RecommendationType =
-  | "PRIORIDAD_ALTA"
-  | "REVISION_ESTANDAR"
-  | "RECAUDOS_INCOMPLETOS"
-  | "BLOQUEADO_SEGURIDAD";
+AdapterMode = Literal[
+    "LOCAL_OLLAMA",
+    "HYBRID_OPENAI",
+    "OFFLINE_DETERMINISTIC_FALLBACK"
+]
 
-export type AdapterMode =
-  | "WORKERS_AI_GLM47"
-  | "WORKERS_AI_LLAMA31"
-  | "OFFLINE_DETERMINISTIC_FALLBACK";
+@dataclass(frozen=True, slots=True)
+class CitizenConsent:
+    granted: bool
+    purpose_code: str
+    timestamp_utc: str
+    consent_hash: str
 
-export interface CitizenConsent {
-  readonly granted: boolean;
-  readonly purpose_code: string;
-  readonly timestamp_utc: string;
-  readonly consent_hash: string;
-}
+@dataclass(frozen=True, slots=True)
+class ShieldMeta:
+    blind_citizen_id: str
+    pii_count: int
+    detected_types: List[str]
+    rif_mod11_verified: Optional[bool]
+    validation_passed: bool
+    latency_ms: float
 
-export interface ShieldMeta {
-  readonly blind_citizen_id: string;
-  readonly pii_count: number;
-  readonly detected_types: readonly string[];
-  readonly rif_mod11_verified: boolean;
-  readonly validation_passed: boolean;
-  readonly latency_ms: number;
-}
+@dataclass(frozen=True, slots=True)
+class GuardInResult:
+    allowed: bool
+    normalized_nfkc: bool
+    encoding_evasion_detected: bool
+    risk_score: float
+    canary_token: str
+    xml_sandbox_applied: bool
+    matched_patterns: List[str]
+    policy_status: PolicyStatus
+    latency_ms: float
 
-export interface GuardInResult {
-  readonly allowed: boolean;
-  readonly normalized_nfkc: boolean;
-  readonly encoding_evasion_detected: boolean;
-  readonly risk_score: number;
-  readonly canary_token: string;
-  readonly xml_sandbox_applied: boolean;
-  readonly matched_patterns: readonly string[];
-  readonly policy_status: PolicyStatus;
-  readonly latency_ms: number;
-}
+@dataclass(frozen=True, slots=True)
+class LLMExchangeResult:
+    adapter_mode: AdapterMode
+    ai_generated_notice: bool
+    circuit_breaker_tripped: bool
+    prompt_sent_hash: str
+    raw_response: str
+    latency_ms: float
 
-export interface GuardOutResult {
-  readonly allowed: boolean;
-  readonly canary_leaked: boolean;
-  readonly residual_pii_detected: boolean;
-  readonly xss_or_code_injected: boolean;
-  readonly unverified_claims_flag: boolean;
-  readonly sanitized_response: string;
-  readonly latency_ms: number;
-}
+@dataclass(frozen=True, slots=True)
+class GuardOutResult:
+    allowed: bool
+    canary_leaked: bool
+    residual_pii_detected: bool
+    xss_or_code_injected: bool
+    unverified_claims_flag: bool
+    sanitized_response: str
+    latency_ms: float
 
-export interface ExplicaResult {
-  readonly model_type: string;
-  readonly logit_z: number;
-  readonly probability_score: number;
-  readonly intercept_b0: number;
-  readonly feature_values: Readonly<Record<string, number>>;
-  readonly feature_contributions_bx: Readonly<Record<string, number>>;
-  readonly linear_shap_values: Readonly<Record<string, number>>;
-  readonly logit_reconstruction_error: number;
-  readonly model_recommendation: RecommendationType;
-  readonly human_decision: RecommendationType;
-  readonly human_override: boolean;
-  readonly override_justification: string | null;
-}
+@dataclass(frozen=True, slots=True)
+class ExplicaResult:
+    model_type: str
+    logit_z: float
+    probability_score: float
+    intercept_b0: float
+    feature_values: Dict[str, float]
+    feature_contributions_bx: Dict[str, float]
+    linear_shap_values: Dict[str, float]
+    logit_reconstruction_error: float
+    model_recommendation: RecommendationType
+    human_decision: RecommendationType
+    human_override: bool
+    override_justification: Optional[str] = None
 
-export interface LedgerReceipt {
-  readonly block_index: number;
-  readonly prev_hash: string;
-  readonly payload_hash: string;
-  readonly block_hash: string;
-  readonly hmac_signature: string;
-  readonly citizen_receipt_code: string;
-  readonly chain_verified: boolean;
-}
+@dataclass(frozen=True, slots=True)
+class LedgerReceipt:
+    block_index: int
+    prev_hash: str
+    payload_hash: str
+    block_hash: str
+    hmac_signature: str
+    citizen_receipt_code: str
+    chain_verified: bool
+
+@dataclass(frozen=True, slots=True)
+class AduanaPacket:
+    request_id: str
+    timestamp_utc: str
+    masked_text: str
+    consent: CitizenConsent
+    shield: ShieldMeta
+    guard_in: GuardInResult
+    llm: LLMExchangeResult
+    guard_out: GuardOutResult
+    explica: ExplicaResult
+    ledger: LedgerReceipt
 ```
 
 ---
 
-## 🎯 PARTE 3: REGLAS MATEMÁTICAS, CRIPTOGRÁFICAS Y ANTI-TRAMPA
+## 🎯 PARTE 3: ESPECIFICACIÓN DE TODA LA CRIPTOGRAFÍA DEL BACKEND
 
-El agente tiene **prohibido simplificar o falsificar** estos cuatro algoritmos nucleares:
+El agente de código debe implementar estos algoritmos en `core/crypto.py`, `core/ephemeral_vault.py` y los módulos del pipeline sin simplificaciones:
 
-### 1. Algoritmo Oficial Módulo 11 (SENIAT) para Validación de RIF en `[1 SHIELD]`
-- Mapeo de letra inicial: `{"V": 1, "E": 2, "J": 3, "P": 4, "G": 5, "C": 3}`.
-- Vector de 9 pesos posicionales (prefijo + 8 dígitos base): $W = [4, 3, 2, 7, 6, 5, 4, 3, 2]$.
-- Cálculo:
+### 1. Algoritmo Oficial SENIAT Módulo 11 para RIF (`pipeline/stage1_shield.py`)
+- Mapeo de letra: `{"V": 1, "E": 2, "J": 3, "P": 4, "G": 5, "C": 3}`.
+- Vector de 9 pesos posicionales oficiales: $W = [4, 3, 2, 7, 6, 5, 4, 3, 2]$.
+- Fórmula exacta:
   $$S = \sum_{k=0}^{8} d_k \cdot W_k, \qquad R = 11 - (S \bmod 11)$$
-  Si $R \ge 10$, dígito verificador esperado = `0`; si no, `R`.
-- Todo patrón con forma de RIF (`[VEJGPC]-?\d{8}-?\d`) se enmascara preventivamente como `[RIF_n]`, y `rif_mod11_verified` registra si pasa la validación matemática SENIAT.
+  Si $R \ge 10$, dígito esperado = `0`; de lo contrario = $R$.
+- Se enmascara preventivamente todo RIF detectado como `[RIF_n]` y se registra si es matemáticamente auténtico en `rif_mod11_verified`.
 
-### 2. Defensa Multicapa y Normalización en `[2 GUARD-IN]` y `[3 GUARD-OUT]`
-- Antes de evaluar heurísticas:
-  1. `text.normalize("NFKC")` para colapsar homógrafos.
-  2. Eliminación de caracteres invisibles (`\u200b`, `\u200c`, `\u200d`, `\ufeff`).
-  3. Detección y decodificación de payloads `Base64` / `Hex` embebidos.
-- **Canary Dinámico por Transacción** vía Web Crypto API (`crypto.subtle`):
-  `[[CANARY-HMAC-${HMAC_SHA256(secret, request_id).slice(0, 8).toUpperCase()}]]`
-- **Métricas Auditables Honestas:** `runSecurityBenchmark()` lee `data/attack_benchmark.json` ($N=100$: 50 consultas benignas + 50 ataques) y calcula $\text{TPR}$, $\text{FPR}$ y $\text{F1}$ reales.
+### 2. Bóveda Efímera con Shredding de Memoria (`core/ephemeral_vault.py`)
+- Almacena en memoria RAM volátil: `vault[request_id] = {"created_at": ts, "map": {token: real_value}}`.
+- Verifica expiración automática ante TTL $> 180\text{ s}$.
+- Método `zeroize(request_id)`: sobrescribe las cadenas en memoria antes de eliminarlas del diccionario (`del vault[request_id]`), garantizando que jamás toquen el disco.
 
-### 3. Doble Sello Criptográfico en `[4 LEDGER]` (Cloudflare D1)
-1. **Encadenamiento Canónico SHA-256:**
-   $$H_i = \text{SHA256}\big(\text{`${i}|${timestamp_utc}|${blind_citizen_id}|${payload_hash}|${prev_hash}`}\big)$$
-2. **Sello de Autenticidad HMAC-SHA256 (`env.LEDGER_HMAC_KEY`):**
-   $$\text{Sig}_i = \text{HMAC-SHA256}\big(\text{LEDGER\_HMAC\_KEY}, \; H_i \parallel \text{human\_decision}_i\big)$$
-3. `verifyChain()` verifica en tiempo constante: $H_i === \text{recalcHash}(i)$, `row.prev_hash === prev.block_hash` y firma HMAC válida, retornando `HASH_MISMATCH`, `PREV_HASH_LINK_BROKEN` o `HMAC_SIGNATURE_FORGED`.
+### 3. Normalización Anti-Evasión y Canary Dinámico (`pipeline/stage2_guard_in.py`)
+- Normalización canónica con `unicodedata.normalize("NFKC", text)`.
+- Eliminación de caracteres invisibles (*zero-width* `\u200b`, `\u200c`, `\u200d`, `\ufeff`).
+- Decodificación preventiva de bloques en `Base64` o `Hex` embebidos para inspeccionar el payload oculto.
+- Generación de Canary Token dinámico por transacción con HMAC:
+  $$\text{Canary}_i = \text{f"[[CANARY-HMAC-}\{\text{hmac.new(key, request\_id.encode(), hashlib.sha256).hexdigest()[:8].upper()}\}\text{]]"}$$
 
-### 4. Matemática Exacta en `[5 EXPLICA]` (Regresión Logística + Linear SHAP)
-- Pesos $\beta_0, \beta_1, \dots, \beta_5$ y medias poblacionales $\mu_1, \dots, \mu_5$ calibrados de forma determinista sobre `data/synthetic_tramites.csv` e embebidos como constantes auditables (cero entrenamiento aleatorio en tiempo de request, ejecución $< 0.1\text{ ms}$ en el Worker).
-- Inferencia:
-  $$z = \beta_0 + \sum_{j=1}^{5} \beta_j x_j, \qquad P(y=1 \mid \mathbf{x}) = \frac{1}{1 + e^{-z}}$$
-- Contribuciones directas $c_j = \beta_j x_j$ y valores SHAP lineales $\phi_j = \beta_j(x_j - \mu_j)$, cumpliendo $\left|(\beta_0 + \sum c_j) - z\right| < 10^{-9}$.
+### 4. Doble Sello Criptográfico en Ledger (`pipeline/stage4_ledger.py`)
+- **Encadenamiento SHA-256 Canónico:**
+  $$H_i = \text{hashlib.sha256}\big(\text{f"}\{i\}|\{\text{timestamp\_utc}\}|\{\text{blind\_citizen\_id}\}|\{\text{payload\_hash}\}|\{\text{prev\_hash}\}\text{"}.\text{encode}()\big).\text{hexdigest}()$$
+- **Sello de Autenticidad HMAC-SHA256 con Clave de Servidor:**
+  $$\text{Sig}_i = \text{hmac.new}(\text{SERVER\_MASTER\_KEY}, \text{f"}\{H_i\}|\{\text{human\_decision}\}\text{"}.\text{encode}(), \text{hashlib.sha256}).\text{hexdigest}()$$
+- Función `verify_chain(blocks)`: recorre la cadena comprobando $H_i == \text{calc\_hash}(i)$, $H_i.\text{prev\_hash} == H_{i-1}.\text{block\_hash}$ y `hmac.compare_digest(block.hmac_signature, calc_sig(i))`. Retorna `(False, corrupted_idx, 'HASH_MISMATCH' | 'PREV_HASH_LINK_BROKEN' | 'HMAC_SIGNATURE_FORGED')` ante cualquier discrepancia.
+
+### 5. Explicabilidad Matemática Exacta White-Box (`pipeline/stage5_explica.py`)
+- Inferencia determinista sobre coeficientes $\beta_0, \beta_1, \dots, \beta_5$ y medias poblacionales $\mu_1, \dots, \mu_5$:
+  $$z = \beta_0 + \sum_{j=1}^{5} \beta_j x_j, \qquad P(y=1\mid\mathbf{x}) = \frac{1}{1 + e^{-z}}$$
+- Contribuciones directas: $c_j = \beta_j \cdot x_j$.
+- Valores SHAP lineales centrados: $\phi_j = \beta_j \cdot (x_j - \mu_j)$.
+- Validación estricta: $\left|(\beta_0 + \sum c_j) - z\right| < 10^{-9}$ (cero `random()`).
 
 ---
 
-## ⚡ PARTE 4: GATILLOS SDD PARA CONSTRUCCIÓN DEL MVP EN CLOUDFLARE
+## ⚡ PARTE 4: GATILLOS SDD PARA CONSTRUCCIÓN DEL SISTEMA EN PYTHON
 
-1. **Gatillo 0 (Infraestructura y Contratos):** `wrangler.jsonc`, `schema.sql` (D1 `ledger_blocks`), `core/config.ts`, `core/context.ts`, `core/ephemeral_vault.ts`, `specs/00_kernel_storage.spec.md`, `tests/test_ca05_restrictive_db.test.js`.
-2. **Gatillo 1 (`SHIELD`):** `pipeline/stage1_shield.ts`, `specs/01_shield.spec.md`, `tests/test_ca01_shield.test.js`.
-3. **Gatillo 2 (`GUARD-IN` / `GUARD-OUT` + Benchmark):** `pipeline/stage2_guard_in.ts`, `pipeline/stage3_guard_out.ts`, `data/attack_benchmark.json`, `specs/02_guardian.spec.md`, `tests/test_ca02_guardian.test.js`.
-4. **Gatillo 3 (`LEDGER` D1):** `pipeline/stage4_ledger.ts`, `specs/03_ledger.spec.md`, `tests/test_ca03_ledger.test.js`.
-5. **Gatillo 4 (`EXPLICA`):** `data/synthetic_tramites.csv`, `pipeline/stage5_explica.ts`, `specs/04_explica.spec.md`, `tests/test_ca04_explica.test.js`.
-6. **Gatillo 5 (`Workers AI` + Circuit Breaker):** `pipeline/llm_adapter.ts`, `specs/05_interconnect.spec.md`, `tests/test_ca06_resilience.test.js`.
-7. **Gatillo 6 (Endpoints Pages Functions + UI Dual):** `functions/api/v1/*.ts` + `static/index.html`, `static/styles.css`, `static/app.js` (cero CDNs externos, identificación explícita de salidas generadas por IA).
+Ejecuta estos gatillos modulares en orden:
+
+### 🧱 Gatillo 0: Kernel Base, Tipos y Bóveda Efímera
+- Generar `core/context.py` con las dataclasses de `AduanaPacket`.
+- Generar `core/crypto.py` con funciones puras para SHA-256, HMAC-SHA256, Módulo 11 SENIAT y blind indexing.
+- Generar `core/ephemeral_vault.py` con TTL 180s y `zeroize()`.
+- Crear `tests/test_ca05_restrictive_db.py` verificando purga en RAM y cero fugas en disco.
+
+### 🛡️ Gatillo 1: Módulo SHIELD (Anonimización Soberana)
+- Generar `pipeline/stage1_shield.py` (Cédula, RIF con Módulo 11, teléfono venezolano, cuenta de 20 dígitos, clínica y blind index HMAC).
+- Crear `specs/01_shield.spec.md` y `tests/test_ca01_shield.py` (< 20 ms de latencia).
+
+### 🚨 Gatillo 2: Guardián Multicapa (GUARD-IN & GUARD-OUT)
+- Generar `pipeline/stage2_guard_in.py` (NFKC, Base64 check, risk scoring, XML sandbox y Canary dinámico).
+- Generar `pipeline/stage3_guard_out.py` (detección de fuga de Canary, re-inspección PII y anti-XSS).
+- Crear `data/attack_benchmark.json` (100 prompts) y `tests/test_ca02_guardian.py` ($\text{TPR} \ge 88\%$, $\text{FPR} \le 4\%$).
+
+### 🔗 Gatillo 3: Ledger Criptográfico Inmutable
+- Generar `pipeline/stage4_ledger.py` (SQLite endurecido WAL/secure_delete, triggers SQL, encadenamiento SHA-256 + HMAC y simulador de sabotaje).
+- Crear `specs/03_ledger.spec.md` y `tests/test_ca03_ledger.py` (detección de sabotaje en < 50 ms).
+
+### 📊 Gatillo 4: Motor de Explicabilidad White-Box
+- Generar `data/synthetic_tramites.csv` y `pipeline/stage5_explica.py` (pesos calibrados, sigmoide, SHAP lineal, human override $\ge 20$ chars).
+- Crear `specs/04_explica.spec.md` y `tests/test_ca04_explica.py` (error $< 10^{-9}$, cero `random()`).
+
+### 🌐 Gatillo 5: Adaptadores LLM y Circuit Breaker
+- Generar `pipeline/llm_adapter.py` (Local Ollama, Cloud OpenAI-compat, Fallback Offline y Circuit Breaker a 3.5s).
+- Crear `specs/05_interconnect.spec.md` y `tests/test_ca06_resilience.py`.
+
+### 🚀 Gatillo 6: Servidor Litestar (Backend Moderno 2026)
+- Generar `app/server.py` utilizando **Litestar** con controladores de ruta tipados:
+  * `POST /api/v1/gateway/process`: flujo secuencial del pipeline completo.
+  * `POST /api/v1/shield/inspect`: endpoint independiente de sanitización.
+  * `GET /api/v1/ledger/verify`: auditoría integral de la cadena.
+  * `POST /api/v1/ledger/tamper-sim`: simulación de sabotaje para demo.
+  * `GET /api/v1/metrics/benchmark`: ejecución del benchmark de 100 ataques.
+  * `GET /api/v1/health/system`: diagnóstico de entorno y estado de bóveda.
+- Servir la interfaz estática local en `static/` con cero dependencias de CDNs externos.
+
+### 🖥️ Gatillo 7: Aplicación de Escritorio PyWebView
+- Generar `app/desktop.py`: lanza el servidor Litestar local en un hilo de fondo y abre una ventana nativa de escritorio moderna mediante **PyWebView** (`webview.create_window('Aduana IA — Perímetro Soberano', 'http://127.0.0.1:8000')`).
+- Crear scripts de arranque directo con un clic: `iniciar_escritorio.bat` (Windows) y `iniciar_escritorio.sh` (Linux).
