@@ -26,6 +26,11 @@ env/
 *.sqlite
 *.sqlite3
 
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+
 # Logs
 *.log
 logs/
