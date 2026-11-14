@@ -229,6 +229,31 @@ class SQLiteLedgerRepository:
             self._conn.close()
 
 
+def compute_attachment_audit_hash(
+    *,
+    file_sha256: str,
+    blind_citizen_id: str,
+    user_role: str,
+    timestamp_utc: str,
+    action: str,
+) -> str:
+    """Construye el hash de auditoría para adjuntos en flujo sin almacenar jamás PII ni el archivo.
+
+    Registra criptográficamente solo: hash SHA-256 del archivo, blind_citizen_id, rol del usuario
+    (analista, administrador o auditor), marca de tiempo UTC y acción ejecutada.
+    """
+    valid_roles = {"analista", "administrador", "auditor"}
+    role_norm = user_role if user_role in valid_roles else "analista"
+    canonical = (
+        f"file_sha256={file_sha256}|"
+        f"blind_citizen_id={blind_citizen_id}|"
+        f"role={role_norm}|"
+        f"timestamp_utc={timestamp_utc}|"
+        f"action={action}"
+    )
+    return block_hash(canonical.encode("utf-8"))
+
+
 def seal_entry(
     entry: LedgerEntry, repo: StorageRepositoryProtocol, *, keys: KeyRing
 ) -> LedgerReceipt:

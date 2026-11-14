@@ -161,14 +161,27 @@ export interface SessionStatusResponse {
 export interface ChatIAUploadRequest {
   prompt: string;
   citizen_cedula?: string;
+  user_role?: 'analista' | 'administrador' | 'auditor';
+  action?: string;
   purpose_code?: string;
   consent_granted?: boolean;
   file_name?: string | null;
   file_mime_type?: string | null;
   file_content_b64?: string | null;
+  client_file_sha256?: string | null;
   features?: Record<string, number> | null;
   human_decision?: RecommendationType | null;
   override_justification?: string | null;
+}
+
+export interface ChatIAStreamUploadParams {
+  file: File;
+  prompt: string;
+  citizen_cedula?: string;
+  user_role?: 'analista' | 'administrador' | 'auditor';
+  action?: string;
+  client_file_sha256?: string | null;
+  signal?: AbortSignal;
 }
 
 export interface ChatIAResponse {
@@ -194,6 +207,9 @@ export interface ChatIAResponse {
   block_index: number;
   chain_verified: boolean;
   latency_ms: number;
+  chunks_processed?: number;
+  user_role?: string;
+  audit_action?: string;
   is_offline_fallback?: boolean;
 }
 

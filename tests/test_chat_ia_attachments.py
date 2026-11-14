@@ -40,7 +40,7 @@ def test_chat_msgspec_contracts_redacted_repr_and_forbid_unknown() -> None:
         file_mime_type="text/plain",
         file_content_b64=base64.b64encode(b"V-18660505 RIF J-12345678-4").decode("ascii"),
     )
-    assert repr(req) == "[REDACTED_CHAT_PAYLOAD]"
+    assert repr(req) == "[REDACTED_LARGE_PAYLOAD]"
     assert "V-18660505" not in repr(req)
     assert "J-12345678-4" not in repr(req)
 
@@ -68,7 +68,7 @@ def test_chat_msgspec_contracts_redacted_repr_and_forbid_unknown() -> None:
         chain_verified=True,
         latency_ms=4.0,
     )
-    assert repr(res) == "[REDACTED_CHAT_PAYLOAD]"
+    assert repr(res) == "[REDACTED_LARGE_PAYLOAD]"
     assert "V-18660505" not in repr(res)
 
     with pytest.raises(msgspec.ValidationError):
@@ -364,4 +364,122 @@ def test_gemini_adapter_zero_trust_and_redacted_repr(tmp_path: Path) -> None:
     sent_text = captured_payloads[0]["contents"][0]["parts"][0]["text"]
     assert "CANARY-HMAC" not in sent_text
     assert "[CEDULA_1]" in sent_text
+
+
+def test_chat_stream_100mb_limit_mapreduce_and_ledger_audit_trace_only(
+    tmp_path: Path,
+) -> None:
+    import hashlib
+
+    from pipeline.chat_attachments import MAX_CHAT_ATTACHMENT_BYTES
+    from pipeline.stage4_ledger import compute_attachment_audit_hash
+
+    assert MAX_CHAT_ATTACHMENT_BYTES == 100 * 1024 * 1024
+
+    db_path = tmp_path / "stream_ledger.db"
+    settings = Settings(
+        db_path=db_path,
+        static_dir=Settings().static_dir,
+        allowed_hosts=("127.0.0.1", "localhost", "testserver.local"),
+    )
+    app = create_app(
+        settings=settings,
+        keys=KeyRing(bytes(range(32))),
+        api_token=TOKEN_HEADERS["X-Aduana-Token"],
+    )
+
+    # Construir un archivo grande (~320 KB = 5 fragmentos de 64 KB) en RAM con PII en cada bloque
+    line = (
+        "Manifiesto Aduanal SENIAT — Solicitante V-18660505 — "
+        "Empresa Importadora RIF J-12345678-4 — Contacto 0414-5551234 — "
+        "Informe de salud patología clínica prioritaria con recaudos completos.\n"
+    )
+    large_payload = (line * 2100).encode("utf-8")
+    assert len(large_payload) > 300 * 1024
+    expected_sha256 = hashlib.sha256(large_payload).hexdigest()
+
+    with TestClient(app=app) as client:
+        resp = client.post(
+            "/api/v1/chat/stream",
+            headers={
+                "X-Aduana-Token": TOKEN_HEADERS["X-Aduana-Token"],
+                "Content-Type": "application/octet-stream",
+                "X-Chat-Prompt": "Analiza el manifiesto masivo y verifica prioridad medica.",
+                "X-File-Name": "manifiesto_masivo_seniat.txt",
+                "X-File-Mime": "text/plain",
+                "X-Citizen-Cedula": "V-18660505",
+                "X-User-Role": "auditor",
+                "X-Audit-Action": "CHAT_IA_STREAM_UPLOAD",
+                "X-Client-File-Sha256": expected_sha256,
+            },
+            content=large_payload,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+
+        assert data["policy_status"] == "CLEAN"
+        assert data["file_sha256"] == expected_sha256
+        assert data["file_size_bytes"] == len(large_payload)
+        assert data["chunks_processed"] >= 5
+        assert data["user_role"] == "auditor"
+        assert data["audit_action"] == "CHAT_IA_STREAM_UPLOAD"
+
+        # Map-Reduce comprimió >320 KB a un contexto seguro para el LLM (< 8000 chars)
+        assert len(data["masked_prompt"]) <= 8000
+        assert "[CEDULA_1]" in data["masked_prompt"]
+        assert "[RIF_1]" in data["masked_prompt"]
+        assert "[PHONE_1]" in data["masked_prompt"]
+        assert "V-18660505" not in data["masked_prompt"]
+        assert "J-12345678-4" not in data["masked_prompt"]
+
+        # Rehidratación en GUARD-OUT y zeroize en EphemeralVault
+        assert "V-18660505" in data["restored_response"]
+        assert app.state.aduana.vault.active_sessions == 0
+
+        # Verificar que en ledger_blocks el payload_hash se calculó ÚNICAMENTE
+        # con (file_sha256, blind_citizen_id, role, timestamp_utc, action)
+        blocks = list(app.state.aduana.repo.iter_blocks())
+        assert len(blocks) == 1
+        blk = blocks[0]
+        expected_audit_hash = compute_attachment_audit_hash(
+            file_sha256=expected_sha256,
+            blind_citizen_id=blk.blind_citizen_id,
+            user_role="auditor",
+            timestamp_utc=blk.timestamp_utc,
+            action="CHAT_IA_STREAM_UPLOAD",
+        )
+        assert blk.payload_hash == expected_audit_hash
+
+
+def test_stream_disconnect_destroys_buffers_and_zeroizes_vault() -> None:
+    import asyncio
+    from collections.abc import AsyncIterable
+
+    from core.ephemeral_vault import EphemeralVault
+    from core.errors import VaultSessionNotFoundError
+    from pipeline.chat_attachments import process_attachment_stream
+
+    vault = EphemeralVault()
+
+    async def _broken_stream() -> AsyncIterable[bytes]:
+        yield b"Primer fragmento con PII V-18660505 y RIF J-12345678-4\n"
+        raise ConnectionResetError("Cliente desconectado al cambiar de vista")
+
+    with pytest.raises(ConnectionResetError):
+        asyncio.run(
+            process_attachment_stream(
+                _broken_stream(),
+                request_id="req-disconnect-1",
+                prompt="Analizar archivo",
+                file_name="interrumpido.txt",
+                file_mime_type="text/plain",
+                vault=vault,
+                blind_citizen_id="blind-01",
+            )
+        )
+
+    assert vault.active_sessions == 0
+    with pytest.raises(VaultSessionNotFoundError):
+        vault.get_map("req-disconnect-1")
+
 

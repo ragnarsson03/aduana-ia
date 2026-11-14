@@ -162,20 +162,28 @@ class LogoutResponse(msgspec.Struct, frozen=True):
         return "[REDACTED_CHAT_PAYLOAD]"
 
 
+UserRole = Literal["analista", "administrador", "auditor"]
+AuditAction = Annotated[str, msgspec.Meta(min_length=3, max_length=64)]
+Sha256Hex = Annotated[str, msgspec.Meta(pattern=r"^[a-fA-F0-9]{64}$")]
+
+
 class ChatIAUploadRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     prompt: RawText
     citizen_cedula: Cedula = "V-12345678"
+    user_role: UserRole = "analista"
+    action: AuditAction = "CHAT_IA_STREAM_UPLOAD"
     purpose_code: PurposeCode = "CHAT_IA_CONSULTA"
     consent_granted: bool = True
     file_name: Annotated[str, msgspec.Meta(min_length=1, max_length=120)] | None = None
     file_mime_type: Annotated[str, msgspec.Meta(min_length=3, max_length=64)] | None = None
-    file_content_b64: Annotated[str, msgspec.Meta(min_length=1, max_length=48_000)] | None = None
+    file_content_b64: Annotated[str, msgspec.Meta(min_length=1)] | None = None
+    client_file_sha256: Sha256Hex | None = None
     features: Features | None = None
     human_decision: RecommendationType | None = None
     override_justification: Justification | None = None
 
     def __repr__(self) -> str:  # Zero-Leak
-        return "[REDACTED_CHAT_PAYLOAD]"
+        return "[REDACTED_LARGE_PAYLOAD]"
 
 
 class ChatIAResponse(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -201,7 +209,10 @@ class ChatIAResponse(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     block_index: int
     chain_verified: bool
     latency_ms: float
+    chunks_processed: int = 0
+    user_role: str = "analista"
+    audit_action: str = "CHAT_IA_STREAM_UPLOAD"
 
     def __repr__(self) -> str:  # Zero-Leak
-        return "[REDACTED_CHAT_PAYLOAD]"
+        return "[REDACTED_LARGE_PAYLOAD]"
 

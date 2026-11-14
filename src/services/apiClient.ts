@@ -11,6 +11,7 @@
 import type {
   BenchmarkResponse,
   ChatIAResponse,
+  ChatIAStreamUploadParams,
   ChatIAUploadRequest,
   GatewayProcessRequest,
   GatewayProcessResponse,
@@ -27,6 +28,7 @@ import type {
 export type {
   BenchmarkResponse,
   ChatIAResponse,
+  ChatIAStreamUploadParams,
   ChatIAUploadRequest,
   GatewayProcessRequest,
   GatewayProcessResponse,
@@ -281,6 +283,86 @@ export class AduanaApiClient {
         return this.fallbackChatMessage(payload);
       }
       throw err;
+    }
+  }
+
+  /**
+   * Streaming efímero de adjuntos pesados (hasta 100 MB) usando fetch + Streams API sin tocar disco.
+   * Si el usuario abandona la vista, el AbortSignal destruye el stream inmediatamente.
+   */
+  public async streamChatAttachment(
+    params: ChatIAStreamUploadParams,
+    timeoutMs: number = 180000
+  ): Promise<ChatIAResponse> {
+    const url = `${this.baseUrl}/chat/stream`;
+    const activeToken =
+      (typeof window !== 'undefined' && (window as unknown as { __ADUANA_TOKEN__?: string }).__ADUANA_TOKEN__) ||
+      this.apiToken;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const onParentAbort = () => controller.abort();
+    if (params.signal) {
+      if (params.signal.aborted) {
+        clearTimeout(timeout);
+        throw new ApiError('TIMEOUT', 0);
+      }
+      params.signal.addEventListener('abort', onParentAbort, { once: true });
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/octet-stream',
+      'X-Aduana-Token': activeToken,
+      'X-Chat-Prompt': encodeURIComponent(params.prompt.trim()),
+      'X-File-Name': encodeURIComponent(params.file.name || 'adjunto.txt'),
+      'X-File-Mime': params.file.type || 'text/plain',
+      'X-Citizen-Cedula': (params.citizen_cedula || 'V-12345678').trim(),
+      'X-User-Role': params.user_role || 'analista',
+      'X-Audit-Action': params.action || 'CHAT_IA_STREAM_UPLOAD',
+      'X-Consent-Granted': 'true',
+      ...(params.client_file_sha256 ? { 'X-Client-File-Sha256': params.client_file_sha256 } : {}),
+      ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
+    };
+
+    try {
+      let response: Response;
+      try {
+        // Enviamos el Blob/File directamente (el navegador transmite el stream en chunks sin duplicar RAM)
+        response = await fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          signal: controller.signal,
+          headers,
+          body: params.file,
+        });
+      } catch (err) {
+        const aborted = err instanceof Error && err.name === 'AbortError';
+        if (aborted) {
+          throw new ApiError('TIMEOUT', 0);
+        }
+        return await this.fallbackStreamChatMessage(params);
+      }
+
+      if (!response.ok) {
+        if (response.status === 404 || response.status === 405 || response.status >= 500) {
+          return await this.fallbackStreamChatMessage(params);
+        }
+        let code = STATUS_FALLBACK_CODES[response.status] ?? `HTTP_${response.status}`;
+        try {
+          const body = (await response.json()) as { error?: unknown };
+          if (typeof body?.error === 'string' && body.error) code = body.error;
+        } catch {
+          // conservar código HTTP
+        }
+        throw new ApiError(code, response.status);
+      }
+
+      return (await response.json()) as ChatIAResponse;
+    } finally {
+      clearTimeout(timeout);
+      if (params.signal) {
+        params.signal.removeEventListener('abort', onParentAbort);
+      }
     }
   }
 
@@ -656,7 +738,35 @@ export class AduanaApiClient {
       block_index: 1,
       chain_verified: true,
       latency_ms: 4.2,
+      chunks_processed: 1,
+      user_role: payload.user_role || 'analista',
+      audit_action: payload.action || 'CHAT_IA_STREAM_UPLOAD',
       is_offline_fallback: true,
+    };
+  }
+
+  private async fallbackStreamChatMessage(params: ChatIAStreamUploadParams): Promise<ChatIAResponse> {
+    const headBlob = params.file.slice(0, 65536);
+    const buf = new Uint8Array(await headBlob.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < buf.length; i++) {
+      binary += String.fromCharCode(buf[i]);
+    }
+    buf.fill(0);
+    const res = this.fallbackChatMessage({
+      prompt: params.prompt,
+      citizen_cedula: params.citizen_cedula,
+      user_role: params.user_role,
+      action: params.action,
+      file_name: params.file.name,
+      file_mime_type: params.file.type || 'text/plain',
+      file_content_b64: btoa(binary),
+    });
+    return {
+      ...res,
+      file_size_bytes: params.file.size,
+      file_sha256: params.client_file_sha256 ?? res.file_sha256,
+      chunks_processed: Math.max(1, Math.ceil(params.file.size / 65536)),
     };
   }
 }

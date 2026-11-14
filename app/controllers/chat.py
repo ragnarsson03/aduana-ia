@@ -1,20 +1,22 @@
-"""Controlador Zero-Trust para el Chat de IA con adjuntos (POST /api/v1/chat/*).
+"""Controlador Zero-Trust para el Chat de IA con streaming efímero de hasta 100 MB.
 
 Cumple estrictamente:
-- Zero-Plaintext-PII: el texto extraído del archivo adjunto se inyecta en ``GatewayPipeline``
-  junto con el prompt, pasando por SHIELD -> GUARD-IN -> LLM -> GUARD-OUT (con rehidratación
-  en RAM desde ``EphemeralVault``) -> EXPLICA (SHAP lineal determinista) -> LEDGER (SHA-256 + HMAC)
-  -> ``finally: EphemeralVault.zeroize()``.
-- Soporta tanto ``application/json`` (``ChatIAUploadRequest`` con base64) como
-  ``multipart/form-data``.
+- Streaming efímero (100 MB máx., 0 escritura en disco/SQLite/D1/R2) por fragmentos de 64 KB.
+- Zero-Plaintext-PII: anonimización al vuelo (SHIELD + GUARD-IN) y síntesis Map-Reduce en RAM
+  con mapa de reversión en ``EphemeralVault`` (TTL 180s) y ``EphemeralVault.zeroize()`` en
+  ``finally``.
+- Auditoría Ledger de rastro sin dato: en ``ledger_blocks`` sólo se sella el hash SHA-256 del
+  archivo, ``blind_citizen_id``, ``user_role``, ``timestamp_utc`` y ``action``.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import secrets
-from typing import Any
+import urllib.parse
+import uuid
+from collections.abc import AsyncIterable
+from typing import Any, Final
 
 import msgspec
 from litestar import Controller, Request, post
@@ -25,20 +27,24 @@ from litestar.handlers.base import BaseRouteHandler
 from litestar.status_codes import HTTP_200_OK
 
 from app.dependencies import AppState
-from app.schemas import ChatIAResponse, ChatIAUploadRequest
+from app.schemas import ChatIAResponse, ChatIAUploadRequest, UserRole
 from app.security import TOKEN_HEADER
+from core import crypto
 from core.config import API_PREFIX
 from core.context import BlockedPacket
 from core.errors import AttachmentValidationError
 from pipeline.chat_attachments import (
     MAX_CHAT_ATTACHMENT_BYTES,
-    ExtractedAttachment,
-    compose_gateway_raw_text,
+    STREAM_CHUNK_SIZE,
+    StreamedChatPrepared,
     derive_chat_features,
-    extract_attachment_from_b64,
-    extract_attachment_from_bytes,
+    iter_b64_in_chunks,
+    process_attachment_stream,
 )
 from pipeline.orchestrator import GatewayInput
+
+MAX_CHAT_REQUEST_BYTES: Final[int] = 105 * 1024 * 1024  # 105 MB para cubrir cabeceras/multipart
+VALID_ROLES: Final[frozenset[str]] = frozenset({"analista", "administrador", "auditor"})
 
 
 def chat_api_guard(connection: ASGIConnection, _: BaseRouteHandler) -> None:
@@ -48,23 +54,130 @@ def chat_api_guard(connection: ASGIConnection, _: BaseRouteHandler) -> None:
         raise NotAuthorizedException(detail="UNAUTHORIZED")
     if connection.scope["method"] in {"POST", "PUT", "PATCH"}:
         content_type = connection.headers.get("content-type", "").split(";")[0].strip().lower()
-        if content_type not in {"application/json", "multipart/form-data"}:
+        if content_type not in {
+            "application/json",
+            "multipart/form-data",
+            "application/octet-stream",
+        }:
             raise HTTPException(status_code=415, detail="UNSUPPORTED_MEDIA_TYPE")
 
 
-async def _parse_chat_request(
+def _normalize_role(raw_role: str | None) -> UserRole:
+    cleaned = (raw_role or "analista").strip().lower()
+    if cleaned == "admin":
+        return "administrador"
+    if cleaned in VALID_ROLES:
+        return cleaned  # type: ignore[return-value]
+    return "analista"
+
+
+async def _iter_upload_file(
+    upload: UploadFile, chunk_size: int = STREAM_CHUNK_SIZE
+) -> AsyncIterable[bytes]:
+    """Itera un ``UploadFile`` en fragmentos de 64 KB sin cargar el archivo entero en RAM."""
+    while True:
+        chunk = await upload.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+def _verify_client_sha256(computed_sha256: str, client_sha256: str | None) -> None:
+    if not client_sha256:
+        return
+    clean_client = client_sha256.strip().lower()
+    if not secrets.compare_digest(computed_sha256.lower().encode(), clean_client.encode()):
+        raise AttachmentValidationError(
+            "Integridad fallida: el SHA-256 del stream no coincide con el hash del cliente."
+        )
+
+
+async def _prepare_from_octet_stream(
     request: Request,
-) -> tuple[ChatIAUploadRequest, ExtractedAttachment | None]:
-    """Decodifica y valida la solicitud de Chat IA (JSON o multipart/form-data) en RAM."""
+    state: AppState,
+    request_id: str,
+) -> tuple[ChatIAUploadRequest, StreamedChatPrepared]:
+    """Procesa un stream binario directo (`application/octet-stream`) desde `request.stream()`."""
+    raw_prompt = urllib.parse.unquote(request.headers.get("x-chat-prompt", "")).strip()
+    if not raw_prompt:
+        raw_prompt = "Analizar documento adjunto en flujo efímero."
+    file_name = urllib.parse.unquote(request.headers.get("x-file-name", "adjunto.txt")).strip()
+    file_mime = request.headers.get("x-file-mime", "text/plain").strip()
+    cedula_val = request.headers.get("x-citizen-cedula", "V-12345678").strip()
+    role_val = _normalize_role(request.headers.get("x-user-role"))
+    action_val = (request.headers.get("x-audit-action") or "CHAT_IA_STREAM_UPLOAD").strip()
+    purpose_val = (request.headers.get("x-purpose-code") or "CHAT_IA_CONSULTA").strip()
+    consent_raw = (request.headers.get("x-consent-granted") or "true").strip().lower()
+    consent_val = consent_raw not in {"false", "0", "no"}
+    client_sha = request.headers.get("x-client-file-sha256") or None
+
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit():
+        if int(content_length) > MAX_CHAT_ATTACHMENT_BYTES:
+            raise AttachmentValidationError(
+                "Archivo adjunto supera el límite soberano de 100 MB."
+            )
+
+    try:
+        dto = msgspec.convert(
+            {
+                "prompt": raw_prompt,
+                "citizen_cedula": cedula_val,
+                "user_role": role_val,
+                "action": action_val,
+                "purpose_code": purpose_val,
+                "consent_granted": consent_val,
+                "file_name": file_name,
+                "file_mime_type": file_mime,
+                "client_file_sha256": client_sha,
+            },
+            type=ChatIAUploadRequest,
+        )
+    except msgspec.ValidationError as exc:
+        raise HTTPException(status_code=400, detail="INVALID_CHAT_PAYLOAD") from exc
+
+    blind_id = crypto.blind_citizen_id(state.keys, dto.citizen_cedula)
+
+    prepared = await process_attachment_stream(
+        request.stream(),
+        request_id=request_id,
+        prompt=dto.prompt,
+        file_name=file_name,
+        file_mime_type=file_mime,
+        vault=state.vault,
+        blind_citizen_id=blind_id,
+    )
+    _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+    return dto, prepared
+
+
+async def _prepare_chat_request(
+    request: Request,
+    state: AppState,
+    request_id: str,
+) -> tuple[ChatIAUploadRequest, StreamedChatPrepared | None]:
+    """Decodifica y procesa en streaming la solicitud de Chat IA (binario, multipart o JSON)."""
     content_type = (request.headers.get("content-type") or "").lower()
+
+    if content_type.startswith("application/octet-stream"):
+        dto, prepared = await _prepare_from_octet_stream(request, state, request_id)
+        return dto, prepared
 
     if content_type.startswith("multipart/form-data"):
         form = await request.form()
         prompt_val = str(form.get("prompt") or "").strip()
         cedula_val = str(form.get("citizen_cedula") or "V-12345678").strip()
+        role_val = _normalize_role(
+            str(form.get("user_role") or request.headers.get("x-user-role") or "analista")
+        )
+        action_val = str(form.get("action") or "CHAT_IA_STREAM_UPLOAD").strip()
         purpose_val = str(form.get("purpose_code") or "CHAT_IA_CONSULTA").strip()
         consent_raw = str(form.get("consent_granted") or "true").strip().lower()
         consent_val = consent_raw not in {"false", "0", "no"}
+        client_sha_raw = form.get("client_file_sha256") or request.headers.get(
+            "x-client-file-sha256"
+        )
+        client_sha = str(client_sha_raw).strip() if client_sha_raw else None
 
         features_val: dict[str, float] | None = None
         if "features" in form and form.get("features"):
@@ -77,28 +190,14 @@ async def _parse_chat_request(
 
         human_decision_val: Any = form.get("human_decision") or None
         override_just_val: Any = form.get("override_justification") or None
-
         upload_obj = form.get("file")
-        attachment: ExtractedAttachment | None = None
         file_name: str | None = None
         file_mime: str | None = None
         file_b64: str | None = None
 
         if isinstance(upload_obj, UploadFile):
-            raw_bytes = bytearray(await upload_obj.read())
-            try:
-                if len(raw_bytes) > MAX_CHAT_ATTACHMENT_BYTES:
-                    raise AttachmentValidationError("Archivo adjunto supera el límite de 32 KB.")
-                file_name = upload_obj.filename or "adjunto.txt"
-                file_mime = upload_obj.content_type or "text/plain"
-                attachment = extract_attachment_from_bytes(
-                    raw_bytes,
-                    file_name=file_name,
-                    file_mime_type=file_mime,
-                )
-                file_b64 = base64.b64encode(b"validated").decode("ascii")
-            finally:
-                raw_bytes[:] = bytes(len(raw_bytes))
+            file_name = upload_obj.filename or "adjunto.txt"
+            file_mime = upload_obj.content_type or "text/plain"
         elif form.get("file_content_b64"):
             file_name = str(form.get("file_name") or "adjunto.txt")
             file_mime = str(form.get("file_mime_type") or "text/plain")
@@ -107,11 +206,14 @@ async def _parse_chat_request(
         raw_dict: dict[str, Any] = {
             "prompt": prompt_val,
             "citizen_cedula": cedula_val,
+            "user_role": role_val,
+            "action": action_val,
             "purpose_code": purpose_val,
             "consent_granted": consent_val,
             "file_name": file_name,
             "file_mime_type": file_mime,
-            "file_content_b64": file_b64,
+            "file_content_b64": "streamed" if isinstance(upload_obj, UploadFile) else file_b64,
+            "client_file_sha256": client_sha,
             "features": features_val,
             "human_decision": human_decision_val,
             "override_justification": override_just_val,
@@ -121,13 +223,35 @@ async def _parse_chat_request(
         except msgspec.ValidationError as exc:
             raise HTTPException(status_code=400, detail="INVALID_CHAT_PAYLOAD") from exc
 
-        if attachment is None and dto.file_content_b64:
-            attachment = extract_attachment_from_b64(
-                dto.file_content_b64,
-                file_name=dto.file_name or "",
-                file_mime_type=dto.file_mime_type or "",
+        blind_id = crypto.blind_citizen_id(state.keys, dto.citizen_cedula)
+
+        if isinstance(upload_obj, UploadFile):
+            prepared = await process_attachment_stream(
+                _iter_upload_file(upload_obj),
+                request_id=request_id,
+                prompt=dto.prompt,
+                file_name=file_name or "adjunto.txt",
+                file_mime_type=file_mime or "text/plain",
+                vault=state.vault,
+                blind_citizen_id=blind_id,
             )
-        return dto, attachment
+            _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+            return dto, prepared
+
+        if file_b64:
+            prepared = await process_attachment_stream(
+                iter_b64_in_chunks(file_b64),
+                request_id=request_id,
+                prompt=dto.prompt,
+                file_name=file_name or "adjunto.txt",
+                file_mime_type=file_mime or "text/plain",
+                vault=state.vault,
+                blind_citizen_id=blind_id,
+            )
+            _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+            return dto, prepared
+
+        return dto, None
 
     raw_body = await request.body()
     try:
@@ -137,53 +261,70 @@ async def _parse_chat_request(
     except msgspec.DecodeError as exc:
         raise HTTPException(status_code=400, detail="MALFORMED_JSON") from exc
 
-    attachment = None
     has_any_file_field = any(
         x is not None for x in (dto.file_name, dto.file_mime_type, dto.file_content_b64)
     )
-    if has_any_file_field:
-        if not (dto.file_name and dto.file_mime_type and dto.file_content_b64):
-            raise AttachmentValidationError(
-                "Adjunto incompleto: requiere file_name, file_mime_type y file_content_b64."
-            )
-        attachment = extract_attachment_from_b64(
-            dto.file_content_b64,
-            file_name=dto.file_name,
-            file_mime_type=dto.file_mime_type,
+    if not has_any_file_field:
+        return dto, None
+
+    if not (dto.file_name and dto.file_mime_type and dto.file_content_b64):
+        raise AttachmentValidationError(
+            "Adjunto incompleto: requiere file_name, file_mime_type y file_content_b64."
         )
 
-    return dto, attachment
+    blind_id = crypto.blind_citizen_id(state.keys, dto.citizen_cedula)
+    prepared = await process_attachment_stream(
+        iter_b64_in_chunks(dto.file_content_b64),
+        request_id=request_id,
+        prompt=dto.prompt,
+        file_name=dto.file_name,
+        file_mime_type=dto.file_mime_type,
+        vault=state.vault,
+        blind_citizen_id=blind_id,
+    )
+    _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+    return dto, prepared
 
 
 async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
     state: AppState = request.app.state.aduana
-    dto, attachment = await _parse_chat_request(request)
-
-    combined_raw_text = compose_gateway_raw_text(dto.prompt, attachment)
-    features = (
-        dict(dto.features)
-        if dto.features is not None
-        else derive_chat_features(
-            combined_raw_text,
-            has_attachment=attachment is not None,
-            pii_count=1 if attachment is not None else 0,
-            detected_types=(),
+    request_id = str(uuid.uuid4())
+    try:
+        dto, prepared = await _prepare_chat_request(request, state, request_id)
+        analysis_text = prepared.reduced_masked_text if prepared is not None else dto.prompt
+        features = (
+            dict(dto.features)
+            if dto.features is not None
+            else derive_chat_features(
+                analysis_text,
+                has_attachment=prepared is not None,
+                pii_count=prepared.shield_meta.pii_count if prepared is not None else 0,
+                detected_types=prepared.shield_meta.detected_types if prepared is not None else (),
+            )
         )
-    )
 
-    gateway_in = GatewayInput(
-        raw_text=combined_raw_text,
-        citizen_cedula=dto.citizen_cedula,
-        consent_granted=dto.consent_granted,
-        purpose_code=dto.purpose_code,
-        features=features,
-        human_decision=dto.human_decision,
-        override_justification=dto.override_justification,
-        attachment_sha256=attachment.sha256_hex if attachment else "NONE",
-        attachment_size_bytes=attachment.size_bytes if attachment else 0,
-    )
+        gateway_in = GatewayInput(
+            raw_text=dto.prompt,
+            citizen_cedula=dto.citizen_cedula,
+            consent_granted=dto.consent_granted,
+            purpose_code=dto.purpose_code,
+            features=features,
+            human_decision=dto.human_decision,
+            override_justification=dto.override_justification,
+            attachment_sha256=prepared.sha256_hex if prepared else "NONE",
+            attachment_size_bytes=prepared.size_bytes if prepared else 0,
+            user_role=dto.user_role,
+            audit_action=dto.action,
+            pre_shielded_text=prepared.reduced_masked_text if prepared else None,
+            pre_shielded_meta=prepared.shield_meta if prepared else None,
+            request_id_override=request_id,
+        )
 
-    packet = await state.pipeline.process(gateway_in)
+        packet = await state.pipeline.process(gateway_in)
+    finally:
+        # Destrucción criptográfica garantizada si ocurre error antes de entrar al pipeline
+        state.vault.zeroize(request_id)
+
     if isinstance(packet, BlockedPacket):
         return ChatIAResponse(
             request_id=packet.request_id,
@@ -196,9 +337,9 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
             pii_count=0,
             detected_types=(),
             rif_mod11_verified=None,
-            file_name_sanitized=attachment.sanitized_name if attachment else None,
-            file_sha256=attachment.sha256_hex if attachment else None,
-            file_size_bytes=attachment.size_bytes if attachment else 0,
+            file_name_sanitized=prepared.sanitized_name if prepared else None,
+            file_sha256=prepared.sha256_hex if prepared else None,
+            file_size_bytes=prepared.size_bytes if prepared else 0,
             model_recommendation="BLOQUEADO_SEGURIDAD",
             human_decision="BLOQUEADO_SEGURIDAD",
             human_override=False,
@@ -208,6 +349,9 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
             block_index=packet.ledger.block_index,
             chain_verified=packet.ledger.chain_verified,
             latency_ms=0.0,
+            chunks_processed=prepared.chunks_processed if prepared else 0,
+            user_role=dto.user_role,
+            audit_action=dto.action,
         )
 
     total_latency = (
@@ -229,9 +373,9 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
         pii_count=packet.shield.pii_count,
         detected_types=packet.shield.detected_types,
         rif_mod11_verified=packet.shield.rif_mod11_verified,
-        file_name_sanitized=attachment.sanitized_name if attachment else None,
-        file_sha256=attachment.sha256_hex if attachment else None,
-        file_size_bytes=attachment.size_bytes if attachment else 0,
+        file_name_sanitized=prepared.sanitized_name if prepared else None,
+        file_sha256=prepared.sha256_hex if prepared else None,
+        file_size_bytes=prepared.size_bytes if prepared else 0,
         model_recommendation=packet.explica.model_recommendation,
         human_decision=packet.explica.human_decision,
         human_override=packet.explica.human_override,
@@ -241,6 +385,9 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
         block_index=packet.ledger.block_index,
         chain_verified=packet.ledger.chain_verified,
         latency_ms=total_latency,
+        chunks_processed=prepared.chunks_processed if prepared else 0,
+        user_role=dto.user_role,
+        audit_action=dto.action,
     )
 
 
@@ -248,14 +395,18 @@ class ChatController(Controller):
     path = f"{API_PREFIX}/chat"
     guards = [chat_api_guard]
 
-    @post("/message", status_code=HTTP_200_OK)
+    @post("/stream", status_code=HTTP_200_OK, request_max_body_size=MAX_CHAT_REQUEST_BYTES)
+    async def stream_upload(self, request: Request) -> ChatIAResponse:
+        return await _execute_chat_pipeline(request)
+
+    @post("/message", status_code=HTTP_200_OK, request_max_body_size=MAX_CHAT_REQUEST_BYTES)
     async def message(self, request: Request) -> ChatIAResponse:
         return await _execute_chat_pipeline(request)
 
-    @post("/upload", status_code=HTTP_200_OK)
+    @post("/upload", status_code=HTTP_200_OK, request_max_body_size=MAX_CHAT_REQUEST_BYTES)
     async def upload(self, request: Request) -> ChatIAResponse:
         return await _execute_chat_pipeline(request)
 
-    @post("/process", status_code=HTTP_200_OK)
+    @post("/process", status_code=HTTP_200_OK, request_max_body_size=MAX_CHAT_REQUEST_BYTES)
     async def process(self, request: Request) -> ChatIAResponse:
         return await _execute_chat_pipeline(request)

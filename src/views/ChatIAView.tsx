@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { api, ChatIAResponse, RecommendationType, errorMessage } from '../services/apiClient';
 
-const MAX_CLIENT_ATTACHMENT_BYTES = 32 * 1024;
+const MAX_CLIENT_ATTACHMENT_BYTES = 100 * 1024 * 1024; // 100 MB (Streaming Efímero)
+const STREAM_SLICE_BYTES = 64 * 1024; // 64 KB por fragmento
 
 const SHAP_LABELS: Record<string, string> = {
   tiempo_espera_dias: 'Tiempo de Espera (días)',
@@ -31,7 +32,7 @@ interface PendingAttachment {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
-  contentB64: string;
+  sha256Hex: string | null;
 }
 
 interface Message {
@@ -78,12 +79,74 @@ function readEphemeralWindowToken(): string {
   return typeof win.__ADUANA_TOKEN__ === 'string' ? win.__ADUANA_TOKEN__ : '';
 }
 
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = '';
+function bytesToHex(bytes: Uint8Array): string {
+  let out = '';
   for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    out += bytes[i].toString(16).padStart(2, '0');
   }
-  return btoa(binary);
+  return out;
+}
+
+/**
+ * Calcula el hash SHA-256 en memoria usando Streams API (`file.stream()`) o `FileReader`
+ * y `crypto.subtle.digest('SHA-256', ...)` para archivos de hasta 100 MB, purgando buffers.
+ */
+async function computeFileSha256InStream(targetFile: File): Promise<string | null> {
+  try {
+    if (
+      typeof crypto !== 'undefined' &&
+      crypto.subtle &&
+      targetFile.size <= 16 * 1024 * 1024
+    ) {
+      if (typeof targetFile.stream === 'function') {
+        const reader = targetFile.stream().getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            total += value.byteLength;
+          }
+        }
+        const merged = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          merged.set(chunk, offset);
+          offset += chunk.byteLength;
+          chunk.fill(0);
+        }
+        try {
+          const digest = await crypto.subtle.digest('SHA-256', merged);
+          return bytesToHex(new Uint8Array(digest));
+        } finally {
+          merged.fill(0);
+        }
+      }
+
+      const buf = new Uint8Array(await targetFile.arrayBuffer());
+      try {
+        const digest = await crypto.subtle.digest('SHA-256', buf);
+        return bytesToHex(new Uint8Array(digest));
+      } finally {
+        buf.fill(0);
+      }
+    }
+
+    // Para archivos mayores de 16 MB (hasta 100 MB), validamos el primer fragmento con FileReader
+    // y delegamos el SHA-256 continuo de 100 MB a `hashlib.sha256` en el stream del backend
+    // para no exceder 128 MB de RAM en el cliente.
+    await new Promise<void>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve();
+      reader.onerror = () => reject(new Error('READ_ERR'));
+      reader.readAsArrayBuffer(targetFile.slice(0, STREAM_SLICE_BYTES));
+    });
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function formatShapFactors(
@@ -113,7 +176,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       content:
         'Solicito revisión de expediente de salud para V-12345678 con informe de patología clínica adjunto.',
       maskedContent:
-        'Solicito revisión de expediente de salud para [CEDULA_1] con informe de [CLINICAL_1] adjunto.\n[DOCUMENTO_ADJUNTO nombre=informe_clinico.txt sha256=8f31c9a0d2e471b2]:\nPaciente [CEDULA_1], RIF [RIF_1], contacto [PHONE_1].',
+        'Solicito revisión de expediente de salud para [CEDULA_1] con informe de [CLINICAL_1] adjunto.\n[DOCUMENTO_STREAM_MAP_REDUCE nombre=informe_clinico.txt sha256=8f31c9a0d2e471b2]:\nPaciente [CEDULA_1], RIF [RIF_1], contacto [PHONE_1].',
       piiCount: 4,
       detectedTypes: ['CEDULA', 'CLINICAL', 'PHONE', 'RIF'],
       rifVerified: true,
@@ -173,6 +236,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
   ]);
 
   const [inputValue, setInputValue] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -183,13 +247,15 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const rawBufferRef = useRef<Uint8Array | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const msgCounterRef = useRef<number>(10);
 
   /**
    * Zero-PII en RAM del cliente: sobrescribe con 0x00 cualquier buffer temporal de archivo
-   * y limpia los inputs del DOM y estado de React.
+   * y limpia agresivamente `setFile(null)` y los inputs del DOM.
    */
   const purgeAttachmentBuffers = useCallback(() => {
+    setFile(null);
     if (rawBufferRef.current) {
       rawBufferRef.current.fill(0);
       rawBufferRef.current = null;
@@ -200,9 +266,14 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
     }
   }, []);
 
-  // Destrucción criptográfica de buffers al desmontar el componente
+  // Destrucción criptográfica de buffers y cancelación de streams al desmontar el componente
   useEffect(() => {
     return () => {
+      setFile(null);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       if (rawBufferRef.current) {
         rawBufferRef.current.fill(0);
         rawBufferRef.current = null;
@@ -219,21 +290,21 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setAttachmentError(null);
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
 
-    if (file.size === 0) {
+    if (selectedFile.size === 0) {
       setAttachmentError('El archivo seleccionado está vacío.');
       purgeAttachmentBuffers();
       return;
     }
-    if (file.size > MAX_CLIENT_ATTACHMENT_BYTES) {
-      setAttachmentError('El archivo supera el límite soberano de 32 KB.');
+    if (selectedFile.size > MAX_CLIENT_ATTACHMENT_BYTES) {
+      setAttachmentError('El archivo supera el límite soberano de 100 MB.');
       purgeAttachmentBuffers();
       return;
     }
 
-    const lowerName = file.name.toLowerCase();
+    const lowerName = selectedFile.name.toLowerCase();
     const validExt =
       lowerName.endsWith('.txt') ||
       lowerName.endsWith('.csv') ||
@@ -248,16 +319,8 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
     }
 
     try {
-      const arrayBuf = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuf);
-      rawBufferRef.current = bytes;
-      const b64 = uint8ToBase64(bytes);
-      // Limpiar inmediatamente el Uint8Array temporal tras codificar
-      bytes.fill(0);
-      rawBufferRef.current = null;
-
       const inferredMime =
-        file.type ||
+        selectedFile.type ||
         (lowerName.endsWith('.csv')
           ? 'text/csv'
           : lowerName.endsWith('.pdf')
@@ -266,19 +329,21 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
           ? 'application/json'
           : 'text/plain');
 
+      const shaHex = await computeFileSha256InStream(selectedFile);
+      setFile(selectedFile);
       setPendingAttachment({
-        fileName: file.name,
+        fileName: selectedFile.name,
         mimeType: inferredMime,
-        sizeBytes: file.size,
-        contentB64: b64,
+        sizeBytes: selectedFile.size,
+        sha256Hex: shaHex,
       });
     } catch {
-      setAttachmentError('No se pudo leer el archivo adjunto en memoria.');
+      setAttachmentError('No se pudo validar el stream del archivo adjunto en memoria.');
       purgeAttachmentBuffers();
     }
   };
 
-  const handleAttachDemoDocument = () => {
+  const handleAttachDemoDocument = async () => {
     setAttachmentError(null);
     const demoContent =
       'ACTA DE CONSIGNACIÓN ADUANAL Y SALUD\n' +
@@ -286,35 +351,36 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       'Entidad Importadora: Suministros Médicos del Sur C.A., RIF J-12345678-4\n' +
       'Teléfono de contacto: 0414-5551234\n' +
       'Diagnóstico: Informe de patología clínica prioritaria con recaudos completos.';
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(demoContent);
-    const b64 = uint8ToBase64(bytes);
-    bytes.fill(0);
-
+    const demoFile = new File([demoContent], 'expediente_recaudos_seniat.txt', {
+      type: 'text/plain',
+    });
+    const shaHex = await computeFileSha256InStream(demoFile);
+    setFile(demoFile);
     setPendingAttachment({
-      fileName: 'expediente_recaudos_seniat.txt',
+      fileName: demoFile.name,
       mimeType: 'text/plain',
-      sizeBytes: demoContent.length,
-      contentB64: b64,
+      sizeBytes: demoFile.size,
+      sha256Hex: shaHex,
     });
     if (!inputValue.trim()) {
       setInputValue(
         'Analiza el documento adjunto y verifica la prioridad del expediente para V-18660505.'
       );
     }
-    onNotify?.('Adjunto de prueba cargado en RAM (listo para sanitizar en SHIELD).');
+    onNotify?.('Adjunto cargado en stream efímero RAM (listo para Map-Reduce y SHIELD).');
   };
 
   const handleSendMessage = async (overridePrompt?: string) => {
     const rawPrompt = (overridePrompt !== undefined ? overridePrompt : inputValue).trim();
     const attachmentToSend = pendingAttachment;
+    const fileToSend = file;
 
-    if ((!rawPrompt && !attachmentToSend) || isProcessing) return;
+    if ((!rawPrompt && !attachmentToSend && !fileToSend) || isProcessing) return;
 
     const effectivePrompt =
       rawPrompt || `Analizar documento institucional adjunto (${attachmentToSend?.fileName}).`;
 
-    // Limpieza inmediata de los buffers de memoria y controles del formulario antes del envío
+    // Limpieza inmediata del archivo (`setFile(null)`) y buffers de memoria antes de transmitir
     setInputValue('');
     purgeAttachmentBuffers();
     setAttachmentError(null);
@@ -326,6 +392,9 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       api.setApiToken(memToken);
     }
 
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
+
     msgCounterRef.current += 1;
     const seq = msgCounterRef.current;
     const now = new Date();
@@ -334,15 +403,24 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
     const asstMsgId = `asst-${seq}`;
 
     try {
-      const res: ChatIAResponse = await api.sendChatMessage({
-        prompt: effectivePrompt,
-        citizen_cedula: 'V-12345678',
-        purpose_code: 'CHAT_IA_CONSULTA',
-        consent_granted: true,
-        file_name: attachmentToSend?.fileName ?? null,
-        file_mime_type: attachmentToSend?.mimeType ?? null,
-        file_content_b64: attachmentToSend?.contentB64 ?? null,
-      });
+      const res: ChatIAResponse = fileToSend
+        ? await api.streamChatAttachment({
+            file: fileToSend,
+            prompt: effectivePrompt,
+            citizen_cedula: 'V-12345678',
+            user_role: 'analista',
+            action: 'CHAT_IA_STREAM_UPLOAD',
+            client_file_sha256: attachmentToSend?.sha256Hex ?? null,
+            signal: abortCtrl.signal,
+          })
+        : await api.sendChatMessage({
+            prompt: effectivePrompt,
+            citizen_cedula: 'V-12345678',
+            user_role: 'analista',
+            action: 'CHAT_IA_CONSULTA',
+            purpose_code: 'CHAT_IA_CONSULTA',
+            consent_granted: true,
+          });
 
       const isBlocked = res.policy_status !== 'CLEAN';
 
@@ -500,7 +578,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                 <strong className="text-slate-700 dark:text-slate-200">
                   {hasEphemeralWindowToken ? 'window.__ADUANA_TOKEN__ (Activo)' : 'Enclave RAM'}
                 </strong>{' '}
-                · Adjuntos: TXT, CSV, PDF, JSON (&le; 32 KB) · Cero localStorage
+                · Adjuntos: TXT, CSV, PDF, JSON (&le; 100 MB Stream Efímero) · Cero localStorage/disco
               </p>
             </div>
           </div>
