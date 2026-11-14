@@ -36,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0b0f19]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 py-2 sm:py-2.5 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[84px] md:min-h-[92px] py-2 sm:py-2.5 flex items-center justify-between gap-4">
         
         {/* Brand Logo and Live Status Indicator */}
         <div className="flex items-center space-x-3 shrink-0">
@@ -47,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img 
               src={logoImg} 
               alt="Aduana IA" 
-              className="h-12 sm:h-14 md:h-16 w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+              className="h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
             />
           </button>
 
