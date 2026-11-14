@@ -1,4 +1,4 @@
-export type NavTabId = 'pasarela' | 'ledger' | 'explicabilidad' | 'canal';
+export type NavTabId = 'pasarela' | 'chat' | 'ledger' | 'explicabilidad' | 'canal';
 
 export interface NavTabItem {
   id: NavTabId;
