@@ -17,7 +17,9 @@ from tests.e2e_harness.support import IndexReferences, assert_asset_type
 @pytest.fixture
 def static_client(tmp_path: Path) -> Iterator[TestClient]:
     # Settings only accepts static_dir inside PROJECT_ROOT; keep this copy in our allowed area.
-    with tempfile.TemporaryDirectory(prefix="static-copy-", dir=PROJECT_ROOT / "tests/e2e_harness") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="static-copy-", dir=PROJECT_ROOT / "tests/e2e_harness"
+    ) as directory:
         static_dir = Path(directory) / "static"
         shutil.copytree(PROJECT_ROOT / "static", static_dir)
         settings = Settings(
@@ -52,7 +54,9 @@ def test_static_assets(static_client: TestClient) -> None:
 @pytest.mark.parametrize("route", ["/tramites/e2e", "/auditoria/e2e"])
 def test_unknown_front_route_never_returns_500(static_client: TestClient, route: str) -> None:
     response = static_client.get(route)
-    assert response.status_code in {200, 404}, "Unknown frontend route must not produce a server error"
+    assert (
+        response.status_code in {200, 404}
+    ), "Unknown frontend route must not produce a server error"
 
 
 def test_spa_deep_link_returns_controlled_404(static_client: TestClient) -> None:

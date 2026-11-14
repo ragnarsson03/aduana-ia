@@ -28,7 +28,7 @@ class LiveStack:
 @pytest.fixture(scope="session")
 def live_stack() -> Iterator[LiveStack]:
     env = {**os.environ, "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1"}
-    process = subprocess.Popen(
+    process = subprocess.Popen(  # noqa: S603
         [sys.executable, str(ROOT / "scripts/run_e2e_stack.py"), "--duration", "180"],
         cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         text=True, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,

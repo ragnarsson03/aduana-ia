@@ -26,7 +26,9 @@ def _body(features: dict[str, float]) -> dict:
 
 
 def test_valid_features_are_accepted(client: TestClient) -> None:
-    response = client.post("/api/v1/gateway/process", json=_body(VALID_FEATURES), headers=TOKEN_HEADERS)
+    response = client.post(
+        "/api/v1/gateway/process", json=_body(VALID_FEATURES), headers=TOKEN_HEADERS
+    )
     assert response.status_code == 201, response.text
     assert 0.0 <= response.json()["probability_score"] <= 1.0
 

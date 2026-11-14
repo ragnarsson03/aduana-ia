@@ -96,7 +96,8 @@ def test_full_api_flow_and_disk_privacy(live_http: httpx.Client, live_stack: Liv
     assert shield.json()["pii_count"] >= 1
     assert_no_cedula(shield.content, "Shield response")
     # The redacted text is safe to forward, unlike the mandatory raw ingress DTO.
-    assert_no_cedula(json.dumps({"raw_text": shield.json()["masked_text"]}).encode(), "masked request")
+    masked_json = json.dumps({"raw_text": shield.json()["masked_text"]}).encode()
+    assert_no_cedula(masked_json, "masked request")
     processed = live_http.post("/api/v1/gateway/process", json=payload)
     assert processed.status_code == 201
     assert_no_cedula(processed.content, "Gateway response")
@@ -151,11 +152,12 @@ def test_ingress_request_bodies_do_not_expose_cedula(live_http: httpx.Client, ro
     response = live_http.post(route, json=body)
     assert response.status_code == 201
     assert_no_cedula(response.content, "API response")
-    assert_no_cedula(response.request.content, "ingress body (FINDING: API requires clear synthetic cedula)")
+    ingress_msg = "ingress body (FINDING: API requires clear synthetic cedula)"
+    assert_no_cedula(response.request.content, ingress_msg)
 
 
 def test_duration_shuts_down_and_removes_temporary_db() -> None:
-    completed = subprocess.run(
+    completed = subprocess.run(  # noqa: S603
         [sys.executable, str(ROOT / "scripts/run_e2e_stack.py"), "--duration", "0.2"],
         cwd=ROOT, env={**os.environ, "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
         capture_output=True, text=True, timeout=45,

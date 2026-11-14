@@ -16,12 +16,12 @@ from litestar.exceptions import HTTPException
 from litestar.middleware import DefineMiddleware
 from litestar.static_files import create_static_files_router
 
-from app.headers_middleware import security_headers_middleware
 from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
 from app.controllers.ledger import DemoLedgerController, LedgerController
 from app.controllers.metrics import MetricsController
 from app.dependencies import AppState, build_state
+from app.headers_middleware import security_headers_middleware
 from core.config import (
     MAX_BODY_BYTES,
     Settings,
