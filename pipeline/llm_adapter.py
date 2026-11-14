@@ -278,9 +278,7 @@ class CircuitBreaker:
                 if self._state == "HALF_OPEN" or self._failure_count >= self._failure_threshold:
                     self._state = "OPEN"
                     self._opened_at = self._clock()
-                return await self._call_fallback(
-                    prompt, prompt_hash=prompt_hash, started=started
-                )
+                return await self._call_fallback(prompt, prompt_hash=prompt_hash, started=started)
 
             self._failure_count = 0
             self._state = "CLOSED"

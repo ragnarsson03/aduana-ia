@@ -1,1 +1,4 @@
-"""Etapas verticales del pipeline: consent -> shield -> guard-in -> LLM -> guard-out -> explica -> ledger."""
+"""Etapas verticales del pipeline.
+
+Flujo: consent -> shield -> guard-in -> LLM -> guard-out -> explica -> ledger.
+"""

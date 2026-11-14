@@ -22,8 +22,12 @@ def test_consent_digest_is_binding() -> None:
     assert a.granted and a.purpose_code == "BECA" and a.timestamp_utc == TS
     assert a.consent_hash == crypto.consent_hash("fixture-001", TS, "BECA", "b" * 64)
     assert a == validate_consent("fixture-001", True, "BECA", TS, "b" * 64)
-    assert a.consent_hash != validate_consent("fixture-001", True, "SALUD", TS, "b" * 64).consent_hash
-    assert a.consent_hash != validate_consent("fixture-001", True, "BECA", TS, "c" * 64).consent_hash
+    assert (
+        a.consent_hash != validate_consent("fixture-001", True, "SALUD", TS, "b" * 64).consent_hash
+    )
+    assert (
+        a.consent_hash != validate_consent("fixture-001", True, "BECA", TS, "c" * 64).consent_hash
+    )
 
 
 class Clock:

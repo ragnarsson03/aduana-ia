@@ -161,7 +161,9 @@ ENTRY = LedgerEntry(
 )
 
 
-def _payload(entry: LedgerEntry = ENTRY, index: int = 1, prev: str = "0" * 64, key_id: str = "k") -> bytes:
+def _payload(
+    entry: LedgerEntry = ENTRY, index: int = 1, prev: str = "0" * 64, key_id: str = "k"
+) -> bytes:
     return crypto.canonical_block_payload(entry, index=index, prev_hash=prev, key_id=key_id)
 
 
@@ -171,9 +173,19 @@ def test_canonical_payload_is_compact_sorted_ascii_json_covering_all_fields() ->
     assert list(data) == sorted(data)
     assert b" " not in payload
     assert set(data) == {
-        "block_index", "request_id", "timestamp_utc", "blind_citizen_id", "payload_hash",
-        "prev_hash", "security_verdict", "model_recommendation", "human_decision",
-        "human_override", "citizen_receipt_code", "override_justification_hash", "key_id",
+        "block_index",
+        "request_id",
+        "timestamp_utc",
+        "blind_citizen_id",
+        "payload_hash",
+        "prev_hash",
+        "security_verdict",
+        "model_recommendation",
+        "human_decision",
+        "human_override",
+        "citizen_receipt_code",
+        "override_justification_hash",
+        "key_id",
     }
 
 

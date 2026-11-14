@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.errors import VaultError, VaultExpiredError, VaultSessionNotFoundError
 from core.ephemeral_vault import EphemeralVault
+from core.errors import VaultError, VaultExpiredError, VaultSessionNotFoundError
 
 PII = {"[CEDULA_1]": "V-12345678", "[PHONE_1]": "0414-1234567"}
 
@@ -46,7 +46,9 @@ def test_unknown_session_raises(vault: EphemeralVault) -> None:
         vault.get_map("nope")
 
 
-def test_ttl_boundary_is_strictly_greater_than_180s(vault: EphemeralVault, clock: FakeClock) -> None:
+def test_ttl_boundary_is_strictly_greater_than_180s(
+    vault: EphemeralVault, clock: FakeClock
+) -> None:
     vault.put("r1", PII)
     clock.now += 180.0
     assert dict(vault.get_map("r1")) == PII  # exactamente 180 s: vigente
@@ -55,7 +57,9 @@ def test_ttl_boundary_is_strictly_greater_than_180s(vault: EphemeralVault, clock
         vault.get_map("r1")
 
 
-def test_expired_session_is_purged_after_failed_get(vault: EphemeralVault, clock: FakeClock) -> None:
+def test_expired_session_is_purged_after_failed_get(
+    vault: EphemeralVault, clock: FakeClock
+) -> None:
     vault.put("r1", PII)
     clock.now += 181
     with pytest.raises(VaultExpiredError):
@@ -129,7 +133,9 @@ def test_put_same_request_id_replaces_and_wipes_previous(vault: EphemeralVault) 
     assert dict(vault.get_map("r1")) == {"[CEDULA_1]": "V-22222222"}
 
 
-def test_put_with_invalid_value_keeps_previous_session_and_does_not_echo(vault: EphemeralVault) -> None:
+def test_put_with_invalid_value_keeps_previous_session_and_does_not_echo(
+    vault: EphemeralVault,
+) -> None:
     vault.put("r1", {"[CEDULA_1]": "V-11111111"})
     for bad in ({"[CEDULA_1]": 5}, {"[CEDULA_1]": "V-\ud800"}):
         with pytest.raises(VaultError) as info:
@@ -187,5 +193,7 @@ def test_vault_does_not_store_raw_input_api() -> None:
     import inspect
 
     assert list(inspect.signature(EphemeralVault.put).parameters) == [
-        "self", "request_id", "token_map",
+        "self",
+        "request_id",
+        "token_map",
     ]

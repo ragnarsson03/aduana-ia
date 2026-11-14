@@ -13,7 +13,7 @@ from litestar.connection import ASGIConnection
 from litestar.exceptions import HTTPException, NotAuthorizedException
 from litestar.handlers.base import BaseRouteHandler
 
-TOKEN_HEADER: Final[str] = "x-aduana-token"
+TOKEN_HEADER: Final[str] = "x-aduana-token"  # noqa: S105 (nombre de cabecera HTTP)
 _BODY_METHODS: Final[frozenset[str]] = frozenset({"POST", "PUT", "PATCH"})
 
 
