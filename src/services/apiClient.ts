@@ -111,6 +111,7 @@ export class AduanaApiClient {
     this.apiToken =
       config.apiToken ||
       (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) ||
+      ((import.meta as any).env?.VITE_ADUANA_TOKEN as string | undefined) ||
       '';
     this.timeoutMs = config.timeoutMs ?? 4000;
   }
@@ -137,7 +138,8 @@ export class AduanaApiClient {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     // El token puede inyectarse tras la carga (evaluate_js de la app de escritorio): se lee en cada llamada.
     const activeToken =
-      (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) || this.apiToken;
+      (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) ||
+      this.apiToken;
 
     let response: Response;
     try {
