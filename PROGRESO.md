@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-13. Estado: 265 tests pasan, 2 CA en `xfail(strict=True)`. Gatillo 2 y Gatillo 3 completos y certificados.
+> Última actualización: 2026-11-13. Estado: 274 tests pasan, 1 CA en `xfail(strict=True)` (CA-06). Gatillos 2, 3 y 4 completos y certificados.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -67,6 +67,13 @@
 - [x] `tests/test_ca05_restrictive_storage.py`: convertido en test real `test_ca05_db_and_wal_hold_zero_plaintext_pii_after_20_requests` (20 trámites simulados, auditoría binaria de `.db`, `-wal`, `-shm` con 0 bytes de PII).
 - [x] Removido xfail de CA-03 en `tests/test_acceptance_matrix.py`.
 
+### Gatillo 4 — EXPLICA (CA-04, completo y verificado)
+- [x] `data/synthetic_tramites.csv`: 60 trámites sintéticos deterministas con 5 variables objetivas (sin PII) y medias poblacionales calculadas.
+- [x] `pipeline/stage5_explica.py`: sigmoide numéricamente estable con bifurcación por signo, descomposición de contribuciones directas ($c_j = \beta_j x_j$) y SHAP lineal ($\phi_j = \beta_j (x_j - \mu_j)$), axioma de eficiencia ($\text{base\_SHAP} + \sum \phi_j = z$), error de reconstrucción $< 10^{-9}$, cero `random()`, validación estricta de esquemas numéricos finitos.
+- [x] Decisión humana y override vinculante: confirmación humana vs override obligatorio con justificación $\ge 20$ y $\le 500$ caracteres (`OverrideJustificationError` ante incumplimiento).
+- [x] `tests/test_ca04_explica.py`: 9 pruebas unitarias pasando (descomposición exacta del oráculo de prueba, vector cero, medias poblacionales, grid determinista de 243 puntos, comprobación anti-random, validación de justificaciones y dataset sintético institucional).
+- [x] Removido xfail de CA-04 en `tests/test_acceptance_matrix.py`.
+
 ## EN CURSO
 - [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
 - [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
@@ -78,11 +85,6 @@
 - [x] **Alcance de CA-01 decidido (usuario, opción A):** < 20 ms para textos de hasta 10 000 caracteres; la API sigue aceptando hasta 20 000 (`MAX_RAW_TEXT_CHARS`) sin garantía de 20 ms por encima de 10 000. Documentado en `specs/01_shield.spec.md` y fijado en `tests/test_ca01_shield.py`.
 - [ ] Reescribir `specs/01_shield.spec.md` (firmas reales; **corregir vector `J-00000000-9`: el verificador correcto es 0**; mover "inconsistencias" a "decisiones tomadas").
 - [ ] Límites conocidos sin cubrir (documentados en `core/pii_patterns.py`): nombres sin marcador/minúsculas, base32/ROT13/entidades HTML/`%NN`, números en palabras, clínicos con variantes (`seropositivo`, `d i a b e t e s`), falsos positivos clínicos en texto comercial ("depresión del mercado").
-
-### P2 — Gatillo 4: EXPLICA (CA-04)
-- [ ] `data/synthetic_tramites.csv` (sintético, determinista) y coeficientes β/μ fijos (5 variables); `explain(features, human_decision, override_justification)`.
-- [ ] Sigmoide **numéricamente estable** (rama por signo de z); validar que `features` tenga exactamente las claves esperadas y valores finitos; error de reconstrucción del logit < 1e-9; sin `random`/numpy/scikit-learn.
-- [ ] Override humano: justificación ≥ 20 y ≤ 500 caracteres, pasada por SHIELD antes de aceptarse; valor por defecto de `human_decision` cuando es `None` (definir). Spec: `specs/04_explica.spec.md`.
 
 ### P2 — Gatillo 5: LLM y Circuit Breaker (CA-06)
 - [ ] `OfflineDeterministicAdapter` (resumen determinista sin red), `OllamaAdapter` y `OpenAICompatAdapter` (httpx; allowlist de hosts, sin redirects, respuesta acotada; **híbrido opt-in**).

@@ -1,6 +1,6 @@
 # 04 — EXPLICA: regresión logística, SHAP lineal y decisión humana
 
-**Estado:** especificación viva de Gatillo 4. `explain` es un stub; no existen aún dataset de calibración ni coeficientes publicados. No se asignan pesos ni umbrales de prioridad como si fueran institucionales.
+**Estado:** implementado y certificado en Gatillo 4 (CA-04). Coeficientes deterministas, modelo oráculo y modelo institucional calibrado sobre `data/synthetic_tramites.csv`. Suite de tests en `tests/test_ca04_explica.py`.
 
 ## Alcance y trazabilidad
 
