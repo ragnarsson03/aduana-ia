@@ -6,6 +6,7 @@ import json
 import re
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -88,7 +89,13 @@ def test_launcher_scripts_exist() -> None:
 
 
 @pytest.mark.integration
-def test_granian_subprocess_real_execution_and_token_auth() -> None:
+def test_granian_subprocess_real_execution_and_token_auth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Aislado de data/: el ledger local persistente (llave de desarrollo) no debe contaminarlo.
+    monkeypatch.setenv("ADUANA_DB_PATH", str(tmp_path / "ledger.db"))
+    for name in ("ADUANA_MASTER_KEY", "ADUANA_RBAC", "ADUANA_USERS_DB_PATH"):
+        monkeypatch.delenv(name, raising=False)
     port = desktop._free_port()
     token = "d" * 40
     proc = desktop.start_server_process(port, token)

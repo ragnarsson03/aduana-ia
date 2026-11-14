@@ -100,7 +100,8 @@
 - [x] **Login único (decisión del usuario: "no hay que tener 2 login, es uno solo, y dejar el más seguro")**: se retiró el login de PR #11 (`pipeline/auth.py`, JWT HS256, PBKDF2 310k, esquema `roles_aduana`). Se conserva `core/identity.py` y se portó lo útil del otro: logout con revocación por `jti` y auditoría de login/logout en el ledger. API única `/api/v1/auth/{login,logout,me}`; el servidor deriva `allowed_tabs`/`default_tab` de los permisos reales (`core/ui_profile.py`).
 - [x] Tests: 858 passed (backend, sin harness e2e). Nuevos: `tests/test_auth_unified.py` (18).
 - [ ] **Pendiente de revisión humana:** `seed_d1.sql` y `scripts/generate_d1_seed.py` (despliegue Cloudflare D1) siguen sembrando usuarios con el esquema del login retirado y contraseñas débiles de demo; no se tocaron.
-- [ ] Con RBAC apagado (`ADUANA_RBAC` sin `1`) el login responde `503 RBAC_DISABLED`: los lanzadores del escritorio y el harness e2e deben arrancar con RBAC activo y usuarios sembrados.
+- [x] El escritorio (`python -m app.desktop`, `iniciar_escritorio.bat/.sh`) arranca con RBAC: `app/rbac_bootstrap.py` usa `ADUANA_MASTER_KEY` si existe o crea/lee `data/dev_master.key` (solo desarrollo local; en producción, vault/DPAPI), fija `ADUANA_RBAC=1` y siembra los usuarios una sola vez (credenciales en `data/seed_credenciales.local.json`). `ADUANA_RBAC=0` lo desactiva. Con RBAC apagado el login responde `503 RBAC_DISABLED`.
+- [ ] `scripts/run_e2e_stack.py` y el harness e2e siguen en modo demo sin RBAC (no usan login).
 - [ ] Canal Seguro: `chat:canal` es solo permiso; la mensajería del front es simulada, no hay backend.
 
 ## EN CURSO
