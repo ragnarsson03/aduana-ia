@@ -15,15 +15,33 @@ from litestar.connection import ASGIConnection
 from litestar.exceptions import HTTPException
 from litestar.handlers.base import BaseRouteHandler
 
-from core.context import UsuarioAduana
+from core.context import AduanaRoleType, UsuarioAduana
 from core.errors import AuthenticationError
 from core.identity import AUTH_ERROR_MESSAGE
 from core.rbac import Permission
 
 SCOPE_USER_KEY: Final[str] = "aduana_user"
 _BEARER_SCHEME: Final[str] = "bearer"
+_DEMO_COOKIE_NAME: Final[str] = "aduana_session"
+_DEMO_ROLE_TO_ADUANA: Final[dict[str, AduanaRoleType]] = {
+    "administrador": "SUPERVISOR_PUERTO_ADUANERO",
+    "auditor": "INSPECTOR_TRIBUTARIO_SENIAT",
+    "analista": "ANALISTA_VALORACION_ADUANERA",
+}
 
 Guard = Callable[[ASGIConnection, BaseRouteHandler], None]
+
+
+def _extract_demo_token(connection: ASGIConnection) -> str:
+    header = connection.headers.get("authorization", "")
+    scheme, _, token = header.partition(" ")
+    token = token.strip()
+    if scheme.lower() == _BEARER_SCHEME and token:
+        return token
+    cookie_token = connection.cookies.get(_DEMO_COOKIE_NAME, "").strip()
+    if cookie_token:
+        return cookie_token
+    raise AuthenticationError(AUTH_ERROR_MESSAGE)
 
 
 def extract_bearer(connection: ASGIConnection) -> str:
@@ -43,7 +61,28 @@ def authenticate(connection: ASGIConnection) -> UsuarioAduana | None:
     cached = connection.scope.get(SCOPE_USER_KEY)
     if cached is not None:
         return cached
-    user = state.identity.resolve_token(extract_bearer(connection))
+    if state.settings.demo_mode:
+        token = _extract_demo_token(connection)
+        if token.startswith("v1."):
+            user = state.identity.resolve_token(token)
+        else:
+            entry = state.session_store.validate_jwt(state.keys, token)
+            if entry is None:
+                raise AuthenticationError(AUTH_ERROR_MESSAGE)
+            demo_user = state.auth_repo.find_active_by_id(entry.user_id)
+            if demo_user is None:
+                raise AuthenticationError(AUTH_ERROR_MESSAGE)
+            aduana_role = _DEMO_ROLE_TO_ADUANA.get(demo_user.role, "ANALISTA_VALORACION_ADUANERA")
+            user = UsuarioAduana(
+                user_id=demo_user.id,
+                codigo_usuario=demo_user.username,
+                blind_identifier=demo_user.id,
+                rol=aduana_role,
+                estado="ACTIVO",
+                created_utc="",
+            )
+    else:
+        user = state.identity.resolve_token(extract_bearer(connection))
     connection.scope[SCOPE_USER_KEY] = user  # type: ignore[typeddict-unknown-key]
     return user
 
