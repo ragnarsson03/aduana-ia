@@ -109,6 +109,8 @@ def _shutdown_handler(app: Litestar) -> None:
     state: AppState = app.state.aduana
     state.vault.zeroize_all()
     state.repo.close()
+    if state.identity is not None:
+        state.identity.close()
     if state.users_repo is not None:
         state.users_repo.close()
 
@@ -127,6 +129,7 @@ def create_app(
 
     handlers: list = [
         HealthController,
+        AuthController,
         GatewayController,
         ShieldController,
         LedgerController,
@@ -136,7 +139,6 @@ def create_app(
     if settings.rbac_enabled:
         handlers.extend(
             [
-                AuthController,
                 UsuariosController,
                 ExplicaController,
                 AuditController,

@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { NavTabId, NavTabItem } from '../../types';
 import { AuthUser } from '../../types/auth';
-import { ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from '../../constants/mockAuth';
 import logoImg from '../../assets/Logo.png';
 import logoWhiteImg from '../../assets/Logo-white.png';
 
@@ -54,16 +53,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const allNavItems: NavTabItem[] = [
     { id: 'pasarela', label: 'Pasarela' },
-    { id: 'chat', label: 'Chat IA', hasDot: true, dotColor: 'bg-indigo-500' },
+    { id: 'chat', label: 'Nexus IA', hasDot: true, dotColor: 'bg-indigo-500' },
     { id: 'ledger', label: 'Ledger' },
     { id: 'explicabilidad', label: 'Explicabilidad' },
     { id: 'canal', label: 'Canal Seguro', hasDot: true, dotColor: 'bg-emerald-500' },
   ];
 
   // Filter based on user's authorized role tabs
-  const allowedTabs = currentUser ? ROLE_ALLOWED_TABS[currentUser.role] : allNavItems.map(i => i.id);
+  const allowedTabs = currentUser ? currentUser.allowedTabs : allNavItems.map(i => i.id);
   const navItems = allNavItems.filter(item => allowedTabs.includes(item.id));
-  const homeTab = currentUser ? ROLE_DEFAULT_TAB[currentUser.role] : 'pasarela';
+  const homeTab = currentUser ? currentUser.defaultTab : 'pasarela';
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0b0f19]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
@@ -81,11 +80,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               alt="Aduana IA" 
               className="block dark:hidden h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
             />
-            {/* Logo en Modo Oscuro (Blanco / Luminoso) */}
+            {/* Logo en Modo Oscuro (Adaptado para fondo oscuro con detalles y colores originales) */}
             <img 
               src={logoWhiteImg} 
               alt="Aduana IA" 
-              className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_0_12px_rgba(255,255,255,0.25)]"
+              className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:drop-shadow-[0_0_14px_rgba(79,70,229,0.3)]"
             />
           </button>
 

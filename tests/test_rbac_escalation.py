@@ -167,7 +167,7 @@ def api(tmp_path: Path) -> Iterator[tuple[TestClient, dict[str, str]]]:
             "/api/v1/auth/login",
             json={"identificador": "V-90000101", "password": PASSWORD},
             headers=HEADERS,
-        ).json()["token"]
+        ).json()["session_token"]
         yield client, {**HEADERS, "Authorization": f"Bearer {token}"}
 
 

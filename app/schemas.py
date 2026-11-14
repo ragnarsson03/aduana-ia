@@ -116,14 +116,40 @@ class LoginRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
         return "LoginRequest(<redacted>)"
 
 
+class LoginUserOut(msgspec.Struct, frozen=True):
+    id: str
+    username: str
+    full_name: str
+    short_name: str
+    avatar_text: str
+    role: Literal["analista", "administrador", "auditor"]  # rol de presentación (UI)
+    role_label: str
+    aduana_role: AduanaRoleType  # rol aduanero real (fuente de los permisos)
+    clearance_level: str
+    entity: str
+    department: str
+    permissions: tuple[str, ...]
+    default_tab: Literal["pasarela", "chat", "ledger", "explicabilidad", "canal"]
+    allowed_tabs: tuple[str, ...]
+
+
 class LoginResponse(msgspec.Struct, frozen=True):
-    token: str
-    codigo_usuario: str
-    rol: AduanaRoleType
+    authenticated: bool
+    session_token: str
+    token_type: Literal["Bearer"]
+    expires_in_seconds: int
     expires_at: int
+    user: LoginUserOut
+    block_index: int
+    citizen_receipt_code: str
 
     def __repr__(self) -> str:  # Zero-Leak
         return "LoginResponse(<redacted>)"
+
+
+class LogoutResponse(msgspec.Struct, frozen=True):
+    revoked: bool
+    jti: str
 
 
 class MeResponse(msgspec.Struct, frozen=True):

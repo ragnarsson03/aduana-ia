@@ -10,28 +10,19 @@ import { ProfileView } from './views/ProfileView';
 import { LoginView } from './views/LoginView';
 import { NavTabId } from './types';
 import { AuthUser } from './types/auth';
-import { MOCK_AUTH_USERS, ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from './constants/mockAuth';
 import { CheckCircle2 } from 'lucide-react';
 import { OfflineBanner } from './components/OfflineBanner';
+import { api } from './services/apiClient';
 import { useBackendStatus } from './state/BackendStatus';
 import { LiveLedgerView } from './views/live/LiveLedgerView';
 import { LiveExplicabilidadView } from './views/live/LiveExplicabilidadView';
 
 export const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    if (typeof window !== 'undefined') {
-      const savedRole = localStorage.getItem('aduana_auth_role');
-      if (savedRole && MOCK_AUTH_USERS[savedRole]) {
-        return MOCK_AUTH_USERS[savedRole];
-      }
-    }
-    return MOCK_AUTH_USERS.auditor; // Default session: Auditora Principal (Deykary González)
-  });
+  // Zero-Trust: usuario y token de sesión viven exclusivamente en memoria RAM (sin localStorage/sessionStorage)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [_sessionToken, setSessionToken] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
-    const role = currentUser ? currentUser.role : 'auditor';
-    return ROLE_DEFAULT_TAB[role] || 'ledger';
-  });
+  const [activeTab, setActiveTab] = useState<NavTabId>('ledger');
   const [profileSection, setProfileSection] = useState<'profile' | 'settings'>('profile');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -59,9 +50,9 @@ export const App: React.FC = () => {
   // Guard active tab based on role permissions
   useEffect(() => {
     if (currentUser && activeTab !== 'perfil') {
-      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      const allowed = currentUser.allowedTabs;
       if (!allowed.includes(activeTab)) {
-        setActiveTab(ROLE_DEFAULT_TAB[currentUser.role] || 'ledger');
+        setActiveTab(currentUser.defaultTab);
       }
     }
   }, [currentUser, activeTab]);
@@ -76,9 +67,9 @@ export const App: React.FC = () => {
   const handleNavigate = (tab: NavTabId) => {
     // If user attempts to navigate to unauthorized tab, redirect to default
     if (currentUser && tab !== 'perfil') {
-      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      const allowed = currentUser.allowedTabs;
       if (!allowed.includes(tab)) {
-        const fallback = ROLE_DEFAULT_TAB[currentUser.role] || 'ledger';
+        const fallback = currentUser.defaultTab;
         setActiveTab(fallback);
         showNotification(`Acceso restringido: El rol ${currentUser.roleLabel} no tiene permisos para ese módulo.`);
         return;
@@ -94,18 +85,29 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLogin = (user: AuthUser) => {
+  const handleLogin = (user: AuthUser, token: string) => {
+    api.setSessionToken(token);
+    setSessionToken(token);
     setCurrentUser(user);
-    localStorage.setItem('aduana_auth_role', user.role);
-    const initialTab = ROLE_DEFAULT_TAB[user.role] || 'ledger';
+    const initialTab = user.defaultTab;
     setActiveTab(initialTab);
     showNotification(`Bienvenido(a), ${user.name}. Sesión iniciada con rol ${user.roleLabel}.`);
   };
 
+  // Un 401 en cualquier petición autenticada = sesión expirada o revocada: volver al login.
+  useEffect(() => {
+    api.onSessionExpired(() => {
+      setSessionToken(null);
+      setCurrentUser(null);
+    });
+    return () => api.onSessionExpired(null);
+  }, []);
+
   const handleLogout = () => {
+    void api.logout();
+    setSessionToken(null);
     setCurrentUser(null);
-    localStorage.removeItem('aduana_auth_role');
-    showNotification('Sesión cerrada. Claves efímeras purgadas de memoria confinada.');
+    showNotification('Sesión cerrada. Claves efímeras y JWT purgados de memoria confinada.');
   };
 
   // If no user is logged in, show the sovereign Login view

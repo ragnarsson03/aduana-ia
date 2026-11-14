@@ -7,12 +7,14 @@ usuario, para impedir la enumeración por contenido o por tiempo.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Final
 
 from core.auth import (
     PasswordRecord,
+    TokenClaims,
     blind_identifier,
     derive_key,
     hash_password,
@@ -67,6 +69,8 @@ class IdentityService:
         self._max_attempts = max_failed_attempts
         self._lockout = lockout_seconds
         self._clock = clock
+        self._revoked: dict[str, int] = {}  # jti -> exp (epoch); solo RAM, se poda al expirar
+        self._revoked_lock = threading.Lock()
 
     # --- autenticación ------------------------------------------------------------------------
 
@@ -102,13 +106,32 @@ class IdentityService:
             return None
         return self._repo.get_credentials(blind)
 
-    def resolve_token(self, token: str) -> UsuarioAduana:
-        """Firma, expiración y relectura del usuario (ACTIVO); devuelve el rol actual de la BD."""
-        claims = verify_token(self._keys, token, now=int(self._clock().timestamp()))
+    def resolve_session(self, token: str) -> tuple[UsuarioAduana, TokenClaims]:
+        """Firma, expiración, no-revocado y relectura del usuario (ACTIVO) con su rol ACTUAL."""
+        now = int(self._clock().timestamp())
+        claims = verify_token(self._keys, token, now=now)
+        with self._revoked_lock:
+            revoked = claims.token_id in self._revoked
         user = self._repo.get_by_id(claims.user_id)
-        if user is None or user.estado != "ACTIVO":
+        if revoked or user is None or user.estado != "ACTIVO":
             raise AuthenticationError(AUTH_ERROR_MESSAGE)
-        return user
+        return user, claims
+
+    def resolve_token(self, token: str) -> UsuarioAduana:
+        return self.resolve_session(token)[0]
+
+    def revoke_token(self, token: str) -> TokenClaims:
+        """Logout: el ``jti`` queda revocado hasta su expiración natural (idempotente)."""
+        _, claims = self.resolve_session(token)
+        now = int(self._clock().timestamp())
+        with self._revoked_lock:
+            self._revoked = {j: e for j, e in self._revoked.items() if e > now}  # poda
+            self._revoked[claims.token_id] = claims.expires_at
+        return claims
+
+    def close(self) -> None:
+        with self._revoked_lock:
+            self._revoked.clear()
 
     # --- administración -----------------------------------------------------------------------
 

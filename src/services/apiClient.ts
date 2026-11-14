@@ -14,6 +14,8 @@ import type {
   GatewayProcessResponse,
   HealthResponse,
   LedgerVerifyResponse,
+  LoginRequest,
+  LoginResponse,
   ShieldInspectResponse,
   TamperScenario,
   TamperSimResponse,
@@ -25,6 +27,8 @@ export type {
   GatewayProcessResponse,
   HealthResponse,
   LedgerVerifyResponse,
+  LoginRequest,
+  LoginResponse,
   RecommendationType,
   ShieldInspectResponse,
   TamperScenario,
@@ -41,6 +45,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
   ERR_OVERRIDE_JUSTIFICATION:
     'La decisión humana difiere de la recomendación: se requiere una justificación escrita válida.',
   UNAUTHORIZED: 'No autorizado: falta o es inválido el token de acceso de la aplicación.',
+  ERR_AUTH_INVALID: 'Credenciales inválidas.',
+  ERR_ACCOUNT_LOCKED: 'Cuenta bloqueada temporalmente. Intenta de nuevo en unos minutos.',
+  RBAC_DISABLED: 'El servidor no tiene el control de acceso (RBAC) activado.',
+  ERR_FORBIDDEN: 'Tu rol no tiene permiso para realizar esta operación.',
+  HTTP_422: 'Formato de cédula/RIF o contraseña inválido. Use V-12345678, E-12345678 o un RIF.',
   UNSUPPORTED_MEDIA_TYPE: 'Tipo de contenido no soportado: la solicitud debe ser application/json.',
   PAYLOAD_TOO_LARGE: 'El texto supera el tamaño máximo permitido.',
   BAD_REQUEST: 'Solicitud inválida: revise los campos del formulario.',
@@ -54,6 +63,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
 const STATUS_FALLBACK_CODES: Record<number, string> = {
   400: 'BAD_REQUEST',
   401: 'UNAUTHORIZED',
+  403: 'ERR_FORBIDDEN',
   404: 'NOT_FOUND',
   413: 'PAYLOAD_TOO_LARGE',
   415: 'UNSUPPORTED_MEDIA_TYPE',
@@ -94,7 +104,9 @@ const GATEWAY_TIMEOUT_MS = 60000;
 export class AduanaApiClient {
   private baseUrl: string;
   private apiToken: string;
+  private sessionJwt: string | null = null;
   private timeoutMs: number;
+  private sessionExpiredHandler: (() => void) | null = null;
 
   constructor(config: ApiClientConfig = {}) {
     // Si no se especifica, usa /api/v1 relativo (mismo origen que sirve Litestar)
@@ -112,6 +124,15 @@ export class AduanaApiClient {
 
   public setApiToken(token: string): void {
     this.apiToken = token;
+  }
+
+  public setSessionToken(token: string | null): void {
+    this.sessionJwt = token;
+  }
+
+  /** Registra el callback que se invoca cuando el servidor rechaza (401) la sesión activa. */
+  public onSessionExpired(handler: (() => void) | null): void {
+    this.sessionExpiredHandler = handler;
   }
 
   private async request<T>(
@@ -134,6 +155,7 @@ export class AduanaApiClient {
         headers: {
           'Content-Type': 'application/json',
           'X-Aduana-Token': activeToken,
+          ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
           ...(options.headers || {}),
         },
       });
@@ -152,6 +174,11 @@ export class AduanaApiClient {
         if (typeof body?.error === 'string' && body.error) code = body.error;
       } catch {
         // cuerpo no JSON: se conserva el código derivado del estado HTTP
+      }
+      // 401 con sesión activa en una ruta autenticada: sesión expirada o revocada.
+      if (response.status === 401 && this.sessionJwt && !endpoint.startsWith('/auth/login')) {
+        this.sessionJwt = null;
+        this.sessionExpiredHandler?.();
       }
       throw new ApiError(code, response.status);
     }
@@ -227,6 +254,31 @@ export class AduanaApiClient {
       { method: 'POST', body: JSON.stringify(payload) },
       timeoutMs
     );
+  }
+
+  /** Login único: identificador (cédula V-/E- o RIF) y contraseña; devuelve el token de sesión Bearer. */
+  public async login(payload: LoginRequest): Promise<LoginResponse> {
+    const res = await this.request<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    this.sessionJwt = res.session_token;
+    return res;
+  }
+
+  /** Cierra la sesión activa y revoca el JWT en RAM del servidor. */
+  public async logout(): Promise<void> {
+    const jwt = this.sessionJwt;
+    this.sessionJwt = null;
+    if (!jwt) return;
+    try {
+      await this.request('/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+    } catch {
+      // Si el servidor no responde, la sesión local en RAM ya quedó purgada.
+    }
   }
 
   /** Estado mínimo del servidor (único endpoint sin token). */

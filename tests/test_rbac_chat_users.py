@@ -52,7 +52,7 @@ def _login(client: TestClient, codigo: str) -> dict[str, str]:
         headers=HEADERS,
     )
     assert response.status_code == 200, response.text
-    return {**HEADERS, "Authorization": f"Bearer {response.json()['token']}"}
+    return {**HEADERS, "Authorization": f"Bearer {response.json()['session_token']}"}
 
 
 def test_exactly_two_chat_users_are_seeded_with_valuation_role() -> None:

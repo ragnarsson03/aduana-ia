@@ -117,3 +117,37 @@ export interface HealthResponse {
   ledger_mode: 'ephemeral' | 'persistent';
   implemented_stages: string[];
 }
+
+export interface LoginRequest {
+  /** Cédula (V-/E-) o RIF. */
+  identificador: string;
+  password: string;
+}
+
+export interface LoginUserOut {
+  id: string;
+  username: string;
+  full_name: string;
+  short_name: string;
+  avatar_text: string;
+  role: 'analista' | 'administrador' | 'auditor';
+  role_label: string;
+  aduana_role: string;
+  clearance_level: string;
+  entity: string;
+  department: string;
+  permissions: string[];
+  default_tab: 'pasarela' | 'chat' | 'ledger' | 'explicabilidad' | 'canal';
+  allowed_tabs: string[];
+}
+
+export interface LoginResponse {
+  authenticated: boolean;
+  session_token: string;
+  token_type: 'Bearer';
+  expires_in_seconds: number;
+  expires_at: number;
+  user: LoginUserOut;
+  block_index: number;
+  citizen_receipt_code: string;
+}

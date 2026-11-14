@@ -30,8 +30,12 @@ def live_stack() -> Iterator[LiveStack]:
     env = {**os.environ, "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1"}
     process = subprocess.Popen(  # noqa: S603
         [sys.executable, str(ROOT / "scripts/run_e2e_stack.py"), "--duration", "180"],
-        cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        text=True, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
     lines: queue.Queue[str] = queue.Queue()
 
@@ -64,7 +68,10 @@ def live_stack() -> Iterator[LiveStack]:
 @pytest.fixture
 def live_http(live_stack: LiveStack) -> Iterator[httpx.Client]:
     with httpx.Client(
-        base_url=live_stack.url, headers={"X-Aduana-Token": live_stack.token},
-        timeout=10, trust_env=False, follow_redirects=False,
+        base_url=live_stack.url,
+        headers={"X-Aduana-Token": live_stack.token},
+        timeout=10,
+        trust_env=False,
+        follow_redirects=False,
     ) as client:
         yield client

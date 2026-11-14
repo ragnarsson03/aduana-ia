@@ -134,7 +134,7 @@ def env(rbac_settings: Settings) -> Iterator[Env]:
         for role, (ident, _codigo, password) in ROLE_ACCOUNTS.items():
             response = _login(client, ident, password)
             assert response.status_code in (200, 201), role
-            headers[role] = _bearer(response.json()["token"])
+            headers[role] = _bearer(response.json()["session_token"])
         sent = client.post(f"{API}/gateway/process", json=gateway_body(), headers=headers[AGENTE])
         assert sent.status_code == 201
         yield Env(client, rbac_settings, keys, headers, sent.json()["citizen_receipt_code"])
@@ -453,7 +453,7 @@ def test_user_creation_errors_use_stable_codes(
 # (h) Suspensión y cambio de rol inmediatos -------------------------------------------------
 def test_suspended_user_loses_access_on_next_request_with_valid_token(env: Env) -> None:
     ident, codigo, password, _role = VICTIM
-    token = _login(env.client, ident, password).json()["token"]
+    token = _login(env.client, ident, password).json()["session_token"]
     victim_headers = _bearer(token)
     assert env.client.get(f"{API}/auth/me", headers=victim_headers).status_code == 200
 
@@ -469,7 +469,7 @@ def test_suspended_user_loses_access_on_next_request_with_valid_token(env: Env) 
 
 def test_suspended_users_token_is_rejected_everywhere(env: Env) -> None:
     ident, codigo, password, _role = VICTIM
-    victim_headers = _bearer(_login(env.client, ident, password).json()["token"])
+    victim_headers = _bearer(_login(env.client, ident, password).json()["session_token"])
     env.call("POST", f"/usuarios/{codigo}/suspender", SUPERVISOR)
 
     statuses = {
@@ -514,7 +514,7 @@ def test_successful_login_has_token_but_no_hash_or_salt(env: Env) -> None:
     response = _login(env.client, ident, password)
 
     assert response.status_code in (200, 201)
-    assert response.json()["token"].startswith("v1.")
+    assert response.json()["session_token"].startswith("v1.")
     assert all(field not in response.text for field in SECRET_FIELDS)
     assert password not in response.text and ident not in response.text
 
@@ -634,8 +634,6 @@ def test_legacy_routes_work_with_app_token_only_when_rbac_disabled(
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        ("POST", "/auth/login"),
-        ("GET", "/auth/me"),
         ("GET", "/usuarios"),
         ("POST", "/usuarios"),
         ("POST", "/usuarios/x/suspender"),

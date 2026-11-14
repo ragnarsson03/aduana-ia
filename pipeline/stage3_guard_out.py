@@ -6,6 +6,7 @@ neutraliza HTML con ``html.escape``. Reutiliza ``core.pii_patterns`` (no importa
 
 from __future__ import annotations
 
+import base64
 import html
 import re
 import time
@@ -19,13 +20,16 @@ _CANARY_HEX_RE: Final = re.compile(r"\[\[CANARY-HMAC-([0-9A-Fa-f]+)\]\]")
 _XSS_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
     re.compile(r"<script[\s>]", re.IGNORECASE),
     re.compile(r"</script>", re.IGNORECASE),
-    re.compile(r"\bjavascript:", re.IGNORECASE),
-    re.compile(r"\bonerror\s*=", re.IGNORECASE),
-    re.compile(r"\bonload\s*=", re.IGNORECASE),
-    re.compile(r"\bonclick\s*=", re.IGNORECASE),
+    re.compile(r"\bjavascript\s*:", re.IGNORECASE),
+    re.compile(r"\bvbscript\s*:", re.IGNORECASE),
+    re.compile(r"\bdata:(?:image/svg|text/html|application/)", re.IGNORECASE),
+    re.compile(r"\]\(\s*//", re.IGNORECASE),
+    re.compile(r"<input[\s>]", re.IGNORECASE),
+    re.compile(r"<details[\s>]", re.IGNORECASE),
     re.compile(r"<iframe[\s>]", re.IGNORECASE),
     re.compile(r"<img[\s>]", re.IGNORECASE),
     re.compile(r"<object[\s>]", re.IGNORECASE),
+    re.compile(r"\bon[a-z]{3,15}\s*=", re.IGNORECASE),
 )
 
 _UNVERIFIED_CLAIMS_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
@@ -43,23 +47,52 @@ def guard_out(llm_response: str, *, canary_token: str) -> GuardOutResult:
     """
     start_time = time.perf_counter()
 
-    # 1. Normalización previa a la inspección
-    normalized = normalize_text(llm_response)
+    # 1. Normalización previa a la inspección (fail-closed ante bombas NFKC)
+    try:
+        normalized = normalize_text(llm_response)
+    except ValueError:
+        return GuardOutResult(
+            allowed=False,
+            canary_leaked=False,
+            residual_pii_detected=False,
+            xss_or_code_injected=False,
+            unverified_claims_flag=False,
+            sanitized_response="",
+            policy_status="BLOCKED_INJECTION",
+            latency_ms=(time.perf_counter() - start_time) * 1000.0,
+        )
 
-    # 2. Detección de fuga de Canary (total o parcial)
+    # 2. Detección de fuga de Canary (total, parcial, fragmentada o codificada)
     canary_leaked = False
     if canary_token in llm_response or canary_token in normalized:
         canary_leaked = True
     else:
-        # Extraer digest hex del Canary Token
+        # Base64 del canary token
+        b64_token = base64.b64encode(canary_token.encode("utf-8")).decode("utf-8")
+        if b64_token in llm_response or b64_token in normalized:
+            canary_leaked = True
+
         match = _CANARY_HEX_RE.search(canary_token)
-        if match:
-            hex_digest = match.group(1)
-            # Fuga si aparece el hash hex completo o un fragmento relevante (>= 8 caracteres)
-            if hex_digest.lower() in normalized.lower() or hex_digest.upper() in normalized:
+        if not canary_leaked and match:
+            hex_digest = match.group(1).upper()
+            compact = re.sub(r"[\s\.\-_/]+", "", normalized).upper()
+            raw_compact = re.sub(r"[\s\.\-_/]+", "", llm_response).upper()
+
+            # Base64 del hex digest
+            b64_hex = base64.b64encode(hex_digest.encode("utf-8")).decode("utf-8")
+            if b64_hex in llm_response or b64_hex in normalized:
                 canary_leaked = True
-            elif len(hex_digest) >= 8 and (
-                hex_digest[:8].lower() in normalized.lower() or hex_digest[:8].upper() in normalized
+            elif hex_digest in compact or hex_digest in raw_compact:
+                canary_leaked = True
+            elif hex_digest[::-1] in compact or hex_digest[::-1] in raw_compact:
+                canary_leaked = True
+            elif any(
+                hex_digest[i : i + 6] in compact or hex_digest[i : i + 6] in raw_compact
+                for i in range(len(hex_digest) - 5)
+            ):
+                canary_leaked = True
+            elif (hex_digest[: len(hex_digest) // 2] in compact) and (
+                hex_digest[len(hex_digest) // 2 :] in compact
             ):
                 canary_leaked = True
 
@@ -79,6 +112,10 @@ def guard_out(llm_response: str, *, canary_token: str) -> GuardOutResult:
     if canary_leaked:
         allowed = False
         policy_status: PolicyStatus = "BLOCKED_CANARY_LEAK"
+        sanitized_response = ""
+    elif xss_detected:
+        allowed = False
+        policy_status = "BLOCKED_INJECTION"
         sanitized_response = ""
     elif residual_pii_detected:
         allowed = False

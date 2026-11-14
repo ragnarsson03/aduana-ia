@@ -12,6 +12,7 @@ from typing import Final
 
 from litestar import Request
 from litestar.connection import ASGIConnection
+from litestar.exceptions import HTTPException
 from litestar.handlers.base import BaseRouteHandler
 
 from core.context import UsuarioAduana
@@ -25,7 +26,7 @@ _BEARER_SCHEME: Final[str] = "bearer"
 Guard = Callable[[ASGIConnection, BaseRouteHandler], None]
 
 
-def _extract_bearer(connection: ASGIConnection) -> str:
+def extract_bearer(connection: ASGIConnection) -> str:
     header = connection.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
     token = token.strip()
@@ -42,7 +43,7 @@ def authenticate(connection: ASGIConnection) -> UsuarioAduana | None:
     cached = connection.scope.get(SCOPE_USER_KEY)
     if cached is not None:
         return cached
-    user = state.identity.resolve_token(_extract_bearer(connection))
+    user = state.identity.resolve_token(extract_bearer(connection))
     connection.scope[SCOPE_USER_KEY] = user  # type: ignore[typeddict-unknown-key]
     return user
 
@@ -81,5 +82,7 @@ def provide_current_user(request: Request) -> UsuarioAduana:
     """Dependencia ``current_user``: lee lo que dejó el guard (solo rutas con RBAC)."""
     user = request.scope.get(SCOPE_USER_KEY)
     if user is None:
+        if not request.app.state.aduana.settings.rbac_enabled:
+            raise HTTPException(status_code=503, detail="RBAC_DISABLED")
         raise AuthenticationError(AUTH_ERROR_MESSAGE)
     return user

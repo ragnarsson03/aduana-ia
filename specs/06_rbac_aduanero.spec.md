@@ -60,7 +60,8 @@ Toda ruta (salvo `GET /health/system`) exige además la cabecera `X-Aduana-Token
 
 | Método y ruta | Permiso | Notas |
 |---|---|---|
-| `POST /auth/login` | pública (solo `X-Aduana-Token`) | `{identificador, password}` → `AuthToken`. Error uniforme. |
+| `POST /auth/login` | pública (solo `X-Aduana-Token`) | `{identificador, password}` → sesión + perfil de UI. Error uniforme. **Único login del sistema.** |
+| `POST /auth/logout` | cualquier usuario activo | Revoca el `jti` de la sesión actual (RAM, hasta su expiración). |
 | `GET /auth/me` | cualquier usuario activo | Rol y permisos efectivos, sin material de contraseña. |
 | `POST /gateway/process` | `tramite:submit`; con `human_decision` o `override_justification` exige `tramite:override` | El agente envía; el inspector decide. |
 | `POST /shield/inspect` | `shield:inspect` | |
@@ -76,7 +77,10 @@ Errores (cuerpo `{"error": "<CODIGO>"}`, sin contenido ciudadano): `401 ERR_AUTH
 
 ### 4.1 Formas de petición y respuesta (fijadas por `tests/test_ca07_rbac_aduana.py`)
 
-- `POST /auth/login` → `200` con `{"token": "v1....", "codigo_usuario", "rol", "expires_at"}`; sin hash ni sal. Usuario inexistente, contraseña errónea y usuario suspendido dan el mismo `401 ERR_AUTH_INVALID`. Los 4 primeros fallos dan 401; con el bloqueo activo, `423 ERR_ACCOUNT_LOCKED` también con la contraseña correcta.
+- `POST /auth/login` → `200` con `{authenticated, session_token: "v1....", token_type: "Bearer", expires_in_seconds, expires_at, user: {id, username, full_name, short_name, avatar_text, role (rol de UI: analista|administrador|auditor), role_label, aduana_role, clearance_level, entity, department, permissions, default_tab, allowed_tabs}, block_index, citizen_receipt_code}`; sin hash ni sal ni identificador. `allowed_tabs` se deriva en servidor de los permisos reales (`core/ui_profile.py`); el front no mantiene tabla de privilegios. Usuario inexistente, contraseña errónea y usuario suspendido dan el mismo `401 ERR_AUTH_INVALID`. Los 4 primeros fallos dan 401; con el bloqueo activo, `423 ERR_ACCOUNT_LOCKED` también con la contraseña correcta.
+- `POST /auth/logout` → `200 {revoked: true, jti}`; el token queda revocado (`401` si se reusa; las demás sesiones del usuario no se afectan).
+- Con `ADUANA_RBAC` apagado, `/auth/login`, `/auth/logout` y `/auth/me` responden `503 RBAC_DISABLED`.
+- **Auditoría:** el login exitoso y el logout se sellan en el ledger (`AUTH_SUCCESS:<rol>`, `AUTH_LOGOUT`) con un id opaco por usuario (HMAC del `user_id`), nunca el índice ciego de la cédula (no correlaciona funcionarios con ciudadanos). Los intentos fallidos **no** se sellan: evita inflar el ledger inmutable sin credenciales y que el coste de sellar delate qué cuentas existen.
 - `GET /auth/me` → `200` con `{"codigo_usuario", "rol", "permisos": [...]}`; sin secretos.
 - `POST /explica/evaluate` → cuerpo `{"features": {...5 variables...}}`; respuesta `200` con `probability_score`, `linear_shap_values`, `model_recommendation` en el nivel superior. No crea bloques.
 - `POST /audit/fiscal` → cuerpo `{"identificador": "V-12345678"}`; respuesta `{"blocks": [{"block_index", "citizen_receipt_code", "security_verdict", "timestamp_utc", "block_hash"}]}`; solo los bloques cuyo `blind_citizen_id` coincide con el índice ciego del identificador; nunca devuelve el identificador ni `blind_citizen_id`.
@@ -90,7 +94,7 @@ Errores (cuerpo `{"error": "<CODIGO>"}`, sin contenido ciudadano): `401 ERR_AUTH
 2. **Política mínima:** ≥ 12 caracteres, al menos una letra y un dígito, no todos los caracteres iguales. `WeakPasswordError` sin eco de la contraseña.
 3. **Índice ciego (Anillo 2):** todo identificador de funcionario o agente (cédula `V|E`+5–9 dígitos, o RIF `V|E|J|P|G|C`+8 dígitos+verificador) se normaliza y se guarda solo como `hmac_hex("blind-index", canónico)` (`core.keyring.KeyRing`). Un RIF y una cédula nunca colisionan (el RIF lleva dígito verificador de 9 dígitos y se canoniza con su letra). El mismo índice liga al usuario con los bloques del ledger de su propio trámite.
 4. **No se guarda nombre ni identificador en claro.** El usuario se identifica por `codigo_usuario` (alias no personal, p. ej. `insp.senat.01`).
-5. **Token** (sin librerías externas): `v1.<base64url(JSON)>.<hmac>`; JSON `{sub, rol, iat, exp, jti}`; HMAC-SHA256 con la subllave `auth-token` del `KeyRing`; verificación en tiempo constante y comprobación de `exp`. Cada petición **vuelve a consultar** al usuario (Zero-Trust): una suspensión o un cambio de rol surte efecto de inmediato. TTL por defecto 30 min.
+5. **Token** (sin librerías externas): `v1.<base64url(JSON)>.<hmac>`; JSON `{sub, rol, iat, exp, jti}`; HMAC-SHA256 con la subllave `auth-token` del `KeyRing`; verificación en tiempo constante, comprobación de `exp` y de revocación (`jti` en la lista de revocados en RAM, podada al expirar). Cada petición **vuelve a consultar** al usuario (Zero-Trust): una suspensión o un cambio de rol surte efecto de inmediato. TTL por defecto 30 min.
 6. **Resistencia a enumeración y fuerza bruta:** login con tiempo comparable exista o no el usuario (hash ficticio), error uniforme, bloqueo tras 5 intentos fallidos durante 15 min (reloj inyectable), contador reiniciado tras éxito.
 7. Con llave efímera (sin `ADUANA_MASTER_KEY`) el índice ciego cambiaría en cada arranque: **RBAC exige llave persistente** (`Settings` rechaza `rbac_enabled` con `ledger_ephemeral`).
 

@@ -30,7 +30,8 @@ class IndexReferences(HTMLParser):
     def external(self, base_url: str) -> list[str]:
         origin = urlsplit(base_url).netloc
         return sorted(
-            ref for ref in self.references
+            ref
+            for ref in self.references
             if urlsplit(urljoin(base_url, ref)).scheme in {"http", "https"}
             and urlsplit(urljoin(base_url, ref)).netloc != origin
         )
@@ -38,9 +39,9 @@ class IndexReferences(HTMLParser):
     def local_assets(self, base_url: str) -> list[str]:
         origin = urlsplit(base_url).netloc
         return sorted(
-            urljoin(base_url, ref) for ref in self.assets
-            if urlsplit(urljoin(base_url, ref)).netloc == origin
-            and not ref.startswith("#")
+            urljoin(base_url, ref)
+            for ref in self.assets
+            if urlsplit(urljoin(base_url, ref)).netloc == origin and not ref.startswith("#")
         )
 
 
@@ -49,10 +50,16 @@ def assert_asset_type(url: str, content_type: str) -> None:
     media_type = content_type.split(";", 1)[0].lower()
     expected = {
         "js": {"text/javascript", "application/javascript"},
-        "css": {"text/css"}, "png": {"image/png"}, "svg": {"image/svg+xml"},
-        "jpg": {"image/jpeg"}, "jpeg": {"image/jpeg"}, "webp": {"image/webp"},
-        "gif": {"image/gif"}, "ico": {"image/x-icon", "image/vnd.microsoft.icon"},
-        "woff": {"font/woff"}, "woff2": {"font/woff2"},
+        "css": {"text/css"},
+        "png": {"image/png"},
+        "svg": {"image/svg+xml"},
+        "jpg": {"image/jpeg"},
+        "jpeg": {"image/jpeg"},
+        "webp": {"image/webp"},
+        "gif": {"image/gif"},
+        "ico": {"image/x-icon", "image/vnd.microsoft.icon"},
+        "woff": {"font/woff"},
+        "woff2": {"font/woff2"},
     }
     assert suffix in expected, f"Add a content-type assertion for asset extension: {suffix}"
     assert media_type in expected[suffix], f"Incorrect asset content-type: {media_type} ({suffix})"
