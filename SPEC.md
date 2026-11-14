@@ -33,13 +33,10 @@ Adicionalmente, el uso directo de IA generativa en trámites administrativos y a
 
 ## 2. Usuarios y Roles (RBAC Aduanero)
 - **Ciudadanos:** Titulares de datos personales que exigen consentimiento explícito, anonimización irreversible y comprobante criptográfico de trámite (`citizen_receipt_code`).
-- **Funcionarios con Control de Acceso Basado en Roles (`usuarios_aduana` — 6 roles):**
-  1. `admin`: Administrador de Infraestructura & Ciberseguridad (gestión de nodos, claves y simulaciones de auditoría).
-  2. `auditor`: Auditor Principal / Forense SHA-256 (inspección de Ledger inmutable, verificación de cadena y explicabilidad).
-  3. `analista`: Analista de Operaciones & Solvencias (operación de Pasarela, sanitización `SHIELD`, Chat IA y Canal Seguro).
-  4. `inspector_aforo`: Inspector de Aforo Físico y Documental (validación de expedientes aduaneros y *override* justificado).
-  5. `oficial_cumplimiento`: Oficial de Cumplimiento y *Habeas Data* (auditoría de `GUARDIÁN`, consentimiento RF-02 y Zero-PII).
-  6. `supervisor_aduana`: Supervisor Nacional de Operaciones Aduaneras (supervisión regional, *override* y verificación de trazabilidad).
+- **Funcionarios con Control de Acceso Basado en Roles (`roles_aduana` / `usuarios_aduana` — 3 roles oficiales):**
+  1. `analista`: Analista de Operaciones & Solvencias (`pasarela`, `chat`, `canal`) — operación de Pasarela en tiempo real, sanitización `SHIELD`, Chat IA y Canal Seguro E2EE.
+  2. `administrador`: Administrador de Infraestructura & Ciberseguridad (`pasarela`, `chat`, `ledger`, `explicabilidad`, `canal`) — control total perimetral, llaves/enclaves y simulación de manipulación.
+  3. `auditor`: Auditor Principal / Forense SHA-256 (`ledger`, `explicabilidad`) — auditoría de Ledger inalterable SHA-256, verificación de cadena e inspección de explicabilidad White-Box.
 
 ---
 
@@ -62,7 +59,7 @@ Adicionalmente, el uso directo de IA generativa en trámites administrativos y a
 - **RF2 (`GUARD-IN` y `GUARD-OUT` — Defensa Activa):** Normalizar texto (`NFKC`), neutralizar evasiones Base64/Hex/Unicode, calcular `risk_score` determinista, encapsular en XML con Canary HMAC dinámico y bloquear fugas de Canary, PII residual o XSS en salida.
 - **RF3 (`EXPLICA` — Explicabilidad White-Box):** Calcular probabilidad sigmoide $P(y=1\mid\mathbf{x}) = \frac{1}{1+e^{-z}}$ y valores SHAP lineales sin `random()`, exigiendo confirmación o justificación escrita ($\ge 20$ caracteres) ante *override*.
 - **RF4 (`LEDGER` — Trazabilidad Inmutable):** Registrar bloques encadenados SHA-256 + HMAC-SHA256 con verificación completa en `/api/v1/ledger/verify`, detección exacta de manipulación (`HASH_MISMATCH`, `PREV_HASH_LINK_BROKEN`, `HMAC_SIGNATURE_FORGED`) y recibo ciudadano.
-- **RF5 (`RBAC` — Control de Acceso Aduanero):** Gestionar 6 roles aduaneros en `usuarios_aduana` con contraseñas protegidas por `PBKDF2-HMAC-SHA256` (310,000 iteraciones) e identidad ciudadana pseudonimizada vía `blind_citizen_id`.
+- **RF5 (`RBAC` — Control de Acceso Aduanero):** Gestionar los 3 roles oficiales (`analista`, `administrador`, `auditor`) en `roles_aduana` y `usuarios_aduana` con contraseñas protegidas por `PBKDF2-HMAC-SHA256` (310,000 iteraciones) e identidad ciudadana pseudonimizada vía `blind_citizen_id`.
 
 ---
 
@@ -114,22 +111,15 @@ Definido de forma unificada en [`schema.sql`](schema.sql) para SQLite3 local y C
 - `override_justification_hash` (`TEXT` — Hash HMAC de la justificación, nunca texto plano con posible PII)
 - **Índices y Triggers:** `idx_ledger_blocks_blind_citizen_id`, `idx_ledger_blocks_timestamp_utc`, `idx_ledger_blocks_security_verdict`, más triggers `prevent_ledger_update` y `prevent_ledger_delete` (`RAISE(ABORT, 'ERR_IMMUTABLE_LEDGER')`).
 
-### 7.2 Tabla `usuarios_aduana` (RBAC Aduanero Zero-PII)
-- `id` (`TEXT PRIMARY KEY` — Identificador institucional, ej. `usr-auditor-01`)
-- `username` (`TEXT NOT NULL UNIQUE`)
-- `email` (`TEXT NOT NULL UNIQUE`)
-- `full_name` (`TEXT NOT NULL`)
-- `role` (`TEXT NOT NULL CHECK (role IN ('admin', 'auditor', 'analista', 'inspector_aforo', 'oficial_cumplimiento', 'supervisor_aduana'))`)
-- `role_label` (`TEXT NOT NULL`)
-- `clearance_level` (`TEXT NOT NULL`)
-- `department` (`TEXT NOT NULL`)
-- `blind_citizen_id` (`TEXT NOT NULL UNIQUE` — HMAC-SHA256 de la cédula normalizada; **cero cédulas en texto plano**)
-- `password_hash` (`TEXT NOT NULL` — `pbkdf2_sha256$310000$<salt_hex>$<dk_hex>`)
-- `permissions_json` (`TEXT NOT NULL` — Arreglo JSON de permisos granulares)
-- `is_active` (`INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))`)
-- `created_at_utc` (`TEXT NOT NULL`)
-- `updated_at_utc` (`TEXT NOT NULL`)
+### 7.2 Tablas RBAC (`roles_aduana` y `usuarios_aduana` — Zero-PII)
+- **`roles_aduana`:** `role_id` (`'analista' | 'administrador' | 'auditor'`), `role_name`, `description`, `allowed_tabs_json`, `default_tab`.
+- **`usuarios_aduana`:** `id` (`TEXT PRIMARY KEY`), `username`, `email`, `full_name`, `short_name`, `avatar_text`, `role` (`REFERENCES roles_aduana(role_id)`), `role_label`, `clearance_level`, `entity`, `department`, `ed25519_key`, `ed25519_status`, `blind_citizen_id` (`TEXT NOT NULL UNIQUE`, cero cédulas en texto plano), `password_hash` (`pbkdf2_sha256$310000$...`), `permissions_json`, `is_active`, `created_at_utc`, `updated_at_utc`.
 - **Índices:** `idx_usuarios_aduana_role`, `idx_usuarios_aduana_is_active`.
+
+### 7.3 Trazabilidad Analítica, Consentimiento y Canal Seguro
+- **`consent_records`:** `request_id`, `blind_citizen_id`, `purpose_code`, `granted`, `consent_hash`, `timestamp_utc`.
+- **`tramite_evaluations`:** Registro Zero-PII de métricas de `SHIELD`, `GUARDIÁN`, adaptador LLM, `EXPLICA` (logit, probabilidad, SHAP JSON, decisión y *override*) y referencia a `ledger_blocks(block_index)`.
+- **`canal_seguro_channels` y `canal_seguro_messages`:** Canales institucionales (`auditoria-general`, `alertas-ledger`) y mensajes sanitizados sin PII en texto plano.
 
 ---
 

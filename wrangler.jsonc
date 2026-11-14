@@ -6,7 +6,10 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "aduana-ia",
 	"compatibility_date": "2026-02-01",
-	"pages_build_output_dir": "dist",
+	// Activos estáticos del frontend React (compilado por Vite en static/)
+	"assets": {
+		"directory": "./static"
+	},
 	// Variables de entorno públicas del entorno Edge
 	"vars": {
 		"ADUANA_EDGE_MODE": "cloudflare-pages",
@@ -33,7 +36,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "KV",
-			"id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+			"id": "3885a09654fa42eea23241b0948b8df7"
 		}
 	]
 }
