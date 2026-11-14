@@ -19,6 +19,7 @@ from core.context import (
     CitizenConsent,
     LedgerEntry,
     RecommendationType,
+    ShieldMeta,
 )
 from core.ephemeral_vault import EphemeralVault
 from core.errors import (
@@ -31,7 +32,7 @@ from pipeline.stage0_consent import validate_consent
 from pipeline.stage1_shield import shield
 from pipeline.stage2_guard_in import guard_in
 from pipeline.stage3_guard_out import guard_out
-from pipeline.stage4_ledger import seal_entry
+from pipeline.stage4_ledger import compute_attachment_audit_hash, seal_entry
 from pipeline.stage5_explica import explain
 
 
@@ -46,6 +47,11 @@ class GatewayInput:
     override_justification: str | None = None
     attachment_sha256: str | None = None
     attachment_size_bytes: int = 0
+    user_role: str = "analista"
+    audit_action: str = "CHAT_IA_STREAM_UPLOAD"
+    pre_shielded_text: str | None = None
+    pre_shielded_meta: ShieldMeta | None = None
+    request_id_override: str | None = None
 
     def __repr__(self) -> str:  # Zero-Leak: nunca imprimir PII
         return "GatewayInput(<redacted>)"
@@ -67,7 +73,7 @@ class GatewayPipeline:
         self._rate_guard = rate_guard
 
     async def process(self, data: GatewayInput) -> AduanaPacket | BlockedPacket:
-        request_id = secrets.token_urlsafe(16)
+        request_id = data.request_id_override or secrets.token_urlsafe(16)
         timestamp_utc = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         try:
@@ -88,11 +94,22 @@ class GatewayPipeline:
                     blind_citizen_id=blind_id,
                 )
             except ConsentError:
+                p_hash = (
+                    compute_attachment_audit_hash(
+                        file_sha256=data.attachment_sha256,
+                        blind_citizen_id=blind_id,
+                        user_role=data.user_role,
+                        timestamp_utc=timestamp_utc,
+                        action=data.audit_action,
+                    )
+                    if data.attachment_sha256 is not None
+                    else crypto.sha256_hex(b"")
+                )
                 entry = LedgerEntry(
                     request_id=request_id,
                     timestamp_utc=timestamp_utc,
                     blind_citizen_id=blind_id,
-                    payload_hash=crypto.sha256_hex(b""),
+                    payload_hash=p_hash,
                     security_verdict="BLOCKED_NO_CONSENT",
                     model_recommendation="BLOQUEADO_SEGURIDAD",
                     human_decision="BLOQUEADO_SEGURIDAD",
@@ -109,44 +126,70 @@ class GatewayPipeline:
                     ledger=receipt,
                 )
 
-            # 4. Stage 1: SHIELD (Anonimización Soberana)
-            try:
-                masked_text, shield_meta = shield(
-                    request_id,
-                    data.raw_text,
-                    vault=self._vault,
-                    blind_citizen_id=blind_id,
-                )
-            except ShieldResidualPiiError:
-                entry = LedgerEntry(
-                    request_id=request_id,
-                    timestamp_utc=timestamp_utc,
-                    blind_citizen_id=blind_id,
-                    payload_hash=crypto.sha256_hex(b""),
-                    security_verdict="BLOCKED_PII_LEAK",
-                    model_recommendation="BLOQUEADO_SEGURIDAD",
-                    human_decision="BLOQUEADO_SEGURIDAD",
-                    human_override=False,
-                    citizen_receipt_code=f"REC-{request_id}",
-                    override_justification_hash=None,
-                )
-                receipt = seal_entry(entry, self._repo, keys=self._keys)
-                return BlockedPacket(
-                    request_id=request_id,
-                    timestamp_utc=timestamp_utc,
-                    policy_status="BLOCKED_PII_LEAK",
-                    consent=consent,
-                    ledger=receipt,
-                )
+            # 4. Stage 1: SHIELD (Anonimización Soberana o flujo ya anonimizado por chunks)
+            if data.pre_shielded_text is not None and data.pre_shielded_meta is not None:
+                masked_text = data.pre_shielded_text
+                shield_meta = data.pre_shielded_meta
+            else:
+                try:
+                    masked_text, shield_meta = shield(
+                        request_id,
+                        data.raw_text,
+                        vault=self._vault,
+                        blind_citizen_id=blind_id,
+                    )
+                except ShieldResidualPiiError:
+                    p_hash = (
+                        compute_attachment_audit_hash(
+                            file_sha256=data.attachment_sha256,
+                            blind_citizen_id=blind_id,
+                            user_role=data.user_role,
+                            timestamp_utc=timestamp_utc,
+                            action=data.audit_action,
+                        )
+                        if data.attachment_sha256 is not None
+                        else crypto.sha256_hex(b"")
+                    )
+                    entry = LedgerEntry(
+                        request_id=request_id,
+                        timestamp_utc=timestamp_utc,
+                        blind_citizen_id=blind_id,
+                        payload_hash=p_hash,
+                        security_verdict="BLOCKED_PII_LEAK",
+                        model_recommendation="BLOQUEADO_SEGURIDAD",
+                        human_decision="BLOQUEADO_SEGURIDAD",
+                        human_override=False,
+                        citizen_receipt_code=f"REC-{request_id}",
+                        override_justification_hash=None,
+                    )
+                    receipt = seal_entry(entry, self._repo, keys=self._keys)
+                    return BlockedPacket(
+                        request_id=request_id,
+                        timestamp_utc=timestamp_utc,
+                        policy_status="BLOCKED_PII_LEAK",
+                        consent=consent,
+                        ledger=receipt,
+                    )
 
             # 5. Stage 2: GUARD-IN (Sandbox XML y Canary dinámico HMAC)
             prompt, guard_in_res = guard_in(request_id, masked_text, keys=self._keys)
             if not guard_in_res.allowed:
+                p_hash = (
+                    compute_attachment_audit_hash(
+                        file_sha256=data.attachment_sha256,
+                        blind_citizen_id=blind_id,
+                        user_role=data.user_role,
+                        timestamp_utc=timestamp_utc,
+                        action=data.audit_action,
+                    )
+                    if data.attachment_sha256 is not None
+                    else crypto.sha256_hex(masked_text.encode())
+                )
                 entry = LedgerEntry(
                     request_id=request_id,
                     timestamp_utc=timestamp_utc,
                     blind_citizen_id=blind_id,
-                    payload_hash=crypto.sha256_hex(masked_text.encode()),
+                    payload_hash=p_hash,
                     security_verdict=guard_in_res.policy_status,
                     model_recommendation="BLOQUEADO_SEGURIDAD",
                     human_decision="BLOQUEADO_SEGURIDAD",
@@ -174,11 +217,22 @@ class GatewayPipeline:
                 token_map=token_map,
             )
             if not guard_out_res.allowed:
+                p_hash = (
+                    compute_attachment_audit_hash(
+                        file_sha256=data.attachment_sha256,
+                        blind_citizen_id=blind_id,
+                        user_role=data.user_role,
+                        timestamp_utc=timestamp_utc,
+                        action=data.audit_action,
+                    )
+                    if data.attachment_sha256 is not None
+                    else crypto.sha256_hex(masked_text.encode())
+                )
                 entry = LedgerEntry(
                     request_id=request_id,
                     timestamp_utc=timestamp_utc,
                     blind_citizen_id=blind_id,
-                    payload_hash=crypto.sha256_hex(masked_text.encode()),
+                    payload_hash=p_hash,
                     security_verdict=guard_out_res.policy_status,
                     model_recommendation="BLOQUEADO_SEGURIDAD",
                     human_decision="BLOQUEADO_SEGURIDAD",
@@ -210,15 +264,13 @@ class GatewayPipeline:
                 )
 
             if data.attachment_sha256 is not None:
-                masked_hash = crypto.sha256_hex(masked_text.encode())
-                canonical_audit = (
-                    f"prompt_sha256={masked_hash}|"
-                    f"file_sha256={data.attachment_sha256}|"
-                    f"file_bytes={data.attachment_size_bytes}|"
-                    f"pii_count={shield_meta.pii_count}|"
-                    f"resp={guard_out_res.sanitized_response}"
+                payload_h = compute_attachment_audit_hash(
+                    file_sha256=data.attachment_sha256,
+                    blind_citizen_id=blind_id,
+                    user_role=data.user_role,
+                    timestamp_utc=timestamp_utc,
+                    action=data.audit_action,
                 )
-                payload_h = crypto.sha256_hex(canonical_audit.encode())
             else:
                 payload_h = crypto.sha256_hex(guard_out_res.sanitized_response.encode())
             receipt_code = f"REC-{request_id}"

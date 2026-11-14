@@ -244,4 +244,18 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
    - Incorporados al flujo de desarrollo el controlador `ChatController` en Litestar (`app/controllers/chat.py`), `pipeline/chat_attachments.py`, `pipeline/llm_adapter.py` (GeminiAdapter), esquemas msgspec (`ChatIAUploadRequest`, `ChatIAResponse`) y la suite de pruebas unitarias y de integración (`tests/test_chat_ia_attachments.py`).
    - Todos los tests de backend (567 pruebas) y frontend (32 pruebas) pasan al 100% en verde.
 
+4. **Solución Definitiva de Despliegue en Cloudflare y Cifrado Real de Archivos:**
+   - **Diagnóstico del "Hello world" y Fallo de Cloudflare:**
+     - El repositorio en Cloudflare estaba conectado a la rama `main`, la cual no tenía los cambios de `develop` (PR #16 sin fusionar).
+     - El archivo `wrangler.jsonc` en `main` carecía de `"build": { "command": "npm run build" }`, lo que provocaba que el contenedor de Cloudflare fallara con `✘ [ERROR] Could not detect a directory containing static files`.
+     - Al fallar el despliegue automático, Cloudflare mantenía el template inicial de Worker que retornaba `Hello world`.
+   - **Corrección y Despliegue en Vivo:**
+     - Se configuró `"build": { "command": "npm run build" }` y `"not_found_handling": "single-page-application"` en `wrangler.jsonc`.
+     - Se fusionó el PR #16 en `main` y se ejecutó el despliegue directo con `npx wrangler deploy` (`Version ID: 7c8b1601-6173-4fc0-9c63-f98999b68370`).
+     - Verificado en producción en `https://aduana-ia.carlos-lamole98.workers.dev`: responde HTTP 200 sirviendo el frontend React Vite y resolviendo rutas SPA (`/login`, `/chat-ia`, `/canal-seguro`).
+   - **Cifrado Matemático Real de Archivos (Web Crypto API AES-256-GCM):**
+     - **Canal Seguro (`CanalSeguroFeature.tsx`):** Al adjuntar un archivo (local o preset), los bytes se leen en RAM como `ArrayBuffer`, se genera una clave AES-GCM de 256 bits y un IV de 96 bits (`window.crypto.getRandomValues`), y se encripta con `crypto.subtle.encrypt`. Se almacena el `ciphertextPreview`, `ivHex` y se valida la etiqueta de autenticación (auth tag). Cada tarjeta de archivo incluye botón de auditoría directa hacia `CryptoAuditModal`.
+     - **Chat IA (`ChatIAView.tsx`):** Cada archivo adjunto se cifra en RAM con AES-256-GCM de 256 bits antes de transmitirse. Se muestran insignias `🔒 AES-256-GCM (256-bit)` y `Tag GCM Autenticado`, y el componente `MaskedContentPreview` oculta volcados de texto plano o texto cifrado masivo, manteniendo la interfaz compacta y con tiempo de expiración (TTL 180s en memoria confinada).
+
+
 

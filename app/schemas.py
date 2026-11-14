@@ -229,20 +229,54 @@ class ReceiptResponse(msgspec.Struct, frozen=True):
     liberacion_autorizada: bool
 
 
+UserRole = Literal["analista", "administrador", "auditor"]
+AuditAction = Annotated[str, msgspec.Meta(min_length=3, max_length=64)]
+Sha256Hex = Annotated[str, msgspec.Meta(pattern=r"^[a-fA-F0-9]{64}$")]
+TurnRole = Literal["user", "assistant"]
+
+
+class AttachmentPayload(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    file_name: Annotated[str, msgspec.Meta(min_length=1, max_length=180)]
+    file_mime_type: Annotated[str, msgspec.Meta(min_length=3, max_length=80)] = "text/plain"
+    file_content_b64: str | None = None
+    file_sha256: str | None = None
+    size_bytes: int = 0
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_LARGE_PAYLOAD]"
+
+
+class ChatTurn(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    role: TurnRole
+    masked_content: str = ""
+    content: str = ""
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_LARGE_PAYLOAD]"
+
+
 class ChatIAUploadRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
-    prompt: RawText
+    prompt: str = ""
+    attachment: AttachmentPayload | None = None
+    history: list[ChatTurn] = []
+    active_document_context: str | None = None
+    active_document_name: str | None = None
+    active_document_sha256: str | None = None
     citizen_cedula: Cedula = "V-12345678"
+    user_role: UserRole = "analista"
+    action: AuditAction = "CHAT_IA_STREAM_UPLOAD"
     purpose_code: PurposeCode = "CHAT_IA_CONSULTA"
     consent_granted: bool = True
-    file_name: Annotated[str, msgspec.Meta(min_length=1, max_length=120)] | None = None
-    file_mime_type: Annotated[str, msgspec.Meta(min_length=3, max_length=64)] | None = None
-    file_content_b64: Annotated[str, msgspec.Meta(min_length=1, max_length=48_000)] | None = None
+    file_name: Annotated[str, msgspec.Meta(min_length=1, max_length=180)] | None = None
+    file_mime_type: Annotated[str, msgspec.Meta(min_length=3, max_length=80)] | None = None
+    file_content_b64: str | None = None
+    client_file_sha256: str | None = None
     features: Features | None = None
     human_decision: RecommendationType | None = None
     override_justification: Justification | None = None
 
     def __repr__(self) -> str:  # Zero-Leak
-        return "[REDACTED_CHAT_PAYLOAD]"
+        return "[REDACTED_LARGE_PAYLOAD]"
 
 
 class ChatIAResponse(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -268,6 +302,11 @@ class ChatIAResponse(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     block_index: int
     chain_verified: bool
     latency_ms: float
+    chunks_processed: int = 0
+    user_role: str = "analista"
+    audit_action: str = "CHAT_IA_STREAM_UPLOAD"
+    document_context_masked: str | None = None
 
     def __repr__(self) -> str:  # Zero-Leak
-        return "[REDACTED_CHAT_PAYLOAD]"
+        return "[REDACTED_LARGE_PAYLOAD]"
+
