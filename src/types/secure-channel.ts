@@ -32,6 +32,16 @@ export interface InstitutionalChannel {
   description: string;
 }
 
+export interface FileAttachment {
+  name: string;
+  sizeBytes: number;
+  formattedSize: string;
+  mimeType: string;
+  dataUrl: string;
+  sha256Hex: string;
+  isClassified?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   senderName: string;
@@ -49,6 +59,7 @@ export interface ChatMessage {
   tokenExampleLabel?: string;
   secondTimestamp?: string;
   sentReceiptLabel?: string;
+  fileAttachment?: FileAttachment;
   attachment?: {
     title: string;
     description: string;
