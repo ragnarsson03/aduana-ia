@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.config import Settings
+from core.config import LLM_TIMEOUT_SECONDS, Settings
 from core.ephemeral_vault import EphemeralVault
 from core.keyring import KeyRing
 from core.protocols import StorageRepositoryProtocol
+from pipeline.llm_adapter import CircuitBreaker, OfflineDeterministicAdapter
+from pipeline.orchestrator import GatewayPipeline
 from pipeline.stage0_consent import RateGuard
 from pipeline.stage4_ledger import SQLiteLedgerRepository
 
@@ -20,6 +22,7 @@ class AppState:
     rate_guard: RateGuard
     repo: StorageRepositoryProtocol
     api_token: str = field(repr=False)
+    pipeline: GatewayPipeline
 
 
 def build_state(
@@ -27,12 +30,27 @@ def build_state(
     keys: KeyRing,
     api_token: str,
     repo: StorageRepositoryProtocol | None = None,
+    pipeline: GatewayPipeline | None = None,
 ) -> AppState:
+    vault = EphemeralVault()
+    rate_guard = RateGuard(settings.rate_limit_per_minute)
+    repository = repo or SQLiteLedgerRepository(str(settings.db_path))
+    if pipeline is None:
+        fallback = OfflineDeterministicAdapter()
+        breaker = CircuitBreaker(fallback, fallback, timeout_s=LLM_TIMEOUT_SECONDS)
+        pipeline = GatewayPipeline(
+            keys=keys,
+            vault=vault,
+            repo=repository,
+            llm=breaker,
+            rate_guard=rate_guard,
+        )
     return AppState(
         settings=settings,
         keys=keys,
-        vault=EphemeralVault(),
-        rate_guard=RateGuard(settings.rate_limit_per_minute),
-        repo=repo or SQLiteLedgerRepository(str(settings.db_path)),
+        vault=vault,
+        rate_guard=rate_guard,
+        repo=repository,
         api_token=api_token,
+        pipeline=pipeline,
     )

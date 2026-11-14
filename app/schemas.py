@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import msgspec
 
 from core.config import MAX_RAW_TEXT_CHARS, OVERRIDE_MAX_JUSTIFICATION_CHARS
-from core.context import ChainFailureReason, RecommendationType
+from core.context import ChainFailureReason, PolicyStatus, RecommendationType
 
 RawText = Annotated[str, msgspec.Meta(min_length=1, max_length=MAX_RAW_TEXT_CHARS)]
 Cedula = Annotated[str, msgspec.Meta(pattern=r"^[A-Za-z]?-?[0-9.]{5,12}$", max_length=20)]
@@ -35,6 +35,24 @@ class GatewayProcessRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=T
 
     def __repr__(self) -> str:  # Zero-Leak
         return "GatewayProcessRequest(<redacted>)"
+
+
+class GatewayProcessResponse(msgspec.Struct, frozen=True):
+    request_id: str
+    timestamp_utc: str
+    policy_status: PolicyStatus
+    masked_text: str | None
+    sanitized_response: str
+    ai_generated_notice: bool
+    model_recommendation: RecommendationType
+    human_decision: RecommendationType
+    human_override: bool
+    citizen_receipt_code: str
+    block_index: int
+    chain_verified: bool
+    latency_ms: float
+    probability_score: float | None = None
+    linear_shap_values: dict[str, float] | None = None
 
 
 class ShieldInspectRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):

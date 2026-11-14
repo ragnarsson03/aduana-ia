@@ -19,7 +19,6 @@ pending = pytest.mark.xfail(strict=True, raises=NotImplementedError)
 KEYS = KeyRing(bytes(range(32)))
 
 
-@pending
 def test_ca06_llm_failover_under_100ms() -> None:
     adapter = OfflineDeterministicAdapter()
     asyncio.run(CircuitBreaker(adapter, adapter).exchange("p"))

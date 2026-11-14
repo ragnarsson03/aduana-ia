@@ -8,12 +8,31 @@ Un trámite rechazado produce ``BlockedPacket`` y se sella igualmente en el ledg
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
-from core.context import AduanaPacket, BlockedPacket, RecommendationType
+from core import crypto
+from core.context import (
+    AduanaPacket,
+    BlockedPacket,
+    CitizenConsent,
+    LedgerEntry,
+    RecommendationType,
+)
 from core.ephemeral_vault import EphemeralVault
+from core.errors import (
+    ConsentError,
+    ShieldResidualPiiError,
+)
 from core.keyring import KeyRing
 from core.protocols import LLMGatewayProtocol, RateGuardProtocol, StorageRepositoryProtocol
+from pipeline.stage0_consent import validate_consent
+from pipeline.stage1_shield import shield
+from pipeline.stage2_guard_in import guard_in
+from pipeline.stage3_guard_out import guard_out
+from pipeline.stage4_ledger import seal_entry
+from pipeline.stage5_explica import explain
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,4 +65,172 @@ class GatewayPipeline:
         self._rate_guard = rate_guard
 
     async def process(self, data: GatewayInput) -> AduanaPacket | BlockedPacket:
-        raise NotImplementedError("Gatillo 6: GatewayPipeline.process pendiente")
+        request_id = secrets.token_urlsafe(16)
+        timestamp_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        try:
+            # 1. Blind Citizen ID
+            blind_id = crypto.blind_citizen_id(self._keys, data.citizen_cedula)
+
+            # 2. Rate guard: si excede tasa lanza RateLimitError (no se sella en ledger)
+            self._rate_guard.check(blind_id)
+
+            # 3. Stage 0: Consentimiento explícito
+            consent: CitizenConsent | None = None
+            try:
+                consent = validate_consent(
+                    request_id=request_id,
+                    granted=data.consent_granted,
+                    purpose_code=data.purpose_code,
+                    timestamp_utc=timestamp_utc,
+                    blind_citizen_id=blind_id,
+                )
+            except ConsentError:
+                entry = LedgerEntry(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    blind_citizen_id=blind_id,
+                    payload_hash=crypto.sha256_hex(b""),
+                    security_verdict="BLOCKED_NO_CONSENT",
+                    model_recommendation="BLOQUEADO_SEGURIDAD",
+                    human_decision="BLOQUEADO_SEGURIDAD",
+                    human_override=False,
+                    citizen_receipt_code=f"REC-{request_id}",
+                    override_justification_hash=None,
+                )
+                receipt = seal_entry(entry, self._repo, keys=self._keys)
+                return BlockedPacket(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    policy_status="BLOCKED_NO_CONSENT",
+                    consent=None,
+                    ledger=receipt,
+                )
+
+            # 4. Stage 1: SHIELD (Anonimización Soberana)
+            try:
+                masked_text, shield_meta = shield(
+                    request_id,
+                    data.raw_text,
+                    vault=self._vault,
+                    blind_citizen_id=blind_id,
+                )
+            except ShieldResidualPiiError:
+                entry = LedgerEntry(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    blind_citizen_id=blind_id,
+                    payload_hash=crypto.sha256_hex(b""),
+                    security_verdict="BLOCKED_PII_LEAK",
+                    model_recommendation="BLOQUEADO_SEGURIDAD",
+                    human_decision="BLOQUEADO_SEGURIDAD",
+                    human_override=False,
+                    citizen_receipt_code=f"REC-{request_id}",
+                    override_justification_hash=None,
+                )
+                receipt = seal_entry(entry, self._repo, keys=self._keys)
+                return BlockedPacket(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    policy_status="BLOCKED_PII_LEAK",
+                    consent=consent,
+                    ledger=receipt,
+                )
+
+            # 5. Stage 2: GUARD-IN (Sandbox XML y Canary dinámico HMAC)
+            prompt, guard_in_res = guard_in(request_id, masked_text, keys=self._keys)
+            if not guard_in_res.allowed:
+                entry = LedgerEntry(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    blind_citizen_id=blind_id,
+                    payload_hash=crypto.sha256_hex(masked_text.encode()),
+                    security_verdict=guard_in_res.policy_status,
+                    model_recommendation="BLOQUEADO_SEGURIDAD",
+                    human_decision="BLOQUEADO_SEGURIDAD",
+                    human_override=False,
+                    citizen_receipt_code=f"REC-{request_id}",
+                    override_justification_hash=None,
+                )
+                receipt = seal_entry(entry, self._repo, keys=self._keys)
+                return BlockedPacket(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    policy_status=guard_in_res.policy_status,
+                    consent=consent,
+                    ledger=receipt,
+                )
+
+            # 6. Intercambio con LLM mediante Circuit Breaker
+            llm_res = await self._llm.exchange(prompt)
+
+            # 7. Stage 3: GUARD-OUT (Anti-fuga de canary, anti-XSS y PII residual)
+            guard_out_res = guard_out(llm_res.raw_response, canary_token=guard_in_res.canary_token)
+            if not guard_out_res.allowed:
+                entry = LedgerEntry(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    blind_citizen_id=blind_id,
+                    payload_hash=crypto.sha256_hex(masked_text.encode()),
+                    security_verdict=guard_out_res.policy_status,
+                    model_recommendation="BLOQUEADO_SEGURIDAD",
+                    human_decision="BLOQUEADO_SEGURIDAD",
+                    human_override=False,
+                    citizen_receipt_code=f"REC-{request_id}",
+                    override_justification_hash=None,
+                )
+                receipt = seal_entry(entry, self._repo, keys=self._keys)
+                return BlockedPacket(
+                    request_id=request_id,
+                    timestamp_utc=timestamp_utc,
+                    policy_status=guard_out_res.policy_status,
+                    consent=consent,
+                    ledger=receipt,
+                )
+
+            # 8. Stage 5: EXPLICA (Regresión logística white-box y SHAP lineal)
+            explica_res = explain(
+                data.features,
+                human_decision=data.human_decision,
+                override_justification=data.override_justification,
+            )
+
+            # 9. Stage 4: LEDGER (Sellado inmutable con doble hash y firma HMAC)
+            override_hash = None
+            if explica_res.human_override and data.override_justification:
+                override_hash = self._keys.hmac_hex(
+                    "justification", data.override_justification.strip().encode()
+                )
+
+            payload_h = crypto.sha256_hex(guard_out_res.sanitized_response.encode())
+            receipt_code = f"REC-{request_id}"
+
+            entry = LedgerEntry(
+                request_id=request_id,
+                timestamp_utc=timestamp_utc,
+                blind_citizen_id=blind_id,
+                payload_hash=payload_h,
+                security_verdict="CLEAN",
+                model_recommendation=explica_res.model_recommendation,
+                human_decision=explica_res.human_decision,
+                human_override=explica_res.human_override,
+                citizen_receipt_code=receipt_code,
+                override_justification_hash=override_hash,
+            )
+            receipt = seal_entry(entry, self._repo, keys=self._keys)
+
+            return AduanaPacket(
+                request_id=request_id,
+                timestamp_utc=timestamp_utc,
+                masked_text=masked_text,
+                consent=consent,
+                shield=shield_meta,
+                guard_in=guard_in_res,
+                llm=llm_res,
+                guard_out=guard_out_res,
+                explica=explica_res,
+                ledger=receipt,
+            )
+        finally:
+            # Destrucción criptográfica incondicional en RAM (Zero-PII)
+            self._vault.zeroize(request_id)
