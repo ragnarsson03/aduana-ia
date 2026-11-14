@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { GatewayConsole } from './components/GatewayConsole';
+import { useBackendStatus } from '../../state/BackendStatus';
 import { HeroPipelineSection } from './components/HeroPipelineSection';
 import { LedgerSummaryWidget } from './components/LedgerSummaryWidget';
 import { ExplicaSummaryWidget } from './components/ExplicaSummaryWidget';
@@ -20,6 +22,7 @@ export const PasarelaFeature: React.FC<PasarelaFeatureProps> = ({
   onNavigateToExplica,
   onNotify,
 }) => {
+  const { connection } = useBackendStatus();
   const [stages, setStages] = useState(INITIAL_PIPELINE_STAGES);
   const [activeStageId, setActiveStageId] = useState('ia-local');
 
@@ -31,6 +34,26 @@ export const PasarelaFeature: React.FC<PasarelaFeatureProps> = ({
     }
   };
 
+  if (connection === 'checking') {
+    return (
+      <p role="status" data-testid="connection-checking" className="text-sm text-slate-500">
+        Comprobando conexión con el servidor…
+      </p>
+    );
+  }
+
+  // Con conexión: datos reales del backend, sin mockData.
+  if (connection === 'online') {
+    return (
+      <GatewayConsole
+        onNavigateToLedger={onNavigateToLedger}
+        onNavigateToExplica={onNavigateToExplica}
+        onNotify={onNotify}
+      />
+    );
+  }
+
+  // Sin conexión: modo simulado (el banner global lo advierte).
   return (
     <div className="space-y-6">
       {/* 1. Hero Pipeline Section (Avila silhouette, 3 columns: Citizen Prompt, 5 stages, Shield Filter) */}

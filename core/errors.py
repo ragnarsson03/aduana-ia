@@ -47,5 +47,13 @@ class ShieldResidualPiiError(AduanaError):
     """SHIELD no logró anonimizar el texto (fail-closed); sin contenido en el mensaje."""
 
 
+class InvalidFeaturesError(AduanaError, ValueError):
+    """Variables de EXPLICA ausentes, sobrantes o no finitas (HTTP 422 ERR_INVALID_FEATURES).
+
+    Hereda de ``ValueError`` para no romper a quien ya capturaba ese tipo. El mensaje nombra las
+    variables, que son parámetros del modelo y no texto ciudadano.
+    """
+
+
 class OverrideJustificationError(AduanaError):
     """Override humano sin justificación de al menos 20 caracteres (RF-20)."""

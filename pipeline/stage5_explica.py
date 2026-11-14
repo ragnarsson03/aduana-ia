@@ -27,7 +27,7 @@ from core.config import (
     OVERRIDE_MIN_JUSTIFICATION_CHARS,
 )
 from core.context import ExplicaResult, RecommendationType
-from core.errors import OverrideJustificationError
+from core.errors import InvalidFeaturesError, OverrideJustificationError
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +100,7 @@ def resolve_model(
         return explicit_model
 
     if not features:
-        raise ValueError("El diccionario de características no puede estar vacío.")
+        raise InvalidFeaturesError("El diccionario de características no puede estar vacío.")
 
     feature_keys = set(features.keys())
     if feature_keys == set(ORACLE_MODEL.feature_names):
@@ -116,7 +116,7 @@ def resolve_model(
     if feature_keys.issubset(inst_set) or any(k in inst_set for k in feature_keys):
         return INSTITUTIONAL_MODEL
 
-    raise ValueError(
+    raise InvalidFeaturesError(
         f"Esquema de variables no reconocido: {sorted(feature_keys)}. "
         f"Esquemas soportados: {sorted(ORACLE_MODEL.feature_names)} o "
         f"{sorted(INSTITUTIONAL_MODEL.feature_names)}."
@@ -134,7 +134,7 @@ def explain(
     # 1. Validación de valores numéricos finitos
     for name, val in features.items():
         if not isinstance(val, (int, float)) or math.isnan(val) or math.isinf(val):
-            raise ValueError(f"Característica '{name}' con valor no finito o inválido: {val}")
+            raise InvalidFeaturesError(f"Característica '{name}' con valor no finito o inválido.")
 
     # 2. Resolución de modelo y validación estricta de esquema
     active_model = resolve_model(features, model)
@@ -143,7 +143,7 @@ def explain(
     if actual_keys != expected_keys:
         missing = expected_keys - actual_keys
         extra = actual_keys - expected_keys
-        raise ValueError(
+        raise InvalidFeaturesError(
             f"El vector de características no coincide con el modelo '{active_model.model_name}'. "
             f"Faltantes: {sorted(missing)}, Sobrantes: {sorted(extra)}"
         )
