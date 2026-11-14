@@ -126,23 +126,23 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ onCopyText }) => {
         </div>
       </div>
 
-      {/* 2. Tampering Alert Banner (Conditional or Persistent with Toggle) */}
+      {/* 2. Tampering Alert Banner (Discreet & Integrated Security Notice) */}
       {isTampered && (
-        <div className="mt-6 rounded-xl bg-red-50/90 dark:bg-red-950/40 border border-red-200 dark:border-red-900/80 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs transition-all">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-lg bg-[#ba1a1a] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-              <ShieldAlert className="w-5 h-5" />
+        <div className="mt-5 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-900/40 p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3.5 shadow-2xs transition-all">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-rose-100/80 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40 flex items-center justify-center shrink-0 mt-0.5">
+              <ShieldAlert className="w-4 h-4" />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-red-200 tracking-tight">
+                <h3 className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 tracking-tight">
                   Alerta de Manipulación Detectada
                 </h3>
-                <span className="font-mono text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded bg-[#ba1a1a] text-white shadow-xs">
+                <span className="font-mono text-[10px] font-medium tracking-wider uppercase px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/50">
                   DESAJUSTE SHA-256
                 </span>
               </div>
-              <p className="text-xs text-red-900/80 dark:text-red-300/90 mt-1 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
                 El Bloque #004 fue modificado externamente. La firma digital y el hash del bloque previo no coinciden con el cálculo estricto en memoria.
               </p>
             </div>
@@ -150,7 +150,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ onCopyText }) => {
 
           <button
             onClick={handleRestoreOriginal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#ba1a1a] hover:bg-[#9a1515] shrink-0 shadow-xs transition-colors self-start md:self-center"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-700 dark:text-rose-300 bg-white dark:bg-[#1a2234] hover:bg-rose-50 dark:hover:bg-rose-950/50 border border-rose-300/80 dark:border-rose-800/60 shrink-0 shadow-2xs transition-all self-start md:self-center cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Restaurar Bloque Original</span>

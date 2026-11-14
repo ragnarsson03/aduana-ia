@@ -1,3 +1,14 @@
+export interface ContactCredentials {
+  clearanceLevel: string;
+  entity: string;
+  ed25519Key: string;
+  ed25519Status: string;
+  permissions: string[];
+  sessionId: string;
+  department: string;
+  idNumber: string;
+}
+
 export interface ContactProfile {
   id: string;
   name: string;
@@ -7,25 +18,43 @@ export interface ContactProfile {
   avatarBgColor?: string;
   badge?: string;
   hasGreenDot?: boolean;
+  time?: string;
+  unreadCount?: number;
+  credentials?: ContactCredentials;
+}
+
+export interface InstitutionalChannel {
+  id: string;
+  name: string;
+  badgeCount?: number;
+  hasAlertDot?: boolean;
+  alertDotColor?: string;
+  description: string;
 }
 
 export interface ChatMessage {
   id: string;
   senderName: string;
   senderInitials?: string;
-  isSystem: boolean;
+  senderRole?: string;
+  isCurrentUser?: boolean;
+  isSystem?: boolean;
   timestamp: string;
   content: string;
+  piiMasked?: boolean;
+  piiType?: string;
+  piiHash?: string;
+  verifiedDelivery?: boolean;
+  maskedToken?: string;
+  tokenExampleLabel?: string;
+  secondTimestamp?: string;
+  sentReceiptLabel?: string;
   attachment?: {
     title: string;
     description: string;
     code?: string;
     isClassified: boolean;
   };
-  maskedToken?: string;
-  tokenExampleLabel?: string;
-  secondTimestamp?: string;
-  sentReceiptLabel?: string;
 }
 
 export interface AuditorUserProfile {

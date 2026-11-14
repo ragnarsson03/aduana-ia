@@ -27,11 +27,11 @@ export const CanalHeader: React.FC<CanalHeaderProps> = ({
           alt="Aduana IA" 
           className="block dark:hidden h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
         />
-        {/* Logo en Modo Oscuro (Blanco / Luminoso) */}
+        {/* Logo en Modo Oscuro (Adaptado para fondo oscuro con detalles y colores originales) */}
         <img 
           src={logoWhiteImg} 
           alt="Aduana IA" 
-          className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_0_12px_rgba(255,255,255,0.25)]"
+          className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:drop-shadow-[0_0_14px_rgba(79,70,229,0.3)]"
         />
         <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           <span className="text-slate-400 dark:text-slate-500 font-normal">—</span> Canal Seguro

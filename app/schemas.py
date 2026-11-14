@@ -81,7 +81,7 @@ class LedgerVerifyResponse(msgspec.Struct, frozen=True):
 
 class TamperSimRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     scenario: TamperScenario
-    block_index: Annotated[int, msgspec.Meta(ge=1)]
+    block_index: Annotated[int, msgspec.Meta(ge=0)]  # 0 = bloque génesis, también simulable
 
 
 class TamperSimResponse(msgspec.Struct, frozen=True):
@@ -103,3 +103,57 @@ class HealthResponse(msgspec.Struct, frozen=True):
     status: str
     ledger_mode: Literal["ephemeral", "persistent"]
     implemented_stages: tuple[str, ...]
+
+
+class LoginRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=128)]
+    password: Annotated[str, msgspec.Meta(min_length=1, max_length=128)]
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "LoginRequest([REDACTED])"
+
+
+class LoginUserOut(msgspec.Struct, frozen=True):
+    id: str
+    username: str
+    full_name: str
+    short_name: str
+    avatar_text: str
+    role: Literal["analista", "administrador", "auditor"]
+    role_label: str
+    clearance_level: str
+    entity: str
+    department: str
+    permissions: tuple[str, ...]
+    default_tab: Literal["pasarela", "ledger"]
+    allowed_tabs: tuple[str, ...]
+
+
+class LoginResponse(msgspec.Struct, frozen=True):
+    authenticated: bool
+    session_token: str
+    token_type: Literal["Bearer"]
+    expires_in_seconds: int
+    user: LoginUserOut
+    block_index: int
+    citizen_receipt_code: str
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "LoginResponse([REDACTED])"
+
+
+class SessionStatusResponse(msgspec.Struct, frozen=True):
+    authenticated: bool
+    user_id: str
+    role: Literal["analista", "administrador", "auditor"]
+    jti: str
+    expires_at_epoch: int
+    user: LoginUserOut
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "SessionStatusResponse([REDACTED])"
+
+
+class LogoutResponse(msgspec.Struct, frozen=True):
+    revoked: bool
+    jti: str

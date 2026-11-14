@@ -6,11 +6,26 @@ import { ChatIAView } from './views/ChatIAView';
 import { LedgerView } from './views/LedgerView';
 import { ExplicabilidadView } from './views/ExplicabilidadView';
 import { CanalSeguroView } from './views/CanalSeguroView';
+import { ProfileView } from './views/ProfileView';
+import { LoginView } from './views/LoginView';
 import { NavTabId } from './types';
+import { AuthUser } from './types/auth';
+import { ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from './constants/mockAuth';
 import { CheckCircle2 } from 'lucide-react';
+import { OfflineBanner } from './components/OfflineBanner';
+import { api } from './services/apiClient';
+import { useBackendStatus } from './state/BackendStatus';
+import { LiveLedgerView } from './views/live/LiveLedgerView';
+import { LiveExplicabilidadView } from './views/live/LiveExplicabilidadView';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTabId>('pasarela');
+  // Zero-Trust: usuario y token de sesión viven exclusivamente en memoria RAM (sin localStorage/sessionStorage)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [_sessionToken, setSessionToken] = useState<string | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState<boolean>(true);
+
+  const [activeTab, setActiveTab] = useState<NavTabId>('ledger');
+  const [profileSection, setProfileSection] = useState<'profile' | 'settings'>('profile');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('aduana_dark_mode');
@@ -20,6 +35,7 @@ export const App: React.FC = () => {
     return false;
   });
 
+  const { connection } = useBackendStatus();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync dark class on documentElement
@@ -33,6 +49,59 @@ export const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Restaurar sesión tras F5 consultando /api/v1/auth/session (cookie HttpOnly SameSite=Strict)
+  useEffect(() => {
+    let active = true;
+    api
+      .getSession()
+      .then((sess) => {
+        if (!active || !sess.authenticated) return;
+        const hydratedUser: AuthUser = {
+          id: sess.user.id,
+          name: sess.user.full_name,
+          shortName: sess.user.short_name,
+          role: sess.user.role,
+          roleLabel: sess.user.role_label,
+          avatarText: sess.user.avatar_text,
+          email: `${sess.user.username}@aduana.gob.ve`,
+          status: 'online',
+          credentials: {
+            clearanceLevel: sess.user.clearance_level,
+            entity: sess.user.entity,
+            ed25519Key: 'Enclave-RAM',
+            ed25519Status: 'Validada y Activa',
+            permissions: sess.user.permissions,
+            sessionId: sess.jti.slice(0, 12),
+            fingerprint: `jwt-exp:${sess.expires_at_epoch}`,
+            department: sess.user.department,
+            idNumber: sess.user.id,
+          },
+          lastLogin: new Date().toISOString(),
+        };
+        setCurrentUser(hydratedUser);
+        setActiveTab(ROLE_DEFAULT_TAB[hydratedUser.role] || sess.user.default_tab || 'ledger');
+      })
+      .catch(() => {
+        // Sin sesión activa: permanecer en LoginView sin error
+      })
+      .finally(() => {
+        if (active) setIsRestoringSession(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Guard active tab based on role permissions
+  useEffect(() => {
+    if (currentUser && activeTab !== 'perfil') {
+      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab(ROLE_DEFAULT_TAB[currentUser.role] || 'ledger');
+      }
+    }
+  }, [currentUser, activeTab]);
+
   const showNotification = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -41,20 +110,76 @@ export const App: React.FC = () => {
   };
 
   const handleNavigate = (tab: NavTabId) => {
+    // If user attempts to navigate to unauthorized tab, redirect to default
+    if (currentUser && tab !== 'perfil') {
+      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      if (!allowed.includes(tab)) {
+        const fallback = ROLE_DEFAULT_TAB[currentUser.role] || 'ledger';
+        setActiveTab(fallback);
+        showNotification(`Acceso restringido: El rol ${currentUser.roleLabel} no tiene permisos para ese módulo.`);
+        return;
+      }
+    }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNavigateProfile = (section: 'profile' | 'settings' = 'profile') => {
+    setProfileSection(section);
+    setActiveTab('perfil');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogin = (user: AuthUser, token: string) => {
+    api.setSessionToken(token);
+    setSessionToken(token);
+    setCurrentUser(user);
+    const initialTab = ROLE_DEFAULT_TAB[user.role] || 'ledger';
+    setActiveTab(initialTab);
+    showNotification(`Bienvenido(a), ${user.name}. Sesión iniciada con rol ${user.roleLabel}.`);
+  };
+
+  const handleLogout = () => {
+    void api.logout();
+    setSessionToken(null);
+    setCurrentUser(null);
+    showNotification('Sesión cerrada. Claves efímeras y JWT purgados de memoria confinada.');
+  };
+
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0f131d] text-[#dfe2f1] font-mono text-xs">
+        Verificando sesión criptográfica en enclave...
+      </div>
+    );
+  }
+
+  // If no user is logged in, show the sovereign Login view
+  if (!currentUser) {
+    return (
+      <LoginView
+        onLogin={handleLogin}
+        darkMode={darkMode}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F6FB] text-slate-800 dark:bg-[#030712] dark:text-slate-100 transition-colors selection:bg-[#4f46e5] selection:text-white">
       
-      {/* Top Header Navbar */}
+      {/* Top Header Navbar with User Dropdown */}
       <Navbar
         activeTab={activeTab}
         onTabChange={handleNavigate}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onNavigateProfile={handleNavigateProfile}
       />
+
+      <OfflineBanner />
 
       {/* Main Content Area */}
       <main className="flex-1 w-full animate-in fade-in duration-200">
@@ -74,20 +199,36 @@ export const App: React.FC = () => {
           />
         )}
 
-        {activeTab === 'ledger' && (
+        {activeTab === 'ledger' && (connection === 'online' ? (
+          <LiveLedgerView onNotify={showNotification} />
+        ) : (
           <LedgerView onCopyText={showNotification} />
-        )}
+        ))}
 
-        {activeTab === 'explicabilidad' && (
+        {activeTab === 'explicabilidad' && (connection === 'online' ? (
+          <LiveExplicabilidadView onNavigateToPasarela={() => handleNavigate('pasarela')} />
+        ) : (
           <ExplicabilidadView onNotify={showNotification} />
-        )}
+        ))}
 
         {activeTab === 'canal' && (
           <CanalSeguroView 
+            currentUser={currentUser}
             onBackToPasarela={() => handleNavigate('pasarela')}
             onNotify={showNotification}
             darkMode={darkMode}
             onToggleDarkMode={() => setDarkMode(!darkMode)}
+          />
+        )}
+
+        {activeTab === 'perfil' && (
+          <ProfileView 
+            user={currentUser}
+            darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode(!darkMode)}
+            onLogout={handleLogout}
+            onNavigate={handleNavigate}
+            defaultSection={profileSection}
           />
         )}
       </main>

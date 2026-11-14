@@ -16,7 +16,16 @@ _DOMAIN_PREFIX: Final[bytes] = b"aduana/v1/"
 
 # Dominios permitidos: una llave comprometida en un uso no compromete a las demás.
 DOMAINS: Final[frozenset[str]] = frozenset(
-    {"ledger-sign", "canary", "blind-index", "rate-guard", "consent", "key-id", "justification"}
+    {
+        "ledger-sign",
+        "canary",
+        "blind-index",
+        "rate-guard",
+        "consent",
+        "key-id",
+        "justification",
+        "jwt-session",
+    }
 )
 
 
