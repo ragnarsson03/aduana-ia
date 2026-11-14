@@ -151,3 +151,27 @@ Medido sobre un conjunto INDEPENDIENTE de 288 casos (185 ataques y 103 benignos 
 | API | `app/server.py`, `security.py`, `schemas.py`, `dependencies.py`, `controllers/*`, `desktop.py` (sin probar) |
 | Tests | `tests/` (conftest con `client`, `demo_client`, `keys`; token `API_TOKEN`/`TOKEN_HEADERS`) |
 | Specs | `specs/00_architecture.spec.md`, `00_kernel`, `01_shield` (desactualizada), `02_guardian`, `03_ledger`, `04_explica`, `05_interconnect`, `06_files_and_chat_frontend` |
+
+### 2026-11-14 — Harness de front y back reales
+
+Añadidos `scripts/run_e2e_stack.py`, `tests/e2e_harness/` y `tests/test_static_serving.py`; Granian instalado y utilizado, SQLite temporal aislado, token fijo local, demo activa, readiness y cierre limpio. Pruebas HTTP de front/assets, headers, auth, flujo institucional, cuatro simulaciones y búsqueda binaria de cédula en SQLite/WAL/SHM. Hallazgos: faltan CSP/nosniff en `/`; SPA profunda devuelve 404; el contrato de ingreso exige cédula en claro (dos pruebas lo señalan). No hay Google Fonts en el índice/CSS servido. La verificación final del harness dio 16 passed y 5 failed; cierre por duración y por señal comprobados. La suite completa ejecutada dio 427 passed, 11 failed, 66 xfailed, 7 xpassed: cinco fallos del harness y seis de pruebas existentes (latencia Shield, URL del decodificador React en JS, autocomplete de LoginView y compatibilidad desktop/Granian). Los cambios concurrentes de otros agentes en React/static/backend no forman parte de este trabajo. Sin commit ni push.
+
+Comandos exactos, desde PowerShell (arranque y pruebas en terminales distintas):
+
+```powershell
+Set-Location 'E:\proyectos\hackatonUNETI\aduana-ia-integration'
+$env:PYTHONPATH = (Get-Location).Path
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& 'E:\proyectos\hackatonUNETI\aduana-ia\.venv\Scripts\python' scripts/run_e2e_stack.py
+```
+
+```powershell
+Set-Location 'E:\proyectos\hackatonUNETI\aduana-ia-integration'
+$env:PYTHONPATH = (Get-Location).Path
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& 'E:\proyectos\hackatonUNETI\aduana-ia\.venv\Scripts\python' -m pytest tests/e2e_harness tests/test_static_serving.py -q --tb=short -o cache_dir=tests/e2e_harness/.pytest_cache --basetemp=tests/e2e_harness/.pytest_tmp
+$stackUrl = Read-Host 'Pegue el campo url del JSON del stack manual'
+Start-Process $stackUrl
+```
+
+En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKEN__ = 'e2e-token-' + '0'.repeat(32);`. Reasignar después de recargar; con `--token`, usar el valor configurado. La sección «Probar front y back juntos» del README documenta los límites y la diferencia entre el fixture HTTP y la prueba visual manual.
