@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { PasarelaView } from './views/PasarelaView';
+import { ChatIAView } from './views/ChatIAView';
 import { LedgerView } from './views/LedgerView';
 import { ExplicabilidadView } from './views/ExplicabilidadView';
 import { CanalSeguroView } from './views/CanalSeguroView';
@@ -62,6 +63,14 @@ export const App: React.FC = () => {
             onNavigateToLedger={() => handleNavigate('ledger')}
             onNavigateToExplica={() => handleNavigate('explicabilidad')}
             onNotify={showNotification}
+          />
+        )}
+
+        {activeTab === 'chat' && (
+          <ChatIAView 
+            onNotify={showNotification}
+            onNavigateToLedger={() => handleNavigate('ledger')}
+            onNavigateToExplica={() => handleNavigate('explicabilidad')}
           />
         )}
 
