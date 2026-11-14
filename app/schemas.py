@@ -148,6 +148,7 @@ class SessionStatusResponse(msgspec.Struct, frozen=True):
     role: Literal["analista", "administrador", "auditor"]
     jti: str
     expires_at_epoch: int
+    user: LoginUserOut
 
     def __repr__(self) -> str:  # Zero-Leak
         return "SessionStatusResponse([REDACTED])"

@@ -309,6 +309,60 @@ class SQLiteAuthRepository:
             cur.executescript(build_seed_sql(self._keys))
         self._seeded = True
 
+    def find_active_by_id(self, user_id: str) -> AuthenticatedUser | None:
+        """Hidrata un funcionario activo por su ID interno tras validar el JWT."""
+        with self._lock:
+            cur = self._conn.cursor()
+            self._seed_if_empty_locked(cur)
+            cur.execute(
+                """
+                SELECT
+                    u.id,
+                    u.username,
+                    u.full_name,
+                    u.short_name,
+                    u.avatar_text,
+                    u.role,
+                    u.role_label,
+                    u.clearance_level,
+                    u.entity,
+                    u.department,
+                    u.permissions_json,
+                    r.default_tab,
+                    r.allowed_tabs_json
+                FROM usuarios_aduana AS u
+                INNER JOIN roles_aduana AS r ON r.role_id = u.role
+                WHERE u.id = ? AND u.is_active = 1
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            cur.close()
+
+        if row is None:
+            return None
+
+        role: OfficialRole = row[5]
+        default_tab: DefaultTab = "ledger" if role == "auditor" else "pasarela"
+        permissions = tuple(str(p) for p in json.loads(row[10]))
+        allowed_tabs = tuple(str(t) for t in json.loads(row[12]))
+        return AuthenticatedUser(
+            id=row[0],
+            username=row[1],
+            full_name=row[2],
+            short_name=row[3],
+            avatar_text=row[4],
+            role=role,
+            role_label=row[6],
+            clearance_level=row[7],
+            entity=row[8],
+            department=row[9],
+            permissions=permissions,
+            default_tab=default_tab,
+            allowed_tabs=allowed_tabs,
+        )
+
     def find_active_by_blind_id(self, blind_id: str) -> tuple[AuthenticatedUser, str] | None:
         """Busca un funcionario activo exclusivamente por su ``blind_citizen_id``."""
         with self._lock:

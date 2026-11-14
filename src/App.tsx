@@ -22,6 +22,7 @@ export const App: React.FC = () => {
   // Zero-Trust: usuario y token de sesión viven exclusivamente en memoria RAM (sin localStorage/sessionStorage)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [_sessionToken, setSessionToken] = useState<string | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState<boolean>(true);
 
   const [activeTab, setActiveTab] = useState<NavTabId>('ledger');
   const [profileSection, setProfileSection] = useState<'profile' | 'settings'>('profile');
@@ -47,6 +48,49 @@ export const App: React.FC = () => {
       localStorage.setItem('aduana_dark_mode', 'false');
     }
   }, [darkMode]);
+
+  // Restaurar sesión tras F5 consultando /api/v1/auth/session (cookie HttpOnly SameSite=Strict)
+  useEffect(() => {
+    let active = true;
+    api
+      .getSession()
+      .then((sess) => {
+        if (!active || !sess.authenticated) return;
+        const hydratedUser: AuthUser = {
+          id: sess.user.id,
+          name: sess.user.full_name,
+          shortName: sess.user.short_name,
+          role: sess.user.role,
+          roleLabel: sess.user.role_label,
+          avatarText: sess.user.avatar_text,
+          email: `${sess.user.username}@aduana.gob.ve`,
+          status: 'online',
+          credentials: {
+            clearanceLevel: sess.user.clearance_level,
+            entity: sess.user.entity,
+            ed25519Key: 'Enclave-RAM',
+            ed25519Status: 'Validada y Activa',
+            permissions: sess.user.permissions,
+            sessionId: sess.jti.slice(0, 12),
+            fingerprint: `jwt-exp:${sess.expires_at_epoch}`,
+            department: sess.user.department,
+            idNumber: sess.user.id,
+          },
+          lastLogin: new Date().toISOString(),
+        };
+        setCurrentUser(hydratedUser);
+        setActiveTab(ROLE_DEFAULT_TAB[hydratedUser.role] || sess.user.default_tab || 'ledger');
+      })
+      .catch(() => {
+        // Sin sesión activa: permanecer en LoginView sin error
+      })
+      .finally(() => {
+        if (active) setIsRestoringSession(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Guard active tab based on role permissions
   useEffect(() => {
@@ -101,6 +145,14 @@ export const App: React.FC = () => {
     setCurrentUser(null);
     showNotification('Sesión cerrada. Claves efímeras y JWT purgados de memoria confinada.');
   };
+
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0f131d] text-[#dfe2f1] font-mono text-xs">
+        Verificando sesión criptográfica en enclave...
+      </div>
+    );
+  }
 
   // If no user is logged in, show the sovereign Login view
   if (!currentUser) {

@@ -130,28 +130,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
     pass: string;
     clearance: string;
   }[] = [
-    {
-      role: 'auditor',
-      label: 'Auditor (Deykary González)',
-      cedula: 'V-14220101',
-      pass: 'auditor2026',
-      clearance: 'Nivel 4 — Confidencial Estatal',
-    },
-    {
-      role: 'analista',
-      label: 'Analista (Elena Salazar)',
-      cedula: 'V-18660505',
-      pass: 'analista2026',
-      clearance: 'Nivel 2 — Operativo Aduanero',
-    },
-    {
-      role: 'administrador',
-      label: 'Administrador (Marcos Vivas)',
-      cedula: 'V-12110909',
-      pass: 'admin2026',
-      clearance: 'Nivel 5 — Soberanía Crítica',
-    },
-  ];
+      {
+        role: 'auditor',
+        label: 'Auditor (Deykary González)',
+        cedula: 'V-14220101',
+        pass: 'auditor2026',
+        clearance: 'Nivel 4 — Confidencial Estatal',
+      },
+      {
+        role: 'analista',
+        label: 'Analista (Elena Salazar)',
+        cedula: 'V-18660505',
+        pass: 'analista2026',
+        clearance: 'Nivel 2 — Operativo Aduanero',
+      },
+      {
+        role: 'administrador',
+        label: 'Administrador (Marcos Vivas)',
+        cedula: 'V-12110909',
+        pass: 'admin2026',
+        clearance: 'Nivel 5 — Soberanía Crítica',
+      },
+    ];
 
   const handleSelectAccount = (acc: (typeof demoAccounts)[0]) => {
     setCedulaInput(acc.cedula);
@@ -267,8 +267,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </p>
 
             <div className="inline-flex items-center space-x-1.5 mt-3 px-3 py-1 rounded-full bg-[#0a0e18]/85 border border-white/10 text-[11px] font-mono text-[#4edea3]">
-              <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse" />
-              <span>Zero-Trust Enclave (PBKDF2-HMAC-SHA256 / RAM-Only)</span>
+
             </div>
           </div>
 

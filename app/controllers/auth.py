@@ -6,7 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from litestar import Controller, Request, get, post
+from litestar import Controller, Request, Response, get, post
+from litestar.datastructures import Cookie
 from litestar.exceptions import HTTPException, NotAuthorizedException
 from litestar.params import Body
 
@@ -23,11 +24,32 @@ from core.config import API_PREFIX
 from core.context import LedgerEntry, LedgerReceipt
 from core.crypto import sha256_hex
 from pipeline.auth import (
+    AuthenticatedUser,
     compute_blind_citizen_id,
     dummy_pbkdf2_work,
     verify_pbkdf2_password,
 )
 from pipeline.stage4_ledger import seal_entry
+
+SESSION_COOKIE_NAME = "aduana_session"
+
+
+def _to_user_out(user: AuthenticatedUser) -> LoginUserOut:
+    return LoginUserOut(
+        id=user.id,
+        username=user.username,
+        full_name=user.full_name,
+        short_name=user.short_name,
+        avatar_text=user.avatar_text,
+        role=user.role,
+        role_label=user.role_label,
+        clearance_level=user.clearance_level,
+        entity=user.entity,
+        department=user.department,
+        permissions=user.permissions,
+        default_tab=user.default_tab,
+        allowed_tabs=user.allowed_tabs,
+    )
 
 
 def _seal_auth_event(
@@ -63,7 +85,7 @@ class AuthController(Controller):
         self,
         data: Annotated[LoginRequest, Body()],
         request: Request,
-    ) -> LoginResponse:
+    ) -> Response[LoginResponse]:
         state: AppState = request.app.state.aduana
         try:
             blind_id = compute_blind_citizen_id(state.keys, data.cedula)
@@ -112,36 +134,40 @@ class AuthController(Controller):
             success=True,
         )
 
-        return LoginResponse(
+        payload = LoginResponse(
             authenticated=True,
             session_token=session_token,
             token_type="Bearer",  # noqa: S106
             expires_in_seconds=ttl_seconds,
-            user=LoginUserOut(
-                id=user.id,
-                username=user.username,
-                full_name=user.full_name,
-                short_name=user.short_name,
-                avatar_text=user.avatar_text,
-                role=user.role,
-                role_label=user.role_label,
-                clearance_level=user.clearance_level,
-                entity=user.entity,
-                department=user.department,
-                permissions=user.permissions,
-                default_tab=user.default_tab,
-                allowed_tabs=user.allowed_tabs,
-            ),
+            user=_to_user_out(user),
             block_index=receipt.block_index,
             citizen_receipt_code=receipt.citizen_receipt_code,
         )
+        return Response(
+            content=payload,
+            status_code=200,
+            cookies=[
+                Cookie(
+                    key=SESSION_COOKIE_NAME,
+                    value=session_token,
+                    max_age=ttl_seconds,
+                    path="/",
+                    httponly=True,
+                    samesite="strict",
+                    secure=request.url.scheme == "https",
+                )
+            ],
+        )
 
-    @get("/session", guards=[api_guard], status_code=200, sync_to_thread=False)
+    @get("/session", guards=[api_guard], status_code=200, sync_to_thread=True)
     def session_status(self, request: Request) -> SessionStatusResponse:
         state: AppState = request.app.state.aduana
-        token = _extract_bearer_token(request)
+        token = _extract_session_jwt(request)
         entry = state.session_store.validate_jwt(state.keys, token)
         if entry is None:
+            raise NotAuthorizedException(detail="INVALID_SESSION")
+        user = state.auth_repo.find_active_by_id(entry.user_id)
+        if user is None:
             raise NotAuthorizedException(detail="INVALID_SESSION")
         return SessionStatusResponse(
             authenticated=True,
@@ -149,22 +175,40 @@ class AuthController(Controller):
             role=entry.role,
             jti=entry.jti,
             expires_at_epoch=entry.expires_at_epoch,
+            user=_to_user_out(user),
         )
 
     @post("/logout", guards=[api_guard], status_code=200, sync_to_thread=False)
-    def logout(self, request: Request) -> LogoutResponse:
+    def logout(self, request: Request) -> Response[LogoutResponse]:
         state: AppState = request.app.state.aduana
-        token = _extract_bearer_token(request)
+        token = _extract_session_jwt(request)
         entry = state.session_store.validate_jwt(state.keys, token)
         if entry is None:
             raise NotAuthorizedException(detail="INVALID_SESSION")
         revoked = state.session_store.revoke(entry.jti)
-        return LogoutResponse(revoked=revoked, jti=entry.jti)
+        return Response(
+            content=LogoutResponse(revoked=revoked, jti=entry.jti),
+            status_code=200,
+            cookies=[
+                Cookie(
+                    key=SESSION_COOKIE_NAME,
+                    value="",
+                    max_age=0,
+                    path="/",
+                    httponly=True,
+                    samesite="strict",
+                    secure=request.url.scheme == "https",
+                )
+            ],
+        )
 
 
-def _extract_bearer_token(request: Request) -> str:
+def _extract_session_jwt(request: Request) -> str:
     auth_header = request.headers.get("authorization", "")
     prefix = "Bearer "
-    if not auth_header.startswith(prefix):
-        raise NotAuthorizedException(detail="INVALID_SESSION")
-    return auth_header[len(prefix) :].strip()
+    if auth_header.startswith(prefix):
+        return auth_header[len(prefix) :].strip()
+    cookie_token = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if cookie_token:
+        return cookie_token.strip()
+    raise NotAuthorizedException(detail="INVALID_SESSION")

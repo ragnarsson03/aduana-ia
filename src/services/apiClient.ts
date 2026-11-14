@@ -16,6 +16,7 @@ import type {
   LedgerVerifyResponse,
   LoginRequest,
   LoginResponse,
+  SessionStatusResponse,
   ShieldInspectResponse,
   TamperScenario,
   TamperSimResponse,
@@ -30,6 +31,7 @@ export type {
   LoginRequest,
   LoginResponse,
   RecommendationType,
+  SessionStatusResponse,
   ShieldInspectResponse,
   TamperScenario,
   TamperSimResponse,
@@ -141,6 +143,7 @@ export class AduanaApiClient {
     try {
       response = await fetch(url, {
         ...options,
+        credentials: 'same-origin',
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
@@ -251,15 +254,19 @@ export class AduanaApiClient {
     return res;
   }
 
+  /** Verifica si existe una sesión JWT activa (cookie HttpOnly o Bearer) tras F5. */
+  public async getSession(): Promise<SessionStatusResponse> {
+    return this.request<SessionStatusResponse>('/auth/session', { method: 'GET' });
+  }
+
   /** Cierra la sesión activa y revoca el JWT en RAM del servidor. */
   public async logout(): Promise<void> {
     const jwt = this.sessionJwt;
     this.sessionJwt = null;
-    if (!jwt) return;
     try {
       await this.request('/auth/logout', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${jwt}` },
+        ...(jwt ? { headers: { Authorization: `Bearer ${jwt}` } } : {}),
       });
     } catch {
       // Si el servidor no responde, la sesión local en RAM ya quedó purgada.
