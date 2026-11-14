@@ -14,6 +14,8 @@ import type {
   GatewayProcessResponse,
   HealthResponse,
   LedgerVerifyResponse,
+  LoginRequest,
+  LoginResponse,
   ShieldInspectResponse,
   TamperScenario,
   TamperSimResponse,
@@ -25,6 +27,8 @@ export type {
   GatewayProcessResponse,
   HealthResponse,
   LedgerVerifyResponse,
+  LoginRequest,
+  LoginResponse,
   RecommendationType,
   ShieldInspectResponse,
   TamperScenario,
@@ -41,6 +45,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   ERR_OVERRIDE_JUSTIFICATION:
     'La decisión humana difiere de la recomendación: se requiere una justificación escrita válida.',
   UNAUTHORIZED: 'No autorizado: falta o es inválido el token de acceso de la aplicación.',
+  INVALID_CREDENTIALS: 'Cédula o contraseña inválida en el enclave de autenticación.',
+  INVALID_CEDULA: 'Formato de cédula inválido. Use V-12345678 o E-12345678.',
   UNSUPPORTED_MEDIA_TYPE: 'Tipo de contenido no soportado: la solicitud debe ser application/json.',
   PAYLOAD_TOO_LARGE: 'El texto supera el tamaño máximo permitido.',
   BAD_REQUEST: 'Solicitud inválida: revise los campos del formulario.',
@@ -94,6 +100,7 @@ const GATEWAY_TIMEOUT_MS = 60000;
 export class AduanaApiClient {
   private baseUrl: string;
   private apiToken: string;
+  private sessionJwt: string | null = null;
   private timeoutMs: number;
 
   constructor(config: ApiClientConfig = {}) {
@@ -112,6 +119,10 @@ export class AduanaApiClient {
 
   public setApiToken(token: string): void {
     this.apiToken = token;
+  }
+
+  public setSessionToken(token: string | null): void {
+    this.sessionJwt = token;
   }
 
   private async request<T>(
@@ -134,6 +145,7 @@ export class AduanaApiClient {
         headers: {
           'Content-Type': 'application/json',
           'X-Aduana-Token': activeToken,
+          ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
           ...(options.headers || {}),
         },
       });
@@ -227,6 +239,31 @@ export class AduanaApiClient {
       { method: 'POST', body: JSON.stringify(payload) },
       timeoutMs
     );
+  }
+
+  /** Autenticación Zero-Trust por Cédula (V-/E-) y contraseña PBKDF2 + JWT HS256. */
+  public async login(payload: LoginRequest): Promise<LoginResponse> {
+    const res = await this.request<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    this.sessionJwt = res.session_token;
+    return res;
+  }
+
+  /** Cierra la sesión activa y revoca el JWT en RAM del servidor. */
+  public async logout(): Promise<void> {
+    const jwt = this.sessionJwt;
+    this.sessionJwt = null;
+    if (!jwt) return;
+    try {
+      await this.request('/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+    } catch {
+      // Si el servidor no responde, la sesión local en RAM ya quedó purgada.
+    }
   }
 
   /** Estado mínimo del servidor (único endpoint sin token). */

@@ -5,13 +5,13 @@ import { NavTabId } from '../types/navigation';
 export const ROLE_ALLOWED_TABS: Record<UserRole, NavTabId[]> = {
   auditor: ['ledger', 'explicabilidad'],
   analista: ['pasarela', 'chat', 'canal'],
-  admin: ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'],
+  administrador: ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'],
 };
 
 export const ROLE_DEFAULT_TAB: Record<UserRole, NavTabId> = {
   auditor: 'ledger',
   analista: 'pasarela',
-  admin: 'pasarela',
+  administrador: 'pasarela',
 };
 
 export const MOCK_AUTH_USERS: Record<string, AuthUser> = {
@@ -69,11 +69,11 @@ export const MOCK_AUTH_USERS: Record<string, AuthUser> = {
     },
     lastLogin: '14 Feb 2026, 14:12 UTC'
   },
-  admin: {
+  administrador: {
     id: 'usr-admin-03',
     name: 'Marcos Vivas',
     shortName: 'Marcos V.',
-    role: 'admin',
+    role: 'administrador',
     roleLabel: 'Administrador de Infraestructura & Ciberseguridad',
     avatarText: 'MV',
     email: 'admin@aduana.gob.ve',
@@ -116,9 +116,9 @@ export const LOGIN_PRESETS: LoginCredentialPreset[] = [
     description: 'Módulos asignados: Pasarela, Nexus IA y Canal Seguro E2EE.'
   },
   {
-    role: 'admin',
+    role: 'administrador',
     roleName: 'Administrador de Infraestructura',
-    user: MOCK_AUTH_USERS.admin,
+    user: MOCK_AUTH_USERS.administrador,
     defaultPass: 'admin2026',
     badgeColor: 'border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300',
     description: 'Módulos asignados: Control total perimetral (Todos los módulos).'
