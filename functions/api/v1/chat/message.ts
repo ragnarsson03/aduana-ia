@@ -85,8 +85,64 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     }
   }
 
-  // 2. OpenAI / OpenRouter / Compatible OpenAI
-  if (provider === 'openai' || provider === 'custom' || (!provider && apiKey?.startsWith('sk-'))) {
+  // Detección proactiva de Google Gemini (incluso si el usuario seleccionó "custom" pero colocó endpoint o clave de Gemini)
+  const isGoogleEndpoint = Boolean(endpoint && endpoint.includes('generativelanguage.googleapis.com'));
+  const isGoogleKey = Boolean(apiKey && (apiKey.startsWith('AIza') || apiKey.startsWith('AQ.')));
+  const isGemini = provider === 'gemini' || isGoogleEndpoint || (!provider && isGoogleKey);
+
+  // 2. Google Gemini
+  const geminiKey = apiKey || env.GEMINI_API_KEY;
+  if (isGemini) {
+    if (!geminiKey) throw new Error('Falta la API Key de Google Gemini (AIza... o AQ...)');
+    let targetModel = (model || env.GEMINI_MODEL || 'gemini-3.5-flash').trim();
+    if (!targetModel || targetModel.toLowerCase().includes('key') || targetModel.includes('1.5') || targetModel.includes('2.5')) {
+      targetModel = 'gemini-3.5-flash';
+    }
+    let targetUrl: string;
+    if (isGoogleEndpoint && endpoint) {
+      targetUrl = endpoint.includes('?key=')
+        ? endpoint
+        : `${endpoint.split('?')[0]}?key=${geminiKey}`;
+    } else {
+      targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': geminiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userInput}` }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: 512,
+            temperature: 0.2,
+          },
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Google Gemini API Error (${res.status}): ${err.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as any;
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (content) return content;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 3. OpenAI / OpenRouter / Compatible OpenAI
+  if (!isGemini && (provider === 'openai' || provider === 'custom' || (!provider && apiKey?.startsWith('sk-')))) {
     if (!apiKey) throw new Error('Falta la API Key de OpenAI / OpenRouter (sk-...)');
     const targetUrl = endpoint || 'https://api.openai.com/v1/chat/completions';
     const targetModel = model || 'gpt-4o-mini';
@@ -116,44 +172,6 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
       }
       const data = (await res.json()) as any;
       const content = data.choices?.[0]?.message?.content?.trim();
-      if (content) return content;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  // 3. Google Gemini
-  const geminiKey = apiKey || env.GEMINI_API_KEY;
-  if (provider === 'gemini' || (!provider && geminiKey?.startsWith('AIza'))) {
-    if (!geminiKey) throw new Error('Falta la API Key de Google Gemini');
-    const targetModel = model || env.GEMINI_MODEL || 'gemini-1.5-flash';
-    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 18000);
-    try {
-      const res = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${systemPrompt}\n\n${userInput}` }],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 512,
-            temperature: 0.2,
-          },
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Gemini API Error (${res.status}): ${err.slice(0, 200)}`);
-      }
-      const data = (await res.json()) as any;
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       if (content) return content;
     } finally {
       clearTimeout(timer);
