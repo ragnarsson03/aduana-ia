@@ -113,7 +113,7 @@ export const LOGIN_PRESETS: LoginCredentialPreset[] = [
     user: MOCK_AUTH_USERS.analista,
     defaultPass: 'analista2026',
     badgeColor: 'border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300',
-    description: 'Módulos asignados: Pasarela, Chat IA y Canal Seguro E2EE.'
+    description: 'Módulos asignados: Pasarela, Nexus IA y Canal Seguro E2EE.'
   },
   {
     role: 'admin',
