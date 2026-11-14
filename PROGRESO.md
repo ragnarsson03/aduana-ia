@@ -93,7 +93,11 @@
 - [x] `index.html`, `vite.config.ts`, `src/` y `static/`: eliminados los `<link>` a Google Fonts CDN y URLs externas en bundle, `autoComplete="off"` en todos los `<input>`/`<textarea>`, lectura dinámica de `window.__ADUANA_TOKEN__` en `AduanaApiClient`, cero `innerHTML`/`dangerouslySetInnerHTML`.
 - [x] `tests/test_ca07_desktop_and_frontend.py`: 5 tests pasando (incluyendo arranque real del subproceso Granian, verificación CSP, 401/200 con token, auditoría de `https?://` en `static/` y `autoComplete="off"`).
 
-### Gatillo 8 — Base de Datos Cloudflare D1 v3.1, RBAC y Despliegue Edge (PR #8, completo y desplegado)
+### Gatillo 8 — Base de Datos Cloudflare D1 v3.1, RBAC Aduanero y Despliegue Edge (PR #8 y PR #13, completos)
+- [x] 6 roles aduaneros y matriz de permisos con segregación de funciones (`core/rbac.py`); anti-escalada: el SUPERVISOR solo gestiona AGENTE/FISCAL/OPERADOR/ANALISTA y no puede suspenderse a sí mismo (`specs/06_rbac_aduanero.spec.md`).
+- [x] Identidad RBAC (`core/identity.py`, `core/auth.py`, `core/rbac_db.py`): PBKDF2-HMAC-SHA256 600 000 iteraciones, sal `secrets.token_bytes(32)` por usuario, índice ciego HMAC, SQLite `usuarios_aduana` (WAL, `secure_delete`, triggers), bloqueo 5 fallos/15 min, error uniforme, relectura del usuario en cada petición y `core/ui_profile.py` (derivación de `allowed_tabs`/`default_tab` en servidor).
+- [x] 12 usuarios sembrados (uno por rol, 4 de mínimo privilegio y 2 con acceso a chat IA y canal): `scripts/seed_usuarios.py`; las contraseñas se generan al sembrar y quedan solo en `data/seed_credenciales.local.json` (gitignored).
+- [x] El escritorio (`python -m app.desktop`, `iniciar_escritorio.bat/.sh`) arranca con RBAC: `app/rbac_bootstrap.py` usa `ADUANA_MASTER_KEY` si existe o crea/lee `data/dev_master.key`, fija `ADUANA_RBAC=1` y siembra los usuarios una sola vez.
 - [x] `schema.sql`: 6 tablas formalizadas (`roles_aduana`, `usuarios_aduana`, `ledger_blocks`, `consent_records`, `tramite_evaluations`, `canal_seguro_channels`, `canal_seguro_messages`) con triggers de inmutabilidad y `PRAGMA foreign_keys = ON`.
 - [x] `seed_d1.sql` / `scripts/generate_d1_seed.py`: 3 roles oficiales (`analista`, `administrador`, `auditor`), 10 funcionarios con `blind_citizen_id` HMAC-SHA256 y PBKDF2 (310.000 iteraciones), 2 canales E2EE.
 - [x] `wrangler.jsonc`: configurado con bindings `DB` (`aduana-db` UUID `21eb0bb7-3d0f-4695-b450-3af441ab4d5b`), `KV` (`aduana-kv` ID `3885a09654fa42eea23241b0948b8df7`), `AI` y soporte de Workers Static Assets (`assets: { directory: "./static" }`).
@@ -107,10 +111,10 @@
 - [x] Auditoría en UI: alerta de manipulación de bloque (`DESAJUSTE SHA-256`) en `LedgerView.tsx` rediseñada con mayor sobriedad e integración estética.
 - [x] Accesibilidad: soporte estricto de `@media (prefers-reduced-motion: reduce)` desactivando animaciones y transformaciones CSS ante preferencias del sistema.
 
-### Gatillo 10 — Autenticación Zero-Trust, JWT Sessions y Auditoría en Ledger (PR #11, completo)
-- [x] `pipeline/auth.py` y `app/controllers/auth.py`: autenticación soberana mediante PBKDF2-HMAC-SHA256 (310.000 iteraciones) + `blind_citizen_id` (HMAC-SHA256 de cédula), emisión de tokens JWT HS256 firmados con subllave dedicada del `KeyRing`, endpoints `/api/v1/auth/login`, `/api/v1/auth/verify`, `/api/v1/auth/me`.
-- [x] Registro inmutable en `ledger_blocks` de todos los eventos de autenticación (éxitos y rechazos por credencial incorrecta).
-- [x] `tests/test_auth_login.py`: 12 pruebas unitarias pasando (total suite: 552 tests en verde).
+### Gatillo 10 — Autenticación Zero-Trust, JWT Sessions y Auditoría en Ledger (PR #11, PR #12 y PR #13, completo)
+- [x] `core/identity.py`, `pipeline/auth.py` y `app/controllers/auth.py`: autenticación soberana mediante PBKDF2-HMAC-SHA256 + `blind_citizen_id`, soporte tanto para RBAC aduanero estricto (`specs/06_rbac_aduanero.spec.md`) como para correo institucional y persistencia de sesión F5 (`HttpOnly; SameSite=Strict` cookie).
+- [x] Registro inmutable en `ledger_blocks` de eventos de autenticación.
+- [x] `tests/test_auth_unified.py` (18) y `tests/test_auth_login.py` (6): todas las pruebas pasando en verde.
 
 ## EN CURSO
 - [x] **Codex** — optimización de rendimiento y benchmarks en `core/pii_patterns.py` y `core/text_normalizer.py`.
@@ -142,6 +146,13 @@ Medido sobre la regresión del red team (`tests/test_guardian_regression.py`) y 
 - [x] **Alcance de CA-01 decidido (usuario, opción A):** < 20 ms para textos de hasta 10 000 caracteres; la API sigue aceptando hasta 20 000 (`MAX_RAW_TEXT_CHARS`) sin garantía de 20 ms por encima de 10 000. Documentado en `specs/01_shield.spec.md` y fijado en `tests/test_ca01_shield.py`.
 - [x] Reescribir `specs/01_shield.spec.md` (firmas reales; **corregir vector `J-00000000-9`: el verificador correcto es 0**; mover "inconsistencias" a "decisiones tomadas").
 - [ ] Límites conocidos sin cubrir (documentados en `core/pii_patterns.py`): nombres sin marcador/minúsculas, base32/ROT13/entidades HTML/`%NN`, números en palabras, clínicos con variantes (`seropositivo`, `d i a b e t e s`), falsos positivos clínicos en texto comercial ("depresión del mercado").
+
+### P1 — Endurecer identidad (revisión de Security Architect; las pruebas de regresión borrador están en 13 xfail por escribir)
+- [ ] H-01 iteraciones mínimas de KDF no impuestas al verificar. H-10 política de contraseña (NUL, sustitutos, dígitos no ASCII, NFKC). H-11 validar `codigo_usuario`. H-13 `repr` puede filtrar sal o índice ciego.
+- [ ] H-03/H-04 el bloqueo permite DoS dirigido y delata existencia (423 vs 401); carrera de intentos en paralelo. H-14 el contador de fallos no decae.
+- [ ] H-05 un token vuelve a valer si se suspende y reactiva al usuario (la revocación hoy es solo por logout, en RAM, se pierde al reiniciar). H-12 `aud` en el token.
+- [ ] H-06 índice ciego de personal vs ciudadano para cédulas de 9 dígitos (la auditoría de login ya usa un id opaco). H-07 triggers eludibles con `INSERT OR REPLACE`/`DROP TRIGGER`. H-08 ACL de archivos en Windows. H-09 el seeder no es atómico con el archivo de credenciales.
+- [ ] Test intermitente de Zero-PII en CA-07 (1 fallo en una corrida combinada, no reproducible en 16 repeticiones): vigilar.
 
 ### P4 — Calidad, seguridad y empaquetado
 - [x] Instalar y pasar `ruff` (cero violaciones), `bandit` (auditoría estática), `pip-audit` (cero vulnerabilidades conocidas en dependencias); Pipeline CI activo en `.github/workflows/ci.yml`.

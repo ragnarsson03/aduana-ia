@@ -11,9 +11,13 @@ import {
   X,
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types/auth';
+import { NavTabId } from '../types/navigation';
 import { api, errorMessage } from '../services/apiClient';
 import loginBgImg from '../assets/login-bg.jpg';
 import systemLogoImg from '../assets/Logo-white.png';
+
+const NAV_TAB_IDS: readonly string[] = ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'];
+const isNavTabId = (tab: string): tab is NavTabId => NAV_TAB_IDS.includes(tab);
 
 interface LoginViewProps {
   onLogin: (user: AuthUser, sessionToken: string) => void;
@@ -131,31 +135,31 @@ export const LoginView: React.FC<LoginViewProps> = ({
     pass: string;
     clearance: string;
   }[] = [
-      {
-        role: 'auditor',
-        label: 'Auditor (Deykary González)',
-        email: 'auditor@aduana.gob.ve',
-        cedula: 'V-14220101',
-        pass: 'auditor2026',
-        clearance: 'Nivel 4 — Confidencial Estatal',
-      },
-      {
-        role: 'analista',
-        label: 'Analista (Elena Salazar)',
-        email: 'analista@aduana.gob.ve',
-        cedula: 'V-18660505',
-        pass: 'analista2026',
-        clearance: 'Nivel 2 — Operativo Aduanero',
-      },
-      {
-        role: 'administrador',
-        label: 'Administrador (Marcos Vivas)',
-        email: 'admin@aduana.gob.ve',
-        cedula: 'V-12110909',
-        pass: 'admin2026',
-        clearance: 'Nivel 5 — Soberanía Crítica',
-      },
-    ];
+    {
+      role: 'auditor',
+      label: 'Auditor (Deykary González)',
+      email: 'auditor@aduana.gob.ve',
+      cedula: 'V-14220101',
+      pass: 'auditor2026',
+      clearance: 'Nivel 4 — Confidencial Estatal',
+    },
+    {
+      role: 'analista',
+      label: 'Analista (Elena Salazar)',
+      email: 'analista@aduana.gob.ve',
+      cedula: 'V-18660505',
+      pass: 'analista2026',
+      clearance: 'Nivel 2 — Operativo Aduanero',
+    },
+    {
+      role: 'administrador',
+      label: 'Administrador (Marcos Vivas)',
+      email: 'admin@aduana.gob.ve',
+      cedula: 'V-12110909',
+      pass: 'admin2026',
+      clearance: 'Nivel 5 — Soberanía Crítica',
+    },
+  ];
 
   const handleSelectAccount = (acc: (typeof demoAccounts)[0]) => {
     setCedulaInput(acc.email);
@@ -163,7 +167,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setShowForgotModal(false);
     setErrorMsg(null);
   };
-
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -171,7 +174,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
     try {
       const res = await api.login({
-        cedula: cedulaInput.trim(),
+        identificador: cedulaInput.trim(),
         password: passwordInput,
       });
 
@@ -195,6 +198,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
           department: res.user.department,
           idNumber: res.user.id,
         },
+        allowedTabs: res.user.allowed_tabs.filter(isNavTabId),
+        defaultTab: res.user.default_tab,
+        aduanaRole: res.user.aduana_role,
         lastLogin: new Date().toISOString(),
       };
 
@@ -295,7 +301,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 spellCheck={false}
                 value={cedulaInput}
                 onChange={(e) => setCedulaInput(e.target.value)}
-                placeholder="Ingrese Correo Electronico"
+                placeholder="Correo institucional o Cédula / RIF"
+                aria-label="Correo institucional o Cédula / RIF"
                 required
                 className="w-full bg-[#090d16]/80 border border-white/15 pl-14 pr-4 py-3.5 rounded-full text-xs sm:text-sm text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all font-mono"
               />
@@ -338,7 +345,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 onClick={() => setShowForgotModal(true)}
                 className="text-xs text-[#c3c0ff] hover:text-white transition-colors hover:underline font-sans"
               >
-                Credenciales Demo
+                Acceso y credenciales
               </button>
             </div>
 
@@ -364,7 +371,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-bold">Credenciales Oficiales de Demostración</h3>
+                <h3 className="text-sm font-bold">Acceso y credenciales</h3>
               </div>
               <button
                 onClick={() => setShowForgotModal(false)}
@@ -376,7 +383,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
             <div className="space-y-2 text-xs">
               <p className="text-slate-300 leading-relaxed text-[11px]">
-                Seleccione una de las credenciales para cargarla en el formulario:
+                Las credenciales RBAC las entrega el Supervisor del Puerto Aduanero (bloqueo de 15 min tras 5 fallos). En entorno demo también puede cargar una credencial institucional:
               </p>
 
               {demoAccounts.map((acc) => (

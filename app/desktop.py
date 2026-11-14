@@ -108,9 +108,13 @@ def main() -> None:
     multiprocessing.freeze_support()
     import webview  # import perezoso: el servidor no depende de pywebview
 
+    from app.rbac_bootstrap import prepare_rbac_environment
+
+    prepare_rbac_environment()  # llave persistente + ADUANA_RBAC=1 + usuarios sembrados (1.ª vez)
     port = _free_port()
     token = secrets.token_urlsafe(32)
     proc = start_server_process(port, token)
+    os.environ.pop("ADUANA_MASTER_KEY", None)  # el hijo ya heredó la llave; el padre no la retiene
     try:
         _wait_ready(port)
         window = webview.create_window(

@@ -6,8 +6,10 @@ from dataclasses import dataclass, field
 
 from core.config import LLM_TIMEOUT_SECONDS, Settings, load_gemini_from_env
 from core.ephemeral_vault import EphemeralVault
+from core.identity import IdentityService
 from core.keyring import KeyRing
 from core.protocols import LLMAdapterProtocol, StorageRepositoryProtocol
+from core.rbac_db import UsuariosRepository
 from pipeline.auth import SessionStore, SQLiteAuthRepository
 from pipeline.llm_adapter import (
     CircuitBreaker,
@@ -33,6 +35,8 @@ class AppState:
     auth_repo: SQLiteAuthRepository
     api_token: str = field(repr=False)
     pipeline: GatewayPipeline
+    identity: IdentityService | None = None
+    users_repo: UsuariosRepository | None = None
 
 
 def build_state(
@@ -70,6 +74,18 @@ def build_state(
             llm=breaker,
             rate_guard=rate_guard,
         )
+    users_repo: UsuariosRepository | None = None
+    identity: IdentityService | None = None
+    if settings.rbac_enabled:
+        users_repo = UsuariosRepository(str(settings.users_db_path))
+        identity = IdentityService(
+            users_repo,
+            keys,
+            iterations=settings.pbkdf2_iterations,
+            token_ttl_seconds=settings.token_ttl_seconds,
+            max_failed_attempts=settings.max_failed_attempts,
+            lockout_seconds=settings.lockout_seconds,
+        )
     return AppState(
         settings=settings,
         keys=keys,
@@ -81,4 +97,6 @@ def build_state(
         auth_repo=auth_repo,
         api_token=api_token,
         pipeline=pipeline,
+        identity=identity,
+        users_repo=users_repo,
     )

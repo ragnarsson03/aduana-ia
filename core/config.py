@@ -50,8 +50,24 @@ class Settings:
     allow_remote: bool = False
     ledger_ephemeral: bool = True
     allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "[::1]")
+    # Identidad y RBAC aduanero (specs/06). Apagado por defecto: rige solo el token de sesión.
+    rbac_enabled: bool = False
+    users_db_path: Path = PROJECT_ROOT / "data" / "usuarios.db"
+    pbkdf2_iterations: int = 600_000
+    token_ttl_seconds: int = 30 * 60
+    max_failed_attempts: int = 5
+    lockout_seconds: int = 15 * 60
 
     def __post_init__(self) -> None:
+        if self.rbac_enabled and self.ledger_ephemeral:
+            raise ValueError(
+                "RBAC exige llave persistente: define ADUANA_MASTER_KEY (el índice ciego de los "
+                "usuarios cambiaría en cada arranque con una llave efímera)."
+            )
+        if self.pbkdf2_iterations < 1:
+            raise ValueError("pbkdf2_iterations debe ser >= 1.")
+        if self.token_ttl_seconds < 1 or self.max_failed_attempts < 1 or self.lockout_seconds < 1:
+            raise ValueError("Parámetros de sesión/bloqueo fuera de rango.")
         if self.host not in LOOPBACK_HOSTS and not self.allow_remote:
             raise ValueError("Host no loopback: exige ADUANA_ALLOW_REMOTE=1 (y TLS + auth).")
         if not 1024 <= self.port <= 65535:
@@ -78,6 +94,8 @@ class Settings:
             demo_mode=env.get("ADUANA_DEMO_MODE", "0") == "1",
             allow_remote=env.get("ADUANA_ALLOW_REMOTE", "0") == "1",
             ledger_ephemeral=not env.get("ADUANA_MASTER_KEY"),
+            rbac_enabled=env.get("ADUANA_RBAC", "0") == "1",
+            users_db_path=Path(env.get("ADUANA_USERS_DB_PATH", str(defaults.users_db_path))),
         )
 
 

@@ -8,13 +8,16 @@ from typing import Annotated, Literal
 import msgspec
 
 from core.config import MAX_RAW_TEXT_CHARS, OVERRIDE_MAX_JUSTIFICATION_CHARS
-from core.context import ChainFailureReason, PolicyStatus, RecommendationType
+from core.context import AduanaRoleType, ChainFailureReason, PolicyStatus, RecommendationType
 
 RawText = Annotated[str, msgspec.Meta(min_length=1, max_length=MAX_RAW_TEXT_CHARS)]
 Cedula = Annotated[str, msgspec.Meta(pattern=r"^[A-Za-z]?-?[0-9.]{5,12}$", max_length=20)]
 PurposeCode = Annotated[str, msgspec.Meta(pattern=r"^[A-Z0-9_]{3,32}$")]
 Features = Annotated[dict[str, float], msgspec.Meta(max_length=32)]
 Justification = Annotated[str, msgspec.Meta(max_length=OVERRIDE_MAX_JUSTIFICATION_CHARS)]
+Identificador = Annotated[str, msgspec.Meta(min_length=1, max_length=20)]
+Password = Annotated[str, msgspec.Meta(max_length=1024)]
+CodigoUsuario = Annotated[str, msgspec.Meta(pattern=r"^[a-z0-9._-]{3,40}$")]
 TamperScenario = Literal[
     "flip_payload_bit", "recompute_sha_without_key", "break_prev_link", "flip_override"
 ]
@@ -106,8 +109,9 @@ class HealthResponse(msgspec.Struct, frozen=True):
 
 
 class LoginRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
-    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=128)]
-    password: Annotated[str, msgspec.Meta(min_length=1, max_length=128)]
+    password: Password
+    identificador: Annotated[str, msgspec.Meta(min_length=1, max_length=128)] | None = None
+    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=128)] | None = None
 
     def __repr__(self) -> str:  # Zero-Leak
         return "LoginRequest([REDACTED])"
@@ -119,14 +123,15 @@ class LoginUserOut(msgspec.Struct, frozen=True):
     full_name: str
     short_name: str
     avatar_text: str
-    role: Literal["analista", "administrador", "auditor"]
+    role: Literal["analista", "administrador", "auditor"]  # rol de presentación (UI)
     role_label: str
     clearance_level: str
     entity: str
     department: str
     permissions: tuple[str, ...]
-    default_tab: Literal["pasarela", "ledger"]
+    default_tab: Literal["pasarela", "chat", "ledger", "explicabilidad", "canal"]
     allowed_tabs: tuple[str, ...]
+    aduana_role: AduanaRoleType = "INSPECTOR_TRIBUTARIO_SENIAT"  # rol aduanero real
 
 
 class LoginResponse(msgspec.Struct, frozen=True):
@@ -137,6 +142,7 @@ class LoginResponse(msgspec.Struct, frozen=True):
     user: LoginUserOut
     block_index: int
     citizen_receipt_code: str
+    expires_at: int = 0
 
     def __repr__(self) -> str:  # Zero-Leak
         return "LoginResponse([REDACTED])"
@@ -160,6 +166,67 @@ class LogoutResponse(msgspec.Struct, frozen=True):
 
     def __repr__(self) -> str:  # Zero-Leak
         return "[REDACTED_CHAT_PAYLOAD]"
+
+
+class MeResponse(msgspec.Struct, frozen=True):
+    codigo_usuario: str
+    rol: AduanaRoleType
+    permisos: list[str]
+
+
+class CreateUserRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    codigo_usuario: CodigoUsuario
+    identificador: Identificador
+    rol: AduanaRoleType
+    password: Password
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "CreateUserRequest(<redacted>)"
+
+
+class UsuarioPublic(msgspec.Struct, frozen=True):
+    codigo_usuario: str
+    rol: AduanaRoleType
+    estado: str
+    created_utc: str
+    last_login_utc: str | None
+
+
+class ExplicaEvaluateRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    features: Features
+
+
+class ExplicaEvaluateResponse(msgspec.Struct, frozen=True):
+    probability_score: float
+    linear_shap_values: dict[str, float]
+    model_recommendation: RecommendationType
+
+
+class AuditFiscalRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    identificador: Identificador
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "AuditFiscalRequest(<redacted>)"
+
+
+class AuditBlockOut(msgspec.Struct, frozen=True):
+    block_index: int
+    citizen_receipt_code: str
+    security_verdict: str
+    timestamp_utc: str
+    block_hash: str
+
+
+class AuditFiscalResponse(msgspec.Struct, frozen=True):
+    blocks: list[AuditBlockOut]
+
+
+class ReceiptResponse(msgspec.Struct, frozen=True):
+    codigo: str
+    block_index: int
+    block_hash: str
+    cadena_valida: bool
+    liberacion_autorizada: bool
 
 
 UserRole = Literal["analista", "administrador", "auditor"]

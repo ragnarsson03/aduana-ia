@@ -60,8 +60,13 @@ export const ERROR_MESSAGES: Record<string, string> = {
     'El archivo adjunto no es válido (verifique extensión .txt/.csv/.pdf/.json y tamaño <= 32 KB).',
   INVALID_CHAT_PAYLOAD: 'Solicitud de Chat IA inválida: revise el prompt y el archivo adjunto.',
   UNAUTHORIZED: 'No autorizado: falta o es inválido el token de acceso de la aplicación.',
-  INVALID_CREDENTIALS: 'Cédula o contraseña inválida en el enclave de autenticación.',
-  INVALID_CEDULA: 'Formato de cédula inválido. Use V-12345678 o E-12345678.',
+  INVALID_CREDENTIALS: 'Credenciales inválidas en el enclave de autenticación.',
+  INVALID_CEDULA: 'Formato de cédula, RIF o correo electrónico inválido.',
+  ERR_AUTH_INVALID: 'Credenciales inválidas.',
+  ERR_ACCOUNT_LOCKED: 'Cuenta bloqueada temporalmente. Intenta de nuevo en unos minutos.',
+  RBAC_DISABLED: 'El servidor no tiene el control de acceso (RBAC) activado.',
+  ERR_FORBIDDEN: 'Tu rol no tiene permiso para realizar esta operación.',
+  HTTP_422: 'Formato de cédula/RIF o contraseña inválido. Use V-12345678, E-12345678 o un RIF.',
   UNSUPPORTED_MEDIA_TYPE: 'Tipo de contenido no soportado: la solicitud debe ser application/json.',
   PAYLOAD_TOO_LARGE: 'El texto supera el tamaño máximo permitido.',
   BAD_REQUEST: 'Solicitud inválida: revise los campos del formulario.',
@@ -75,6 +80,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
 const STATUS_FALLBACK_CODES: Record<number, string> = {
   400: 'BAD_REQUEST',
   401: 'UNAUTHORIZED',
+  403: 'ERR_FORBIDDEN',
   404: 'NOT_FOUND',
   413: 'PAYLOAD_TOO_LARGE',
   415: 'UNSUPPORTED_MEDIA_TYPE',
@@ -117,6 +123,7 @@ export class AduanaApiClient {
   private apiToken: string;
   private sessionJwt: string | null = null;
   private timeoutMs: number;
+  private sessionExpiredHandler: (() => void) | null = null;
 
   constructor(config: ApiClientConfig = {}) {
     // Si no se especifica, usa /api/v1 relativo (mismo origen que sirve Litestar)
@@ -139,6 +146,11 @@ export class AduanaApiClient {
 
   public setSessionToken(token: string | null): void {
     this.sessionJwt = token;
+  }
+
+  /** Registra el callback que se invoca cuando el servidor rechaza (401) la sesión activa. */
+  public onSessionExpired(handler: (() => void) | null): void {
+    this.sessionExpiredHandler = handler;
   }
 
   private async request<T>(
@@ -182,6 +194,11 @@ export class AduanaApiClient {
         if (typeof body?.error === 'string' && body.error) code = body.error;
       } catch {
         // cuerpo no JSON: se conserva el código derivado del estado HTTP
+      }
+      // 401 con sesión activa en una ruta autenticada: sesión expirada o revocada.
+      if (response.status === 401 && this.sessionJwt && !endpoint.startsWith('/auth/login')) {
+        this.sessionJwt = null;
+        this.sessionExpiredHandler?.();
       }
       throw new ApiError(code, response.status);
     }
@@ -377,12 +394,16 @@ export class AduanaApiClient {
     }
   }
 
-  /** Autenticación Zero-Trust por Cédula (V-/E-) o Correo y contraseña PBKDF2 + JWT HS256. */
+  /** Login único: identificador (cédula V-/E-, RIF o correo) y contraseña; devuelve el token de sesión Bearer. */
   public async login(payload: LoginRequest): Promise<LoginResponse> {
+    const rawId = (payload.identificador ?? payload.cedula ?? '').trim();
+    const requestBody = payload.identificador
+      ? { identificador: rawId, password: payload.password }
+      : { cedula: rawId, password: payload.password };
     try {
       const res = await this.request<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
       this.sessionJwt = res.session_token;
       return res;
@@ -503,7 +524,7 @@ export class AduanaApiClient {
   }
 
   private fallbackLocalLogin(payload: LoginRequest): LoginResponse {
-    const id = payload.cedula.trim().toLowerCase();
+    const id = (payload.identificador ?? payload.cedula ?? '').trim().toLowerCase();
     const pwd = payload.password;
 
     const accounts: Array<{
@@ -522,6 +543,7 @@ export class AduanaApiClient {
           avatar_text: 'MV',
           role: 'administrador',
           role_label: 'Administrador de Infraestructura & Ciberseguridad',
+          aduana_role: 'SUPERVISOR_PUERTO_ADUANERO',
           clearance_level: 'Nivel 5 — Soberanía Crítica GovTech',
           entity: 'Centro Nacional de Ciberseguridad / Red Nacional de Integridad',
           department: 'Coordinación Nacional de Infraestructura Soberana',
@@ -546,6 +568,7 @@ export class AduanaApiClient {
           avatar_text: 'DG',
           role: 'auditor',
           role_label: 'Auditora Principal',
+          aduana_role: 'INSPECTOR_TRIBUTARIO_SENIAT',
           clearance_level: 'Nivel 4 — Confidencial Estatal',
           entity: 'Superintendencia Nacional Aduanera / Contraloría GovTech',
           department: 'Dirección de Auditoría Algorítmica y Cumplimiento',
@@ -570,6 +593,7 @@ export class AduanaApiClient {
           avatar_text: 'ES',
           role: 'analista',
           role_label: 'Analista de Operaciones & Solvencias',
+          aduana_role: 'ANALISTA_VALORACION_ADUANERA',
           clearance_level: 'Nivel 2 — Operativo Aduanero',
           entity: 'Intendencia Nacional de Aduanas / División de Trámites',
           department: 'Departamento de Solvencias Fiscales y Aforo',
@@ -590,11 +614,13 @@ export class AduanaApiClient {
       throw new ApiError('INVALID_CREDENTIALS', 401);
     }
 
+    const nowEpoch = Math.floor(Date.now() / 1000);
     return {
       authenticated: true,
       session_token: `offline-jwt.${found.user.role}.ram-enclave`,
       token_type: 'Bearer',
       expires_in_seconds: 1800,
+      expires_at: nowEpoch + 1800,
       user: found.user,
       block_index: 0,
       citizen_receipt_code: 'AUTH-OFFLINE0',

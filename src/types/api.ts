@@ -119,7 +119,9 @@ export interface HealthResponse {
 }
 
 export interface LoginRequest {
-  cedula: string;
+  /** Cédula (V-/E-), RIF o correo institucional. */
+  identificador?: string;
+  cedula?: string;
   password: string;
 }
 
@@ -131,11 +133,12 @@ export interface LoginUserOut {
   avatar_text: string;
   role: 'analista' | 'administrador' | 'auditor';
   role_label: string;
+  aduana_role: string;
   clearance_level: string;
   entity: string;
   department: string;
   permissions: string[];
-  default_tab: 'pasarela' | 'ledger';
+  default_tab: 'pasarela' | 'chat' | 'ledger' | 'explicabilidad' | 'canal';
   allowed_tabs: string[];
 }
 
@@ -144,6 +147,7 @@ export interface LoginResponse {
   session_token: string;
   token_type: 'Bearer';
   expires_in_seconds: number;
+  expires_at: number;
   user: LoginUserOut;
   block_index: number;
   citizen_receipt_code: string;

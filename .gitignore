@@ -49,3 +49,6 @@ logs/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Credenciales de siembra locales (RBAC)
+data/seed_credenciales*.json

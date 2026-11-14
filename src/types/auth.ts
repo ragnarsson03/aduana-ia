@@ -1,3 +1,5 @@
+import type { NavTabId } from './navigation';
+
 export type UserRole = 'analista' | 'administrador' | 'auditor';
 
 export interface UserCredentials {
@@ -21,15 +23,12 @@ export interface AuthUser {
   avatarText: string;
   email: string;
   status: 'online' | 'busy' | 'away';
+  /** Pestañas permitidas, entregadas por el servidor (RBAC aduanero). */
+  allowedTabs: NavTabId[];
+  /** Pestaña inicial, entregada por el servidor. */
+  defaultTab: NavTabId;
+  /** Rol aduanero real (RBAC del backend). */
+  aduanaRole?: string;
   credentials: UserCredentials;
   lastLogin?: string;
-}
-
-export interface LoginCredentialPreset {
-  role: UserRole;
-  roleName: string;
-  user: AuthUser;
-  defaultPass: string;
-  badgeColor: string;
-  description: string;
 }

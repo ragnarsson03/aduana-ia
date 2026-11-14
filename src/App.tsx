@@ -10,13 +10,15 @@ import { ProfileView } from './views/ProfileView';
 import { LoginView } from './views/LoginView';
 import { NavTabId } from './types';
 import { AuthUser } from './types/auth';
-import { ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from './constants/mockAuth';
 import { CheckCircle2 } from 'lucide-react';
 import { OfflineBanner } from './components/OfflineBanner';
 import { api } from './services/apiClient';
 import { useBackendStatus } from './state/BackendStatus';
 import { LiveLedgerView } from './views/live/LiveLedgerView';
 import { LiveExplicabilidadView } from './views/live/LiveExplicabilidadView';
+
+const NAV_TAB_IDS: readonly string[] = ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'];
+const isNavTabId = (tab: string): tab is NavTabId => NAV_TAB_IDS.includes(tab);
 
 export const App: React.FC = () => {
   // Zero-Trust: usuario y token de sesión viven exclusivamente en memoria RAM (sin localStorage/sessionStorage)
@@ -76,10 +78,13 @@ export const App: React.FC = () => {
             department: sess.user.department,
             idNumber: sess.user.id,
           },
+          allowedTabs: sess.user.allowed_tabs.filter(isNavTabId),
+          defaultTab: sess.user.default_tab,
+          aduanaRole: sess.user.aduana_role,
           lastLogin: new Date().toISOString(),
         };
         setCurrentUser(hydratedUser);
-        setActiveTab(ROLE_DEFAULT_TAB[hydratedUser.role] || sess.user.default_tab || 'ledger');
+        setActiveTab(hydratedUser.defaultTab || 'ledger');
       })
       .catch(() => {
         // Sin sesión activa: permanecer en LoginView sin error
@@ -95,9 +100,9 @@ export const App: React.FC = () => {
   // Guard active tab based on role permissions
   useEffect(() => {
     if (currentUser && activeTab !== 'perfil') {
-      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      const allowed = currentUser.allowedTabs;
       if (!allowed.includes(activeTab)) {
-        setActiveTab(ROLE_DEFAULT_TAB[currentUser.role] || 'ledger');
+        setActiveTab(currentUser.defaultTab);
       }
     }
   }, [currentUser, activeTab]);
@@ -112,9 +117,9 @@ export const App: React.FC = () => {
   const handleNavigate = (tab: NavTabId) => {
     // If user attempts to navigate to unauthorized tab, redirect to default
     if (currentUser && tab !== 'perfil') {
-      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      const allowed = currentUser.allowedTabs;
       if (!allowed.includes(tab)) {
-        const fallback = ROLE_DEFAULT_TAB[currentUser.role] || 'ledger';
+        const fallback = currentUser.defaultTab;
         setActiveTab(fallback);
         showNotification(`Acceso restringido: El rol ${currentUser.roleLabel} no tiene permisos para ese módulo.`);
         return;
@@ -134,10 +139,19 @@ export const App: React.FC = () => {
     api.setSessionToken(token);
     setSessionToken(token);
     setCurrentUser(user);
-    const initialTab = ROLE_DEFAULT_TAB[user.role] || 'ledger';
+    const initialTab = user.defaultTab;
     setActiveTab(initialTab);
     showNotification(`Bienvenido(a), ${user.name}. Sesión iniciada con rol ${user.roleLabel}.`);
   };
+
+  // Un 401 en cualquier petición autenticada = sesión expirada o revocada: volver al login.
+  useEffect(() => {
+    api.onSessionExpired(() => {
+      setSessionToken(null);
+      setCurrentUser(null);
+    });
+    return () => api.onSessionExpired(null);
+  }, []);
 
   const handleLogout = () => {
     void api.logout();

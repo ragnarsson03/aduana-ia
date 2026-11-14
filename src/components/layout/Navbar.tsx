@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { NavTabId, NavTabItem } from '../../types';
 import { AuthUser } from '../../types/auth';
-import { ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from '../../constants/mockAuth';
 import logoImg from '../../assets/Logo.png';
 import logoWhiteImg from '../../assets/Logo-white.png';
 
@@ -61,9 +60,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   // Filter based on user's authorized role tabs
-  const allowedTabs = currentUser ? ROLE_ALLOWED_TABS[currentUser.role] : allNavItems.map(i => i.id);
+  const allowedTabs = currentUser ? currentUser.allowedTabs : allNavItems.map(i => i.id);
   const navItems = allNavItems.filter(item => allowedTabs.includes(item.id));
-  const homeTab = currentUser ? ROLE_DEFAULT_TAB[currentUser.role] : 'pasarela';
+  const homeTab = currentUser ? currentUser.defaultTab : 'pasarela';
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0b0f19]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">

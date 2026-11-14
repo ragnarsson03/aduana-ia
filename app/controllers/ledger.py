@@ -10,11 +10,17 @@ import time
 from dataclasses import replace
 
 from litestar import Controller, Request, get, post
-from litestar.exceptions import ClientException
-from litestar.params import JSONBody
+from litestar.exceptions import ClientException, HTTPException
+from litestar.params import FromPath, JSONBody
 
 from app.dependencies import AppState
-from app.schemas import LedgerVerifyResponse, TamperSimRequest, TamperSimResponse
+from app.rbac_guards import require_permission
+from app.schemas import (
+    LedgerVerifyResponse,
+    ReceiptResponse,
+    TamperSimRequest,
+    TamperSimResponse,
+)
 from app.security import api_guard
 from core.config import API_PREFIX
 from core.crypto import block_hash, canonical_block_payload
@@ -25,7 +31,7 @@ class LedgerController(Controller):
     path = f"{API_PREFIX}/ledger"
     guards = [api_guard]
 
-    @get("/verify", sync_to_thread=True)
+    @get("/verify", guards=[require_permission("ledger:audit")], sync_to_thread=True)
     def verify(self, request: Request) -> LedgerVerifyResponse:
         t0 = time.perf_counter()
         state: AppState = request.app.state.aduana
@@ -45,11 +51,42 @@ class LedgerController(Controller):
         )
 
 
+class ReceiptController(Controller):
+    """Solo con RBAC activo. Sin PII ni payload: únicamente el estado criptográfico."""
+
+    path = f"{API_PREFIX}/ledger"
+    guards = [api_guard]
+
+    @get(
+        "/receipt/{codigo:str}",
+        guards=[require_permission("ledger:receipt")],
+        sync_to_thread=True,
+    )
+    def receipt(self, request: Request, codigo: FromPath[str]) -> ReceiptResponse:
+        state: AppState = request.app.state.aduana
+        block = state.repo.find_by_receipt_code(codigo)
+        if block is None:
+            raise HTTPException(status_code=404, detail="ERR_NOT_FOUND")  # sin eco del código
+        valid = verify_chain(list(state.repo.iter_blocks()), keys=state.keys).is_valid
+        return ReceiptResponse(
+            codigo=block.citizen_receipt_code,
+            block_index=block.block_index,
+            block_hash=block.block_hash,
+            cadena_valida=valid,
+            liberacion_autorizada=valid and block.security_verdict == "CLEAN",
+        )
+
+
 class DemoLedgerController(Controller):
     path = f"{API_PREFIX}/ledger"
     guards = [api_guard]
 
-    @post("/tamper-sim", status_code=200, sync_to_thread=True)
+    @post(
+        "/tamper-sim",
+        status_code=200,
+        guards=[require_permission("ledger:audit")],
+        sync_to_thread=True,
+    )
     def tamper_sim(self, request: Request, data: JSONBody[TamperSimRequest]) -> TamperSimResponse:
         state: AppState = request.app.state.aduana
         blocks = list(state.repo.iter_blocks())

@@ -214,6 +214,31 @@ class SQLiteLedgerRepository:
         for row in rows:
             yield _row_to_block(row)
 
+    def find_by_receipt_code(self, code: str) -> LedgerBlock | None:
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute("SELECT * FROM ledger_blocks WHERE citizen_receipt_code = ?", (code,))
+                row = cur.fetchone()
+                return _row_to_block(row) if row else None
+            finally:
+                cur.close()
+
+    def iter_blocks_by_blind_id(self, blind_id: str) -> Iterator[LedgerBlock]:
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT * FROM ledger_blocks WHERE blind_citizen_id = ? "
+                    "ORDER BY block_index ASC",
+                    (blind_id,),
+                )
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+        for row in rows:
+            yield _row_to_block(row)
+
     def count(self) -> int:
         with self._lock:
             cur = self._conn.cursor()

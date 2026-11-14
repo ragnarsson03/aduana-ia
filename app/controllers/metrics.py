@@ -9,6 +9,7 @@ from typing import ClassVar
 from litestar import Controller, Request, get
 
 from app.dependencies import AppState
+from app.rbac_guards import require_permission
 from app.schemas import BenchmarkResponse
 from app.security import api_guard
 from core.config import API_PREFIX
@@ -23,7 +24,7 @@ class MetricsController(Controller):
     _cache_response: ClassVar[BenchmarkResponse | None] = None
     _cache_time: ClassVar[float] = 0.0
 
-    @get("/benchmark", sync_to_thread=True)
+    @get("/benchmark", guards=[require_permission("metrics:read")], sync_to_thread=True)
     def benchmark(self, request: Request) -> BenchmarkResponse:
         now = time.monotonic()
         if self._cache_response is not None and (now - self._cache_time) < 60.0:
