@@ -56,7 +56,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'chat', label: 'Nexus IA', hasDot: true, dotColor: 'bg-indigo-500' },
     { id: 'ledger', label: 'Ledger' },
     { id: 'explicabilidad', label: 'Gráficos & Explicabilidad' },
-    { id: 'canal', label: 'Canal Seguro', hasDot: true, dotColor: 'bg-emerald-500' },
   ];
 
   // Filter based on user's authorized role tabs

@@ -3,9 +3,6 @@ import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { PasarelaView } from './views/PasarelaView';
 import { ChatIAView } from './views/ChatIAView';
-import { LedgerView } from './views/LedgerView';
-import { ExplicabilidadView } from './views/ExplicabilidadView';
-import { CanalSeguroView } from './views/CanalSeguroView';
 import { ProfileView } from './views/ProfileView';
 import { LoginView } from './views/LoginView';
 import { NavTabId } from './types';
@@ -17,7 +14,7 @@ import { useBackendStatus } from './state/BackendStatus';
 import { LiveLedgerView } from './views/live/LiveLedgerView';
 import { LiveExplicabilidadView } from './views/live/LiveExplicabilidadView';
 
-const NAV_TAB_IDS: readonly string[] = ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'];
+const NAV_TAB_IDS: readonly string[] = ['pasarela', 'chat', 'ledger', 'explicabilidad'];
 const isNavTabId = (tab: string): tab is NavTabId => NAV_TAB_IDS.includes(tab);
 
 export const App: React.FC = () => {
@@ -216,24 +213,22 @@ export const App: React.FC = () => {
         {activeTab === 'ledger' && (connection === 'online' ? (
           <LiveLedgerView onNotify={showNotification} />
         ) : (
-          <LedgerView onCopyText={showNotification} />
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-6 text-sm text-amber-900 dark:text-amber-200">
+              Sin conexión con el servidor backend. Conéctese al backend para consultar el Ledger.
+            </div>
+          </div>
         ))}
 
         {activeTab === 'explicabilidad' && (connection === 'online' ? (
           <LiveExplicabilidadView onNavigateToPasarela={() => handleNavigate('pasarela')} onNotify={showNotification} />
         ) : (
-          <ExplicabilidadView onNotify={showNotification} />
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-6 text-sm text-amber-900 dark:text-amber-200">
+              Sin conexión con el servidor backend. Conéctese al backend para consultar métricas de explicabilidad.
+            </div>
+          </div>
         ))}
-
-        {activeTab === 'canal' && (
-          <CanalSeguroView 
-            currentUser={currentUser}
-            onBackToPasarela={() => handleNavigate('pasarela')}
-            onNotify={showNotification}
-            darkMode={darkMode}
-            onToggleDarkMode={() => setDarkMode(!darkMode)}
-          />
-        )}
 
         {activeTab === 'perfil' && (
           <ProfileView 
