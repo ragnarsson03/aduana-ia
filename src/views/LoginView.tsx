@@ -126,35 +126,39 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const demoAccounts: {
     role: UserRole;
     label: string;
+    email: string;
     cedula: string;
     pass: string;
     clearance: string;
   }[] = [
-    {
-      role: 'auditor',
-      label: 'Auditor (Deykary González)',
-      cedula: 'V-14220101',
-      pass: 'auditor2026',
-      clearance: 'Nivel 4 — Confidencial Estatal',
-    },
-    {
-      role: 'analista',
-      label: 'Analista (Elena Salazar)',
-      cedula: 'V-18660505',
-      pass: 'analista2026',
-      clearance: 'Nivel 2 — Operativo Aduanero',
-    },
-    {
-      role: 'administrador',
-      label: 'Administrador (Marcos Vivas)',
-      cedula: 'V-12110909',
-      pass: 'admin2026',
-      clearance: 'Nivel 5 — Soberanía Crítica',
-    },
-  ];
+      {
+        role: 'auditor',
+        label: 'Auditor (Deykary González)',
+        email: 'auditor@aduana.gob.ve',
+        cedula: 'V-14220101',
+        pass: 'auditor2026',
+        clearance: 'Nivel 4 — Confidencial Estatal',
+      },
+      {
+        role: 'analista',
+        label: 'Analista (Elena Salazar)',
+        email: 'analista@aduana.gob.ve',
+        cedula: 'V-18660505',
+        pass: 'analista2026',
+        clearance: 'Nivel 2 — Operativo Aduanero',
+      },
+      {
+        role: 'administrador',
+        label: 'Administrador (Marcos Vivas)',
+        email: 'admin@aduana.gob.ve',
+        cedula: 'V-12110909',
+        pass: 'admin2026',
+        clearance: 'Nivel 5 — Soberanía Crítica',
+      },
+    ];
 
   const handleSelectAccount = (acc: (typeof demoAccounts)[0]) => {
-    setCedulaInput(acc.cedula);
+    setCedulaInput(acc.email);
     setPasswordInput(acc.pass);
     setShowForgotModal(false);
     setErrorMsg(null);
@@ -267,8 +271,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </p>
 
             <div className="inline-flex items-center space-x-1.5 mt-3 px-3 py-1 rounded-full bg-[#0a0e18]/85 border border-white/10 text-[11px] font-mono text-[#4edea3]">
-              <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse" />
-              <span>Zero-Trust Enclave (PBKDF2-HMAC-SHA256 / RAM-Only)</span>
+
             </div>
           </div>
 
@@ -292,7 +295,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 spellCheck={false}
                 value={cedulaInput}
                 onChange={(e) => setCedulaInput(e.target.value)}
-                placeholder="Cédula de Identidad (ej. V-14220101)"
+                placeholder="Ingrese Correo Electronico"
                 required
                 className="w-full bg-[#090d16]/80 border border-white/15 pl-14 pr-4 py-3.5 rounded-full text-xs sm:text-sm text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all font-mono"
               />
@@ -390,6 +393,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     >
                       Cargar
                     </button>
+                  </div>
+                  <div className="text-slate-400">
+                    Correo: <span className="text-white">{acc.email}</span>
                   </div>
                   <div className="text-slate-400">
                     Cédula: <span className="text-white">{acc.cedula}</span>

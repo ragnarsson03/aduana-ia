@@ -24,6 +24,7 @@ from typing import Final, Literal
 
 from core.crypto import blind_citizen_id, normalize_cedula
 from core.keyring import KeyRing
+from core.text_normalizer import normalize_text
 
 OfficialRole = Literal["analista", "administrador", "auditor"]
 DefaultTab = Literal["pasarela", "ledger"]
@@ -278,6 +279,14 @@ def compute_blind_citizen_id(keys: KeyRing, cedula: str) -> str:
     return blind_citizen_id(keys, canonical)
 
 
+def normalize_email(email: str) -> str:
+    """Normaliza correo institucional (NFKC + strip + lower) sin almacenarlo en ledger."""
+    cleaned = normalize_text(email).strip().lower()
+    if "@" not in cleaned or "." not in cleaned.split("@", 1)[1]:
+        raise ValueError("Correo con formato inválido.")
+    return cleaned
+
+
 class SQLiteAuthRepository:
     """Repositorio SQLite para ``roles_aduana`` y ``usuarios_aduana`` (Zero-Plaintext-PII)."""
 
@@ -308,6 +317,119 @@ class SQLiteAuthRepository:
 
             cur.executescript(build_seed_sql(self._keys))
         self._seeded = True
+
+    def find_active_by_id(self, user_id: str) -> AuthenticatedUser | None:
+        """Hidrata un funcionario activo por su ID interno tras validar el JWT."""
+        with self._lock:
+            cur = self._conn.cursor()
+            self._seed_if_empty_locked(cur)
+            cur.execute(
+                """
+                SELECT
+                    u.id,
+                    u.username,
+                    u.full_name,
+                    u.short_name,
+                    u.avatar_text,
+                    u.role,
+                    u.role_label,
+                    u.clearance_level,
+                    u.entity,
+                    u.department,
+                    u.permissions_json,
+                    r.default_tab,
+                    r.allowed_tabs_json
+                FROM usuarios_aduana AS u
+                INNER JOIN roles_aduana AS r ON r.role_id = u.role
+                WHERE u.id = ? AND u.is_active = 1
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            cur.close()
+
+        if row is None:
+            return None
+
+        role: OfficialRole = row[5]
+        default_tab: DefaultTab = "ledger" if role == "auditor" else "pasarela"
+        permissions = tuple(str(p) for p in json.loads(row[10]))
+        allowed_tabs = tuple(str(t) for t in json.loads(row[12]))
+        return AuthenticatedUser(
+            id=row[0],
+            username=row[1],
+            full_name=row[2],
+            short_name=row[3],
+            avatar_text=row[4],
+            role=role,
+            role_label=row[6],
+            clearance_level=row[7],
+            entity=row[8],
+            department=row[9],
+            permissions=permissions,
+            default_tab=default_tab,
+            allowed_tabs=allowed_tabs,
+        )
+
+    def find_active_by_email(
+        self, email: str
+    ) -> tuple[AuthenticatedUser, str, str] | None:
+        """Busca un funcionario activo por correo normalizado y retorna (user, hash, blind_id)."""
+        with self._lock:
+            cur = self._conn.cursor()
+            self._seed_if_empty_locked(cur)
+            cur.execute(
+                """
+                SELECT
+                    u.id,
+                    u.username,
+                    u.full_name,
+                    u.short_name,
+                    u.avatar_text,
+                    u.role,
+                    u.role_label,
+                    u.clearance_level,
+                    u.entity,
+                    u.department,
+                    u.permissions_json,
+                    r.default_tab,
+                    r.allowed_tabs_json,
+                    u.password_hash,
+                    u.blind_citizen_id
+                FROM usuarios_aduana AS u
+                INNER JOIN roles_aduana AS r ON r.role_id = u.role
+                WHERE lower(u.email) = ? AND u.is_active = 1
+                LIMIT 1
+                """,
+                (email,),
+            )
+            row = cur.fetchone()
+            cur.close()
+
+        if row is None:
+            return None
+
+        role: OfficialRole = row[5]
+        default_tab: DefaultTab = "ledger" if role == "auditor" else "pasarela"
+        permissions = tuple(str(p) for p in json.loads(row[10]))
+        allowed_tabs = tuple(str(t) for t in json.loads(row[12]))
+        user = AuthenticatedUser(
+            id=row[0],
+            username=row[1],
+            full_name=row[2],
+            short_name=row[3],
+            avatar_text=row[4],
+            role=role,
+            role_label=row[6],
+            clearance_level=row[7],
+            entity=row[8],
+            department=row[9],
+            permissions=permissions,
+            default_tab=default_tab,
+            allowed_tabs=allowed_tabs,
+        )
+        return user, str(row[13]), str(row[14])
 
     def find_active_by_blind_id(self, blind_id: str) -> tuple[AuthenticatedUser, str] | None:
         """Busca un funcionario activo exclusivamente por su ``blind_citizen_id``."""

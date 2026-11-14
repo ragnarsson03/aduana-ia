@@ -39,8 +39,11 @@ def _make_client(tmp_path: Path) -> tuple[TestClient, Path]:
     [
         ("V-14220101", "auditor2026", "auditor", "ledger"),
         ("v-14.220.101", "auditor2026", "auditor", "ledger"),
+        ("auditor@aduana.gob.ve", "auditor2026", "auditor", "ledger"),
         ("Ｖ-18660505", "analista2026", "analista", "pasarela"),
+        ("analista@aduana.gob.ve", "analista2026", "analista", "pasarela"),
         ("V-12110909", "admin2026", "administrador", "pasarela"),
+        ("admin@aduana.gob.ve", "admin2026", "administrador", "pasarela"),
     ],
 )
 def test_login_success_three_roles_and_normalization(
@@ -207,3 +210,36 @@ def test_session_jwt_logout_and_tamper_rejection(tmp_path: Path) -> None:
         # Reutilizar el JWT revocado -> 401
         after_logout = client.get("/api/v1/auth/session", headers=auth_hdrs)
         assert after_logout.status_code == 401
+
+
+def test_session_cookie_survives_f5_and_logout_clears_it(tmp_path: Path) -> None:
+    client, _ = _make_client(tmp_path)
+    with client:
+        login = client.post(
+            "/api/v1/auth/login",
+            headers=AUTH_HEADERS,
+            json={"cedula": "V-18660505", "password": "analista2026"},
+        )
+        assert login.status_code == 200
+        set_cookie = login.headers.get("set-cookie", "")
+        assert "aduana_session=" in set_cookie
+        assert "httponly" in set_cookie.lower()
+        assert "samesite=strict" in set_cookie.lower()
+
+        # Simular F5: GET /api/v1/auth/session sin header Authorization (solo cookie HttpOnly)
+        f5_sess = client.get("/api/v1/auth/session", headers=AUTH_HEADERS)
+        assert f5_sess.status_code == 200
+        sdata = f5_sess.json()
+        assert sdata["authenticated"] is True
+        assert sdata["role"] == "analista"
+        assert sdata["user"]["full_name"] == "Elena Salazar"
+        assert sdata["user"]["default_tab"] == "pasarela"
+
+        # Logout usando únicamente la cookie HttpOnly
+        out = client.post("/api/v1/auth/logout", headers=AUTH_HEADERS)
+        assert out.status_code == 200
+        assert out.json()["revoked"] is True
+
+        # F5 después de logout -> 401
+        after_logout_f5 = client.get("/api/v1/auth/session", headers=AUTH_HEADERS)
+        assert after_logout_f5.status_code == 401

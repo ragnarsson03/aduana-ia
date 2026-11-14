@@ -148,3 +148,12 @@ export interface LoginResponse {
   block_index: number;
   citizen_receipt_code: string;
 }
+
+export interface SessionStatusResponse {
+  authenticated: boolean;
+  user_id: string;
+  role: 'analista' | 'administrador' | 'auditor';
+  jti: string;
+  expires_at_epoch: number;
+  user: LoginUserOut;
+}

@@ -106,7 +106,7 @@ class HealthResponse(msgspec.Struct, frozen=True):
 
 
 class LoginRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
-    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=32)]
+    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=128)]
     password: Annotated[str, msgspec.Meta(min_length=1, max_length=128)]
 
     def __repr__(self) -> str:  # Zero-Leak
@@ -148,6 +148,7 @@ class SessionStatusResponse(msgspec.Struct, frozen=True):
     role: Literal["analista", "administrador", "auditor"]
     jti: str
     expires_at_epoch: int
+    user: LoginUserOut
 
     def __repr__(self) -> str:  # Zero-Leak
         return "SessionStatusResponse([REDACTED])"
