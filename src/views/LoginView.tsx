@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, 
   Shield, 
   Lock, 
   Unlock, 
   User, 
   ArrowRight, 
-  CheckCircle2, 
-  ExternalLink, 
   Sun, 
   Moon, 
   AlertCircle,
   KeyRound,
-  X,
-  FileCheck
+  X
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types/auth';
 import { MOCK_AUTH_USERS } from '../constants/mockAuth';
@@ -30,44 +26,42 @@ export const LoginView: React.FC<LoginViewProps> = ({
   darkMode,
   onToggleDarkMode,
 }) => {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('auditor');
   const [emailInput, setEmailInput] = useState<string>('auditor.soberano@enclave.aduana.gob');
   const [passwordInput, setPasswordInput] = useState<string>('auditor2026');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberNode, setRememberNode] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-
-  // Modals for footer / passkey links
-  const [showHardwareTokenModal, setShowHardwareTokenModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const roleCredentialsMap: Record<UserRole, { email: string; pass: string; label: string; clearance: string }> = {
-    auditor: {
+  const demoAccounts: { role: UserRole; label: string; email: string; pass: string; clearance: string }[] = [
+    {
+      role: 'auditor',
+      label: 'Auditor (Deykary González)',
       email: 'auditor.soberano@enclave.aduana.gob',
       pass: 'auditor2026',
-      label: 'Auditor',
       clearance: 'Nivel 4 — Confidencial Estatal'
     },
-    analista: {
+    {
+      role: 'analista',
+      label: 'Analista (Elena Salazar)',
       email: 'analista.operaciones@enclave.aduana.gob',
       pass: 'analista2026',
-      label: 'Analista',
       clearance: 'Nivel 2 — Operativo Aduanero'
     },
-    admin: {
+    {
+      role: 'admin',
+      label: 'Administrador (Marcos Vivas)',
       email: 'admin.infraestructura@enclave.aduana.gob',
       pass: 'admin2026',
-      label: 'Administrador',
       clearance: 'Nivel 5 — Soberanía Crítica'
     }
-  };
+  ];
 
-  const handleSelectRoleTab = (role: UserRole) => {
-    setSelectedRole(role);
-    const cred = roleCredentialsMap[role];
-    setEmailInput(cred.email);
-    setPasswordInput(cred.pass);
+  const handleSelectAccount = (acc: typeof demoAccounts[0]) => {
+    setEmailInput(acc.email);
+    setPasswordInput(acc.pass);
+    setShowForgotModal(false);
     setErrorMsg(null);
   };
 
@@ -82,15 +76,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
       // Find user by role or email match
       let matchedUser: AuthUser | undefined = undefined;
 
-      if (emailClean.includes('auditor') || emailClean === 'auditor@aduana.gob.ve' || emailClean === 'auditor.soberano@enclave.aduana.gob') {
-        matchedUser = MOCK_AUTH_USERS.auditor;
-      } else if (emailClean.includes('analista') || emailClean === 'analista@aduana.gob.ve' || emailClean === 'analista.operaciones@enclave.aduana.gob') {
+      if (emailClean.includes('analista')) {
         matchedUser = MOCK_AUTH_USERS.analista;
-      } else if (emailClean.includes('admin') || emailClean === 'admin@aduana.gob.ve' || emailClean === 'admin.infraestructura@enclave.aduana.gob') {
+      } else if (emailClean.includes('admin')) {
         matchedUser = MOCK_AUTH_USERS.admin;
       } else {
-        // Fallback to active selected role
-        matchedUser = MOCK_AUTH_USERS[selectedRole];
+        // Default to auditor
+        matchedUser = MOCK_AUTH_USERS.auditor;
       }
 
       if (!matchedUser) {
@@ -101,13 +93,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
       setIsAuthenticating(false);
       onLogin(matchedUser);
-    }, 450);
+    }, 400);
   };
 
   return (
     <div className="relative min-h-screen flex flex-col justify-center items-center bg-[#0f131d] text-[#dfe2f1] overflow-x-hidden selection:bg-indigo-600 selection:text-white select-none">
       
-      {/* Ambient Cinematic Deep Background with Cryptographic NOC Mesh (Matches code.html & image) */}
+      {/* Ambient Cinematic Deep Background with Cryptographic NOC Mesh */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <img 
           alt="Aduana IA Control Center" 
@@ -129,7 +121,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </button>
       </div>
 
-      {/* Main Login Canvas / Glass Enclave Container (Matches code.html & image) */}
+      {/* Main Login Canvas / Glass Enclave Container */}
       <main className="relative z-10 w-full max-w-[480px] px-4 py-8 mx-auto flex flex-col items-center">
         
         {/* Glass Specimen Card */}
@@ -139,7 +131,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#4f46e5] to-transparent opacity-85" />
 
           {/* Card Header */}
-          <div className="text-center mb-5">
+          <div className="text-center mb-6">
             {/* Elevated Shield Icon */}
             <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#171b26] border border-indigo-500/40 mb-3 shadow-[0_0_22px_rgba(79,70,229,0.35)] text-indigo-400">
               <Shield className="w-8 h-8 fill-indigo-400/20 stroke-indigo-400" />
@@ -157,31 +149,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse" />
               <span>Hardware Secure Enclave Validated (AES-256 / SHA-256)</span>
             </div>
-          </div>
-
-          {/* Role Selector Tabs (Auditor, Analista, Administrador) */}
-          <div className="mb-5 p-1 rounded-xl bg-[#0a0e18]/80 border border-white/10 grid grid-cols-3 gap-1 text-center">
-            {(['auditor', 'analista', 'admin'] as UserRole[]).map((role) => {
-              const isSelected = selectedRole === role;
-              const info = roleCredentialsMap[role];
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => handleSelectRoleTab(role)}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 ${
-                    isSelected
-                      ? 'bg-[#4f46e5] text-white shadow-md'
-                      : 'text-slate-400 hover:text-white hover:bg-[#171b26]'
-                  }`}
-                >
-                  <span className="truncate">{info.label}</span>
-                  <span className={`text-[9px] font-mono ${isSelected ? 'text-indigo-200' : 'text-slate-500'}`}>
-                    {role === 'auditor' ? 'Nivel 4' : role === 'analista' ? 'Nivel 2' : 'Nivel 5'}
-                  </span>
-                </button>
-              );
-            })}
           </div>
 
           {/* Error Banner */}
@@ -206,7 +173,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="auditor.soberano@enclave.aduana.gob"
                 required
-                className="w-full bg-[#090d16]/80 border border-white/15 pl-14 pr-4 py-3.5 rounded-full text-xs text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all font-sans"
+                className="w-full bg-[#090d16]/80 border border-white/15 pl-14 pr-4 py-3.5 rounded-full text-xs sm:text-sm text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all font-sans"
               />
             </div>
 
@@ -219,7 +186,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="Passkey o Clave Encriptada"
                 required
-                className="w-full bg-[#090d16]/80 border border-white/15 pl-5 pr-14 py-3.5 rounded-full text-xs text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 font-mono tracking-wider transition-all"
+                className="w-full bg-[#090d16]/80 border border-white/15 pl-5 pr-14 py-3.5 rounded-full text-xs sm:text-sm text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 font-mono tracking-wider transition-all"
               />
               <button
                 type="button"
@@ -269,72 +236,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
           </form>
 
-          {/* Bottom Telemetry Footer */}
-          <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-[#c7c4d8] font-mono">
-            <div className="flex items-center space-x-2 mb-2 sm:mb-0">
-              <CheckCircle2 className="w-4 h-4 text-[#4edea3]" />
-              <span className="text-[11px]">Hardware Token PKCS#11 Detectado</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowHardwareTokenModal(true)}
-              className="text-[#adc6ff] hover:text-white text-[11px] transition-colors hover:underline flex items-center space-x-1"
-            >
-              <span>Verificar Firma de Nodo</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </div>
-
         </div>
 
       </main>
-
-      {/* Hardware Token Verification Modal */}
-      {showHardwareTokenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-[#0d1527] border border-indigo-500/40 rounded-2xl p-6 shadow-2xl space-y-4 text-white">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-sm font-bold">Verificación Criptográfica de Nodo</h3>
-              </div>
-              <button 
-                onClick={() => setShowHardwareTokenModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs font-mono text-slate-300">
-              <div className="p-3 rounded-xl bg-[#090d16] border border-white/10 space-y-1">
-                <span className="text-slate-400 text-[10px]">Identificador de Nodo:</span>
-                <p className="text-emerald-400 font-bold">NODO-SOBERANO-VE-CARACAS-01</p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#090d16] border border-white/10 space-y-1">
-                <span className="text-slate-400 text-[10px]">Módulo Criptográfico:</span>
-                <p>HSM PKCS#11 FIPS 140-3 Level 4 Compliant</p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#090d16] border border-white/10 space-y-1">
-                <span className="text-slate-400 text-[10px]">Hash de Consenso Activo:</span>
-                <p className="text-indigo-300 break-all text-[10px]">
-                  0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowHardwareTokenModal(false)}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors"
-            >
-              Cerrar Diagnóstico
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Forgot Passkey Modal with Pre-configured Presets */}
       {showForgotModal && (
@@ -355,37 +259,33 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
             <div className="space-y-2 text-xs">
               <p className="text-slate-300 leading-relaxed text-[11px]">
-                En este entorno soberano, las claves de acceso de prueba están pre-cargadas en el enclave:
+                Seleccione una de las credenciales de demostración para cargarla en el formulario:
               </p>
 
-              {(['auditor', 'analista', 'admin'] as UserRole[]).map((r) => {
-                const item = roleCredentialsMap[r];
-                return (
-                  <div key={r} className="p-2.5 rounded-xl bg-[#090d16] border border-white/10 font-mono text-[11px] space-y-0.5">
-                    <div className="flex items-center justify-between text-indigo-300 font-bold">
-                      <span>{item.label} ({item.clearance}):</span>
-                      <button
-                        onClick={() => {
-                          handleSelectRoleTab(r);
-                          setShowForgotModal(false);
-                        }}
-                        className="text-emerald-400 hover:underline text-[10px]"
-                      >
-                        Cargar
-                      </button>
-                    </div>
-                    <div className="text-slate-400">Usuario: <span className="text-white">{item.email}</span></div>
-                    <div className="text-slate-400">Clave: <span className="text-white font-bold">{item.pass}</span></div>
+              {demoAccounts.map((acc) => (
+                <div key={acc.role} className="p-2.5 rounded-xl bg-[#090d16] border border-white/10 font-mono text-[11px] space-y-0.5">
+                  <div className="flex items-center justify-between text-indigo-300 font-bold">
+                    <span>{acc.label}:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAccount(acc)}
+                      className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-sans text-[10px] transition-colors"
+                    >
+                      Cargar
+                    </button>
                   </div>
-                );
-              })}
+                  <div className="text-slate-400">Usuario: <span className="text-white">{acc.email}</span></div>
+                  <div className="text-slate-400">Passkey: <span className="text-white font-bold">{acc.pass}</span></div>
+                </div>
+              ))}
             </div>
 
             <button
+              type="button"
               onClick={() => setShowForgotModal(false)}
               className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors"
             >
-              Entendido
+              Cerrar
             </button>
           </div>
         </div>
