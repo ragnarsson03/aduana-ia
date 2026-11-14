@@ -42,6 +42,18 @@ export interface FileAttachment {
   isClassified?: boolean;
 }
 
+export interface CryptoProcessVerification {
+  algorithm: string;
+  handshakeStatus: string;
+  ed25519Key: string;
+  ivHex: string;
+  ciphertextPreview: string;
+  authTagValid: boolean;
+  sha256Short: string;
+  piiShieldStatus: string;
+  sessionTokenId: string;
+}
+
 export interface ChatMessage {
   id: string;
   senderName: string;
@@ -60,6 +72,7 @@ export interface ChatMessage {
   secondTimestamp?: string;
   sentReceiptLabel?: string;
   fileAttachment?: FileAttachment;
+  cryptoVerification?: CryptoProcessVerification;
   attachment?: {
     title: string;
     description: string;

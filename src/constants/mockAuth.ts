@@ -282,6 +282,17 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
       dataUrl: SAMPLE_PDF_DATA_URL,
       sha256Hex: '9f83c21a4e21b76a889312fe29ab430e7649d821390bf143528bca31a4f52631',
       isClassified: true,
+    },
+    cryptoVerification: {
+      algorithm: 'AES-256-GCM + Gov-Ed25519',
+      handshakeStatus: 'Validada y Activa en Enclave RAM',
+      ed25519Key: '0x8F9...3B',
+      ivHex: '4a1b8c2d9e0f1a2b3c4d5e6f',
+      ciphertextPreview: '0x8f31c9a0d2e471b299c01a2b3c4d5e6f...',
+      authTagValid: true,
+      sha256Short: '9f83c21a4e...52631',
+      piiShieldStatus: 'Protección Homomórfica Conforme',
+      sessionTokenId: 'sec-992a-fed',
     }
   },
   {
@@ -292,7 +303,18 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
     isCurrentUser: true,
     timestamp: '14:25:34 UTC',
     content: 'Recibido, Carlos. Estoy consultando la pasarela de inferencia en memoria aislada. El sistema auditó una solicitud ciudadana hace pocos minutos.',
-    verifiedDelivery: true
+    verifiedDelivery: true,
+    cryptoVerification: {
+      algorithm: 'AES-256-GCM + Gov-Ed25519',
+      handshakeStatus: 'Validada y Activa en Enclave RAM',
+      ed25519Key: 'Enclave-RAM-Local',
+      ivHex: 'e3b0c44298fc1c149afbf4c8',
+      ciphertextPreview: '0x3c99f18a2bc4e578a109ca828190fe...',
+      authTagValid: true,
+      sha256Short: 'e3b0c44298...852b8',
+      piiShieldStatus: 'Zero-Plaintext-PII en Memoria',
+      sessionTokenId: 'sec-992a-fed',
+    }
   },
   {
     id: 'msg-3',
@@ -304,7 +326,18 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
     content: 'El contribuyente envió su consulta con la identificación [CÉDULA OCULTA] y solicitó constancia de solvencia fiscal inmediata. Favor verificar si el guardián de privacidad generó el token homomórfico correspondiente.',
     piiMasked: true,
     piiType: 'CÉDULA OCULTA',
-    piiHash: '89ab...7df1'
+    piiHash: '89ab...7df1',
+    cryptoVerification: {
+      algorithm: 'AES-256-GCM + Gov-Ed25519',
+      handshakeStatus: 'Validada y Activa en Enclave RAM',
+      ed25519Key: '0x8F9...3B',
+      ivHex: '89ab7df10012345678abcdef',
+      ciphertextPreview: '0xd4e5f6a1b2c3d4e5f6a1b2c3d4e5f6...',
+      authTagValid: true,
+      sha256Short: '89ab7df100...cdef1',
+      piiShieldStatus: 'Ofuscación Homomórfica Activa (Cédula)',
+      sessionTokenId: 'sec-992a-fed',
+    }
   },
   {
     id: 'msg-4',
@@ -314,7 +347,18 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
     isCurrentUser: true,
     timestamp: '14:32:48 UTC',
     content: 'Confirmado. El token homomórfico quedó registrado en el bloque #002 con firma válida y cero fuga de datos personales en el modelo local Ollama. El dictamen fue emitido y archivado en el ledger.',
-    verifiedDelivery: true
+    verifiedDelivery: true,
+    cryptoVerification: {
+      algorithm: 'AES-256-GCM + Gov-Ed25519',
+      handshakeStatus: 'Validada y Activa en Enclave RAM',
+      ed25519Key: 'Enclave-RAM-Local',
+      ivHex: '7f83b1657ff1fc53b92dc181',
+      ciphertextPreview: '0x71d5e0a1b2c34d5e6f7a8b9c0d1e2f...',
+      authTagValid: true,
+      sha256Short: '7f83b1657f...069a1',
+      piiShieldStatus: 'Sellado en Bloque Ledger #002',
+      sessionTokenId: 'sec-992a-fed',
+    }
   }
 ];
 

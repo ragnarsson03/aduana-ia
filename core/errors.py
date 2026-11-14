@@ -57,3 +57,8 @@ class InvalidFeaturesError(AduanaError, ValueError):
 
 class OverrideJustificationError(AduanaError):
     """Override humano sin justificación de al menos 20 caracteres (RF-20)."""
+
+
+class AttachmentValidationError(AduanaError):
+    """Archivo adjunto inválido por tamaño, MIME, nombre o contenido corrupto."""
+

@@ -44,6 +44,8 @@ class GatewayInput:
     features: dict[str, float]
     human_decision: RecommendationType | None = None
     override_justification: str | None = None
+    attachment_sha256: str | None = None
+    attachment_size_bytes: int = 0
 
     def __repr__(self) -> str:  # Zero-Leak: nunca imprimir PII
         return "GatewayInput(<redacted>)"
@@ -164,8 +166,13 @@ class GatewayPipeline:
             # 6. Intercambio con LLM mediante Circuit Breaker
             llm_res = await self._llm.exchange(prompt)
 
-            # 7. Stage 3: GUARD-OUT (Anti-fuga de canary, anti-XSS y PII residual)
-            guard_out_res = guard_out(llm_res.raw_response, canary_token=guard_in_res.canary_token)
+            # 7. Stage 3: GUARD-OUT (Anti-fuga de canary, anti-XSS, PII residual y rehidratación)
+            token_map = self._vault.get_map(request_id)
+            guard_out_res = guard_out(
+                llm_res.raw_response,
+                canary_token=guard_in_res.canary_token,
+                token_map=token_map,
+            )
             if not guard_out_res.allowed:
                 entry = LedgerEntry(
                     request_id=request_id,
@@ -202,7 +209,18 @@ class GatewayPipeline:
                     "justification", data.override_justification.strip().encode()
                 )
 
-            payload_h = crypto.sha256_hex(guard_out_res.sanitized_response.encode())
+            if data.attachment_sha256 is not None:
+                masked_hash = crypto.sha256_hex(masked_text.encode())
+                canonical_audit = (
+                    f"prompt_sha256={masked_hash}|"
+                    f"file_sha256={data.attachment_sha256}|"
+                    f"file_bytes={data.attachment_size_bytes}|"
+                    f"pii_count={shield_meta.pii_count}|"
+                    f"resp={guard_out_res.sanitized_response}"
+                )
+                payload_h = crypto.sha256_hex(canonical_audit.encode())
+            else:
+                payload_h = crypto.sha256_hex(guard_out_res.sanitized_response.encode())
             receipt_code = f"REC-{request_id}"
 
             entry = LedgerEntry(
