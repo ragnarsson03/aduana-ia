@@ -2,18 +2,12 @@
 litestar>=2.10.0,<3.0.0
 granian>=1.6.0,<2.0.0
 msgspec>=0.18.6,<1.0.0
-pydantic>=2.7.0,<3.0.0
 
 # Aplicación de Escritorio Nativa (Windows 10/11 y Linux)
 pywebview>=5.1.0,<6.0.0
 
-# Pruebas Automatizadas SDD (CA-01 a CA-06)
-pytest>=8.2.0,<9.0.0
+# Cliente HTTP de runtime para adaptadores LLM (Ollama / OpenAI-compatible)
 httpx>=0.27.0,<1.0.0
 
-# Soporte Numérico / Fallback Determinista
-numpy>=1.26.0
-scikit-learn>=1.4.0
-
-# Driver Opcional PostgreSQL Institucional (cuando StorageRepository use Postgres)
-psycopg[binary]>=3.1.0
+# Driver opcional PostgreSQL institucional: pip install psycopg[binary]
+# EXPLICA (regresión logística + SHAP lineal) es aritmética stdlib: sin numpy ni scikit-learn.
