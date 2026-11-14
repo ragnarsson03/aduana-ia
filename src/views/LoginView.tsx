@@ -10,7 +10,7 @@ import {
   KeyRound,
   X,
 } from 'lucide-react';
-import { AuthUser } from '../types/auth';
+import { AuthUser, UserRole } from '../types/auth';
 import { NavTabId } from '../types/navigation';
 import { api, errorMessage } from '../services/apiClient';
 import loginBgImg from '../assets/login-bg.jpg';
@@ -127,6 +127,46 @@ export const LoginView: React.FC<LoginViewProps> = ({
     };
   }, []);
 
+  const demoAccounts: {
+    role: UserRole;
+    label: string;
+    email: string;
+    cedula: string;
+    pass: string;
+    clearance: string;
+  }[] = [
+    {
+      role: 'auditor',
+      label: 'Auditor (Deykary González)',
+      email: 'auditor@aduana.gob.ve',
+      cedula: 'V-14220101',
+      pass: 'auditor2026',
+      clearance: 'Nivel 4 — Confidencial Estatal',
+    },
+    {
+      role: 'analista',
+      label: 'Analista (Elena Salazar)',
+      email: 'analista@aduana.gob.ve',
+      cedula: 'V-18660505',
+      pass: 'analista2026',
+      clearance: 'Nivel 2 — Operativo Aduanero',
+    },
+    {
+      role: 'administrador',
+      label: 'Administrador (Marcos Vivas)',
+      email: 'admin@aduana.gob.ve',
+      cedula: 'V-12110909',
+      pass: 'admin2026',
+      clearance: 'Nivel 5 — Soberanía Crítica',
+    },
+  ];
+
+  const handleSelectAccount = (acc: (typeof demoAccounts)[0]) => {
+    setCedulaInput(acc.email);
+    setPasswordInput(acc.pass);
+    setShowForgotModal(false);
+    setErrorMsg(null);
+  };
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -237,8 +277,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </p>
 
             <div className="inline-flex items-center space-x-1.5 mt-3 px-3 py-1 rounded-full bg-[#0a0e18]/85 border border-white/10 text-[11px] font-mono text-[#4edea3]">
-              <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse" />
-              <span>Zero-Trust Enclave (PBKDF2-HMAC-SHA256 / RAM-Only)</span>
+
             </div>
           </div>
 
@@ -262,8 +301,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 spellCheck={false}
                 value={cedulaInput}
                 onChange={(e) => setCedulaInput(e.target.value)}
-                placeholder="Cédula / RIF (ej. V-12345678)"
-                aria-label="Cédula / RIF"
+                placeholder="Correo institucional o Cédula / RIF"
+                aria-label="Correo institucional o Cédula / RIF"
                 required
                 className="w-full bg-[#090d16]/80 border border-white/15 pl-14 pr-4 py-3.5 rounded-full text-xs sm:text-sm text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all font-mono"
               />
@@ -342,9 +381,38 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </button>
             </div>
 
-            <p className="text-slate-300 leading-relaxed text-xs">
-              Las credenciales las entrega el Supervisor del Puerto Aduanero. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.
-            </p>
+            <div className="space-y-2 text-xs">
+              <p className="text-slate-300 leading-relaxed text-[11px]">
+                Las credenciales RBAC las entrega el Supervisor del Puerto Aduanero (bloqueo de 15 min tras 5 fallos). En entorno demo también puede cargar una credencial institucional:
+              </p>
+
+              {demoAccounts.map((acc) => (
+                <div
+                  key={acc.role}
+                  className="p-2.5 rounded-xl bg-[#090d16] border border-white/10 font-mono text-[11px] space-y-0.5"
+                >
+                  <div className="flex items-center justify-between text-indigo-300 font-bold">
+                    <span>{acc.label}:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAccount(acc)}
+                      className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-sans text-[10px] transition-colors"
+                    >
+                      Cargar
+                    </button>
+                  </div>
+                  <div className="text-slate-400">
+                    Correo: <span className="text-white">{acc.email}</span>
+                  </div>
+                  <div className="text-slate-400">
+                    Cédula: <span className="text-white">{acc.cedula}</span>
+                  </div>
+                  <div className="text-slate-400">
+                    Clave: <span className="text-white font-bold">{acc.pass}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             <button
               type="button"

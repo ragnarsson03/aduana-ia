@@ -82,3 +82,7 @@ class WeakPasswordError(AduanaError):
 
 class DuplicateUserError(AduanaError):
     """Ya existe un usuario con ese código o identificador (HTTP 409 ERR_USER_EXISTS)."""
+
+
+class AttachmentValidationError(AduanaError):
+    """Archivo adjunto inválido por tamaño, MIME, nombre o contenido corrupto."""

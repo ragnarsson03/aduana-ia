@@ -25,6 +25,7 @@ DOMAINS: Final[frozenset[str]] = frozenset(
         "key-id",
         "justification",
         "auth-token",
+        "jwt-session",
     }
 )
 

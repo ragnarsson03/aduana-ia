@@ -10,6 +10,7 @@ import base64
 import html
 import re
 import time
+from collections.abc import Mapping
 from typing import Final
 
 from core.context import GuardOutResult, PolicyStatus
@@ -39,10 +40,29 @@ _UNVERIFIED_CLAIMS_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
 )
 
 
-def guard_out(llm_response: str, *, canary_token: str) -> GuardOutResult:
+def restore_pii_tokens(sanitized_response: str, token_map: Mapping[str, str] | None) -> str:
+    """Restaura en RAM los tokens [KIND_n] desde EphemeralVault tras superar GUARD-OUT."""
+    if not sanitized_response or not token_map:
+        return sanitized_response
+    restored = sanitized_response
+    for token, original in token_map.items():
+        if token in restored:
+            restored = restored.replace(token, html.escape(original))
+    return restored
+
+
+def guard_out(
+    llm_response: str,
+    *,
+    canary_token: str,
+    token_map: Mapping[str, str] | None = None,
+) -> GuardOutResult:
     """Inspecciona la respuesta del LLM antes de entregarla al ciudadano o funcionario.
 
     Verifica ausencia de fuga de Canary, PII residual no enmascarada y vectores de inyección XSS.
+    Si ``token_map`` (procedente de ``EphemeralVault``) está presente y la respuesta es segura,
+    rehidrata los tokens ``[CEDULA_1]`` etc. en ``restored_response`` sin alterar
+    ``sanitized_response`` (que permanece anonimizada para el sellado en el Ledger).
     Gatillo 2 (specs/02_guardian.spec.md).
     """
     start_time = time.perf_counter()
@@ -113,18 +133,22 @@ def guard_out(llm_response: str, *, canary_token: str) -> GuardOutResult:
         allowed = False
         policy_status: PolicyStatus = "BLOCKED_CANARY_LEAK"
         sanitized_response = ""
+        restored_response = ""
     elif xss_detected:
         allowed = False
         policy_status = "BLOCKED_INJECTION"
         sanitized_response = ""
+        restored_response = ""
     elif residual_pii_detected:
         allowed = False
         policy_status = "BLOCKED_PII_LEAK"
         sanitized_response = ""
+        restored_response = ""
     else:
         allowed = True
         policy_status = "CLEAN"
         sanitized_response = html.escape(llm_response)
+        restored_response = restore_pii_tokens(sanitized_response, token_map)
 
     latency_ms = (time.perf_counter() - start_time) * 1000.0
 
@@ -137,4 +161,5 @@ def guard_out(llm_response: str, *, canary_token: str) -> GuardOutResult:
         sanitized_response=sanitized_response,
         policy_status=policy_status,
         latency_ms=latency_ms,
+        restored_response=restored_response,
     )

@@ -109,11 +109,12 @@ class HealthResponse(msgspec.Struct, frozen=True):
 
 
 class LoginRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
-    identificador: Identificador
     password: Password
+    identificador: Annotated[str, msgspec.Meta(min_length=1, max_length=128)] | None = None
+    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=128)] | None = None
 
     def __repr__(self) -> str:  # Zero-Leak
-        return "LoginRequest(<redacted>)"
+        return "LoginRequest([REDACTED])"
 
 
 class LoginUserOut(msgspec.Struct, frozen=True):
@@ -124,13 +125,13 @@ class LoginUserOut(msgspec.Struct, frozen=True):
     avatar_text: str
     role: Literal["analista", "administrador", "auditor"]  # rol de presentación (UI)
     role_label: str
-    aduana_role: AduanaRoleType  # rol aduanero real (fuente de los permisos)
     clearance_level: str
     entity: str
     department: str
     permissions: tuple[str, ...]
     default_tab: Literal["pasarela", "chat", "ledger", "explicabilidad", "canal"]
     allowed_tabs: tuple[str, ...]
+    aduana_role: AduanaRoleType = "INSPECTOR_TRIBUTARIO_SENIAT"  # rol aduanero real
 
 
 class LoginResponse(msgspec.Struct, frozen=True):
@@ -138,18 +139,33 @@ class LoginResponse(msgspec.Struct, frozen=True):
     session_token: str
     token_type: Literal["Bearer"]
     expires_in_seconds: int
-    expires_at: int
     user: LoginUserOut
     block_index: int
     citizen_receipt_code: str
+    expires_at: int = 0
 
     def __repr__(self) -> str:  # Zero-Leak
-        return "LoginResponse(<redacted>)"
+        return "LoginResponse([REDACTED])"
+
+
+class SessionStatusResponse(msgspec.Struct, frozen=True):
+    authenticated: bool
+    user_id: str
+    role: Literal["analista", "administrador", "auditor"]
+    jti: str
+    expires_at_epoch: int
+    user: LoginUserOut
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "SessionStatusResponse([REDACTED])"
 
 
 class LogoutResponse(msgspec.Struct, frozen=True):
     revoked: bool
     jti: str
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_CHAT_PAYLOAD]"
 
 
 class MeResponse(msgspec.Struct, frozen=True):
@@ -211,3 +227,47 @@ class ReceiptResponse(msgspec.Struct, frozen=True):
     block_hash: str
     cadena_valida: bool
     liberacion_autorizada: bool
+
+
+class ChatIAUploadRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    prompt: RawText
+    citizen_cedula: Cedula = "V-12345678"
+    purpose_code: PurposeCode = "CHAT_IA_CONSULTA"
+    consent_granted: bool = True
+    file_name: Annotated[str, msgspec.Meta(min_length=1, max_length=120)] | None = None
+    file_mime_type: Annotated[str, msgspec.Meta(min_length=3, max_length=64)] | None = None
+    file_content_b64: Annotated[str, msgspec.Meta(min_length=1, max_length=48_000)] | None = None
+    features: Features | None = None
+    human_decision: RecommendationType | None = None
+    override_justification: Justification | None = None
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_CHAT_PAYLOAD]"
+
+
+class ChatIAResponse(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    request_id: str
+    timestamp_utc: str
+    policy_status: PolicyStatus
+    masked_prompt: str | None
+    sanitized_response: str
+    restored_response: str
+    ai_generated_notice: bool
+    pii_count: int
+    detected_types: tuple[str, ...]
+    rif_mod11_verified: bool | None
+    file_name_sanitized: str | None
+    file_sha256: str | None
+    file_size_bytes: int
+    model_recommendation: RecommendationType
+    human_decision: RecommendationType
+    human_override: bool
+    probability_score: float | None
+    linear_shap_values: dict[str, float] | None
+    citizen_receipt_code: str
+    block_index: int
+    chain_verified: bool
+    latency_ms: float
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_CHAT_PAYLOAD]"

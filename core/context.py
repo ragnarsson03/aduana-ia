@@ -100,6 +100,7 @@ class GuardOutResult:
     sanitized_response: str
     policy_status: PolicyStatus
     latency_ms: float
+    restored_response: str = ""
 
 
 def _freeze(mapping: Mapping[str, float]) -> Mapping[str, float]:

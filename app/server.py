@@ -18,6 +18,7 @@ from litestar.static_files import create_static_files_router
 
 from app.controllers.audit import AuditController
 from app.controllers.auth import AuthController
+from app.controllers.chat import ChatController
 from app.controllers.explica import ExplicaController
 from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
@@ -35,6 +36,7 @@ from core.config import (
 from core.errors import (
     AccountLockedError,
     AduanaError,
+    AttachmentValidationError,
     AuthenticationError,
     AuthorizationError,
     ConsentError,
@@ -73,6 +75,7 @@ _ERROR_TABLE: Final[dict[type[AduanaError], tuple[int, str]]] = {
     ImmutableLedgerError: (409, "ERR_IMMUTABLE_LEDGER"),
     OverrideJustificationError: (422, "ERR_OVERRIDE_JUSTIFICATION"),
     InvalidFeaturesError: (422, "ERR_INVALID_FEATURES"),
+    AttachmentValidationError: (422, "ERR_INVALID_ATTACHMENT"),
     ShieldResidualPiiError: (422, "ERR_UNSAFE_INPUT"),
     LLMUnavailableError: (503, "ERR_LLM_UNAVAILABLE"),
     AuthenticationError: (401, "ERR_AUTH_INVALID"),
@@ -108,6 +111,8 @@ def _unhandled_error_handler(_: Request, exc: Exception) -> Response[dict[str, s
 def _shutdown_handler(app: Litestar) -> None:
     state: AppState = app.state.aduana
     state.vault.zeroize_all()
+    state.session_store.zeroize_all()
+    state.auth_repo.close()
     state.repo.close()
     if state.identity is not None:
         state.identity.close()
@@ -130,6 +135,7 @@ def create_app(
     handlers: list = [
         HealthController,
         AuthController,
+        ChatController,
         GatewayController,
         ShieldController,
         LedgerController,

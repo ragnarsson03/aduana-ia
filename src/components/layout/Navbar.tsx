@@ -65,11 +65,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const homeTab = currentUser ? currentUser.defaultTab : 'pasarela';
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0b0f19]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[84px] md:min-h-[92px] py-2 sm:py-2.5 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0b0f19]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-[68px] flex items-center justify-between gap-3">
         
         {/* Brand Logo and Live Status Indicator */}
-        <div className="flex items-center space-x-3 shrink-0">
+        <div className="flex items-center space-x-2.5 shrink-0">
           <button 
             onClick={() => onTabChange(homeTab)}
             className="flex items-center focus:outline-hidden text-left group"
@@ -78,17 +78,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img 
               src={logoImg} 
               alt="Aduana IA" 
-              className="block dark:hidden h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+              className="block dark:hidden h-9 sm:h-10 md:h-11 w-auto object-contain rounded-lg shadow-2xs hover:opacity-95 transition-all"
             />
             {/* Logo en Modo Oscuro (Adaptado para fondo oscuro con detalles y colores originales) */}
             <img 
               src={logoWhiteImg} 
               alt="Aduana IA" 
-              className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:drop-shadow-[0_0_14px_rgba(79,70,229,0.3)]"
+              className="hidden dark:block h-9 sm:h-10 md:h-11 w-auto object-contain rounded-lg shadow-2xs hover:opacity-95 transition-all drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] hover:drop-shadow-[0_0_12px_rgba(79,70,229,0.3)]"
             />
           </button>
 
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Online
           </span>
