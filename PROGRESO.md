@@ -257,5 +257,12 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
      - **Canal Seguro (`CanalSeguroFeature.tsx`):** Al adjuntar un archivo (local o preset), los bytes se leen en RAM como `ArrayBuffer`, se genera una clave AES-GCM de 256 bits y un IV de 96 bits (`window.crypto.getRandomValues`), y se encripta con `crypto.subtle.encrypt`. Se almacena el `ciphertextPreview`, `ivHex` y se valida la etiqueta de autenticación (auth tag). Cada tarjeta de archivo incluye botón de auditoría directa hacia `CryptoAuditModal`.
      - **Chat IA (`ChatIAView.tsx`):** Cada archivo adjunto se cifra en RAM con AES-256-GCM de 256 bits antes de transmitirse. Se muestran insignias `🔒 AES-256-GCM (256-bit)` y `Tag GCM Autenticado`, y el componente `MaskedContentPreview` oculta volcados de texto plano o texto cifrado masivo, manteniendo la interfaz compacta y con tiempo de expiración (TTL 180s en memoria confinada).
 
+5. **Auditoría Exhaustiva de PRs e Integración Total (PR 1 al 16):**
+   - **Estado de PRs:** Los 16 Pull Requests del proyecto se encuentran fusionados (`MERGED`) y sin conflictos en el repositorio oficial `ragnarsson03/aduana-ia`.
+   - **Fusión de PR #13 (`feat/rbac-aduanero`):** Integrado exitosamente a `develop` y `main`, incorporando la base de datos SQLite RBAC, seeder de usuarios, tokens PBKDF2 y pantallas de login unificado.
+   - **Compatibilidad Universal Cloudflare (`wrangler.toml`):** Se generó y versionó `wrangler.toml` junto a `wrangler.jsonc` para compatibilidad cruzada con runners de Cloudflare Workers Builds que requieren sintaxis TOML estricta.
+   - **Despliegue Productivo Actualizado:** Versión `654c3c8a-aede-43e0-97e2-ef226d24dc21` en vivo y operativa en `https://aduana-ia.carlos-lamole98.workers.dev`.
+   - **Verificación Automatizada:** Suite de integración con 130 tests aprobados en `test_ca07_rbac_aduana.py` y `test_ca07_desktop_and_frontend.py`, y 32 tests de Vitest en verde.
+
 
 
