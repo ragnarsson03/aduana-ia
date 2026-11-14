@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { NavTabId, NavTabItem } from '../../types';
 import logoImg from '../../assets/Logo.png';
+import logoWhiteImg from '../../assets/Logo-white.png';
 
 interface NavbarProps {
   activeTab: NavTabId;
@@ -44,10 +45,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onTabChange('pasarela')}
             className="flex items-center focus:outline-hidden text-left group"
           >
+            {/* Logo en Modo Claro */}
             <img 
               src={logoImg} 
               alt="Aduana IA" 
-              className="h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+              className="block dark:hidden h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+            />
+            {/* Logo en Modo Oscuro (Blanco / Luminoso) */}
+            <img 
+              src={logoWhiteImg} 
+              alt="Aduana IA" 
+              className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_0_12px_rgba(255,255,255,0.25)]"
             />
           </button>
 

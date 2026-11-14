@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
 import logoImg from '../../../assets/Logo.png';
+import logoWhiteImg from '../../../assets/Logo-white.png';
 
 interface CanalHeaderProps {
   darkMode: boolean;
@@ -20,10 +21,17 @@ export const CanalHeader: React.FC<CanalHeaderProps> = ({
         onClick={onNavigateHome}
         className="flex items-center gap-2.5 text-left focus:outline-hidden group"
       >
+        {/* Logo en Modo Claro */}
         <img 
           src={logoImg} 
           alt="Aduana IA" 
-          className="h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+          className="block dark:hidden h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+        />
+        {/* Logo en Modo Oscuro (Blanco / Luminoso) */}
+        <img 
+          src={logoWhiteImg} 
+          alt="Aduana IA" 
+          className="hidden dark:block h-14 sm:h-16 md:h-[76px] lg:h-[84px] w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all drop-shadow-[0_0_12px_rgba(255,255,255,0.25)]"
         />
         <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           <span className="text-slate-400 dark:text-slate-500 font-normal">—</span> Canal Seguro
