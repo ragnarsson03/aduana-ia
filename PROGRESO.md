@@ -279,6 +279,11 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
    - **Solución Chat IA Stream (`/api/v1/chat/stream`):** Se enrutó el endpoint de streaming binario de adjuntos en `functions/worker.ts` y se securizó `functions/api/v1/chat/message.ts` con protección `try/catch` y CORS contra fallos de Workers AI, eliminando el fallback offline determinista y devolviendo dictámenes soberanos completos.
    - **Solución Sesión F5:** Se condicionó `/api/v1/auth/session` a la existencia real de la cookie `aduana_session`. Si no hay sesión o se hizo logout devuelve 401 (permaneciendo en LoginView), y si el usuario inició sesión restaura de forma fidedigna al rol específico correspondiente (Administrador, Auditor o Analista).
 
+8. **Sincronización del Repositorio de Destino de Cloudflare (`carloss856/aduana-ia`):**
+   - **Diagnóstico del Registro de Cloudflare:** En los logs de compilación de Cloudflare se identificó que el proyecto estaba vinculado al repositorio clonado `https://github.com/carloss856/aduana-ia.git`, el cual había quedado varado en el commit inicial `bedbfe1` mientras el equipo commiteaba en `ragnarsson03/aduana-ia`.
+   - **Acción:** Se agregó el remote `fork` y se empujaron las ramas `main` y `develop` con todos los PRs (1 al 16), el Edge Router `functions/worker.ts`, `wrangler.toml` y los activos de Vite precompilados.
+
+
 
 
 
