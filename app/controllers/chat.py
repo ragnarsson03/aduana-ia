@@ -1,12 +1,13 @@
-"""Controlador Zero-Trust para el Chat de IA con streaming efímero de hasta 100 MB.
+"""Controlador Zero-Trust para Nexus IA con entrada multimodal flexible y memoria en RAM.
 
-Cumple estrictamente:
-- Streaming efímero (100 MB máx., 0 escritura en disco/SQLite/D1/R2) por fragmentos de 64 KB.
-- Zero-Plaintext-PII: anonimización al vuelo (SHIELD + GUARD-IN) y síntesis Map-Reduce en RAM
-  con mapa de reversión en ``EphemeralVault`` (TTL 180s) y ``EphemeralVault.zeroize()`` en
-  ``finally``.
-- Auditoría Ledger de rastro sin dato: en ``ledger_blocks`` sólo se sella el hash SHA-256 del
-  archivo, ``blind_citizen_id``, ``user_role``, ``timestamp_utc`` y ``action``.
+Cumple estrictamente las 4 directrices:
+1. Flexibilidad total de entrada:
+   - Caso A (Solo texto + historial/documento en sesión RAM).
+   - Caso B (Texto + Archivo adjunto).
+   - Caso C (Solo Archivo sin prompt -> inyecta prompt de auditoría por defecto).
+2. Extracción limpia en RAM de PDF/CSV/TXT/JSON/MD (cero cabeceras `%PDF-1.4`).
+3. Ventana de contexto conversacional multi-turno en RAM (`history` + `active_document_context`).
+4. Contexto de vista minimizado (`ui_masked_preview`) y `EphemeralVault.zeroize()` en `finally`.
 """
 
 from __future__ import annotations
@@ -27,23 +28,25 @@ from litestar.handlers.base import BaseRouteHandler
 from litestar.status_codes import HTTP_200_OK
 
 from app.dependencies import AppState
-from app.schemas import ChatIAResponse, ChatIAUploadRequest, UserRole
+from app.schemas import ChatIAResponse, ChatIAUploadRequest, ChatTurn, UserRole
 from app.security import TOKEN_HEADER
 from core import crypto
 from core.config import API_PREFIX
 from core.context import BlockedPacket
 from core.errors import AttachmentValidationError
 from pipeline.chat_attachments import (
+    DEFAULT_ATTACHMENT_PROMPT,
     MAX_CHAT_ATTACHMENT_BYTES,
     STREAM_CHUNK_SIZE,
     StreamedChatPrepared,
     derive_chat_features,
     iter_b64_in_chunks,
+    prepare_text_only_chat,
     process_attachment_stream,
 )
 from pipeline.orchestrator import GatewayInput
 
-MAX_CHAT_REQUEST_BYTES: Final[int] = 105 * 1024 * 1024  # 105 MB para cubrir cabeceras/multipart
+MAX_CHAT_REQUEST_BYTES: Final[int] = 105 * 1024 * 1024  # 105 MB
 VALID_ROLES: Final[frozenset[str]] = frozenset({"analista", "administrador", "auditor"})
 
 
@@ -71,6 +74,15 @@ def _normalize_role(raw_role: str | None) -> UserRole:
     return "analista"
 
 
+def _extract_history_pairs(history: list[ChatTurn]) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for turn in history[-6:]:
+        text = (turn.masked_content or turn.content).strip()
+        if text:
+            pairs.append((turn.role, text))
+    return pairs
+
+
 async def _iter_upload_file(
     upload: UploadFile, chunk_size: int = STREAM_CHUNK_SIZE
 ) -> AsyncIterable[bytes]:
@@ -86,6 +98,8 @@ def _verify_client_sha256(computed_sha256: str, client_sha256: str | None) -> No
     if not client_sha256:
         return
     clean_client = client_sha256.strip().lower()
+    if len(clean_client) != 64:
+        return
     if not secrets.compare_digest(computed_sha256.lower().encode(), clean_client.encode()):
         raise AttachmentValidationError(
             "Integridad fallida: el SHA-256 del stream no coincide con el hash del cliente."
@@ -99,8 +113,7 @@ async def _prepare_from_octet_stream(
 ) -> tuple[ChatIAUploadRequest, StreamedChatPrepared]:
     """Procesa un stream binario directo (`application/octet-stream`) desde `request.stream()`."""
     raw_prompt = urllib.parse.unquote(request.headers.get("x-chat-prompt", "")).strip()
-    if not raw_prompt:
-        raw_prompt = "Analizar documento adjunto en flujo efímero."
+    effective_prompt = raw_prompt or DEFAULT_ATTACHMENT_PROMPT
     file_name = urllib.parse.unquote(request.headers.get("x-file-name", "adjunto.txt")).strip()
     file_mime = request.headers.get("x-file-mime", "text/plain").strip()
     cedula_val = request.headers.get("x-citizen-cedula", "V-12345678").strip()
@@ -109,7 +122,18 @@ async def _prepare_from_octet_stream(
     purpose_val = (request.headers.get("x-purpose-code") or "CHAT_IA_CONSULTA").strip()
     consent_raw = (request.headers.get("x-consent-granted") or "true").strip().lower()
     consent_val = consent_raw not in {"false", "0", "no"}
-    client_sha = request.headers.get("x-client-file-sha256") or None
+    client_sha = (request.headers.get("x-client-file-sha256") or "").strip() or None
+
+    history_header = request.headers.get("x-chat-history")
+    history_list: list[dict[str, str]] = []
+    if history_header:
+        try:
+            decoded_hist = urllib.parse.unquote(history_header)
+            parsed_hist = json.loads(decoded_hist)
+            if isinstance(parsed_hist, list):
+                history_list = [h for h in parsed_hist if isinstance(h, dict)]
+        except Exception:
+            history_list = []
 
     content_length = request.headers.get("content-length")
     if content_length and content_length.isdigit():
@@ -121,7 +145,8 @@ async def _prepare_from_octet_stream(
     try:
         dto = msgspec.convert(
             {
-                "prompt": raw_prompt,
+                "prompt": effective_prompt,
+                "history": history_list,
                 "citizen_cedula": cedula_val,
                 "user_role": role_val,
                 "action": action_val,
@@ -137,17 +162,17 @@ async def _prepare_from_octet_stream(
         raise HTTPException(status_code=400, detail="INVALID_CHAT_PAYLOAD") from exc
 
     blind_id = crypto.blind_citizen_id(state.keys, dto.citizen_cedula)
-
     prepared = await process_attachment_stream(
         request.stream(),
         request_id=request_id,
-        prompt=dto.prompt,
+        prompt=effective_prompt,
         file_name=file_name,
         file_mime_type=file_mime,
         vault=state.vault,
         blind_citizen_id=blind_id,
+        history_turns=_extract_history_pairs(dto.history),
     )
-    _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+    _verify_client_sha256(prepared.sha256_hex or "", dto.client_file_sha256)
     return dto, prepared
 
 
@@ -155,13 +180,12 @@ async def _prepare_chat_request(
     request: Request,
     state: AppState,
     request_id: str,
-) -> tuple[ChatIAUploadRequest, StreamedChatPrepared | None]:
-    """Decodifica y procesa en streaming la solicitud de Chat IA (binario, multipart o JSON)."""
+) -> tuple[ChatIAUploadRequest, StreamedChatPrepared]:
+    """Decodifica y procesa la solicitud (Casos A: texto, B: texto+archivo, C: solo archivo)."""
     content_type = (request.headers.get("content-type") or "").lower()
 
     if content_type.startswith("application/octet-stream"):
-        dto, prepared = await _prepare_from_octet_stream(request, state, request_id)
-        return dto, prepared
+        return await _prepare_from_octet_stream(request, state, request_id)
 
     if content_type.startswith("multipart/form-data"):
         form = await request.form()
@@ -178,6 +202,18 @@ async def _prepare_chat_request(
             "x-client-file-sha256"
         )
         client_sha = str(client_sha_raw).strip() if client_sha_raw else None
+        active_doc_ctx = str(form.get("active_document_context") or "").strip() or None
+        active_doc_name = str(form.get("active_document_name") or "").strip() or None
+        active_doc_sha = str(form.get("active_document_sha256") or "").strip() or None
+
+        history_list: list[dict[str, str]] = []
+        if form.get("history"):
+            try:
+                parsed_hist = json.loads(str(form.get("history")))
+                if isinstance(parsed_hist, list):
+                    history_list = [h for h in parsed_hist if isinstance(h, dict)]
+            except (ValueError, TypeError):
+                history_list = []
 
         features_val: dict[str, float] | None = None
         if "features" in form and form.get("features"):
@@ -203,8 +239,17 @@ async def _prepare_chat_request(
             file_mime = str(form.get("file_mime_type") or "text/plain")
             file_b64 = str(form.get("file_content_b64"))
 
+        has_attachment = isinstance(upload_obj, UploadFile) or bool(file_b64)
+        if not prompt_val and not has_attachment:
+            raise HTTPException(status_code=400, detail="INVALID_CHAT_PAYLOAD")
+
+        effective_prompt = prompt_val or DEFAULT_ATTACHMENT_PROMPT
         raw_dict: dict[str, Any] = {
-            "prompt": prompt_val,
+            "prompt": effective_prompt,
+            "history": history_list,
+            "active_document_context": active_doc_ctx,
+            "active_document_name": active_doc_name,
+            "active_document_sha256": active_doc_sha,
             "citizen_cedula": cedula_val,
             "user_role": role_val,
             "action": action_val,
@@ -224,34 +269,47 @@ async def _prepare_chat_request(
             raise HTTPException(status_code=400, detail="INVALID_CHAT_PAYLOAD") from exc
 
         blind_id = crypto.blind_citizen_id(state.keys, dto.citizen_cedula)
+        history_pairs = _extract_history_pairs(dto.history)
 
         if isinstance(upload_obj, UploadFile):
             prepared = await process_attachment_stream(
                 _iter_upload_file(upload_obj),
                 request_id=request_id,
-                prompt=dto.prompt,
+                prompt=effective_prompt,
                 file_name=file_name or "adjunto.txt",
                 file_mime_type=file_mime or "text/plain",
                 vault=state.vault,
                 blind_citizen_id=blind_id,
+                history_turns=history_pairs,
             )
-            _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+            _verify_client_sha256(prepared.sha256_hex or "", dto.client_file_sha256)
             return dto, prepared
 
         if file_b64:
             prepared = await process_attachment_stream(
                 iter_b64_in_chunks(file_b64),
                 request_id=request_id,
-                prompt=dto.prompt,
+                prompt=effective_prompt,
                 file_name=file_name or "adjunto.txt",
                 file_mime_type=file_mime or "text/plain",
                 vault=state.vault,
                 blind_citizen_id=blind_id,
+                history_turns=history_pairs,
             )
-            _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
+            _verify_client_sha256(prepared.sha256_hex or "", dto.client_file_sha256)
             return dto, prepared
 
-        return dto, None
+        prepared = prepare_text_only_chat(
+            request_id=request_id,
+            prompt=effective_prompt,
+            vault=state.vault,
+            blind_citizen_id=blind_id,
+            history_turns=history_pairs,
+            active_document_context=dto.active_document_context,
+            active_document_name=dto.active_document_name,
+            active_document_sha256=dto.active_document_sha256,
+        )
+        return dto, prepared
 
     raw_body = await request.body()
     try:
@@ -261,28 +319,57 @@ async def _prepare_chat_request(
     except msgspec.DecodeError as exc:
         raise HTTPException(status_code=400, detail="MALFORMED_JSON") from exc
 
-    has_any_file_field = any(
+    # Resolver adjunto desde `dto.attachment` (nuevo) o desde campos planos (compatibilidad)
+    eff_file_name = dto.attachment.file_name if dto.attachment else dto.file_name
+    eff_file_mime = (
+        dto.attachment.file_mime_type if dto.attachment else (dto.file_mime_type or "text/plain")
+    )
+    eff_file_b64 = dto.attachment.file_content_b64 if dto.attachment else dto.file_content_b64
+    eff_client_sha = (
+        (dto.attachment.file_sha256 if dto.attachment else None) or dto.client_file_sha256
+    )
+
+    has_any_file_field = dto.attachment is not None or any(
         x is not None for x in (dto.file_name, dto.file_mime_type, dto.file_content_b64)
     )
-    if not has_any_file_field:
-        return dto, None
+    clean_prompt = dto.prompt.strip()
 
-    if not (dto.file_name and dto.file_mime_type and dto.file_content_b64):
-        raise AttachmentValidationError(
-            "Adjunto incompleto: requiere file_name, file_mime_type y file_content_b64."
-        )
+    # Validación lógica (Directriz 1): válido si existe prompt != "" O attachment != None
+    if not clean_prompt and not has_any_file_field:
+        raise HTTPException(status_code=400, detail="INVALID_CHAT_PAYLOAD")
 
     blind_id = crypto.blind_citizen_id(state.keys, dto.citizen_cedula)
-    prepared = await process_attachment_stream(
-        iter_b64_in_chunks(dto.file_content_b64),
+    history_pairs = _extract_history_pairs(dto.history)
+
+    if has_any_file_field:
+        if not (eff_file_name and eff_file_b64):
+            raise AttachmentValidationError(
+                "Adjunto incompleto: requiere nombre de archivo y contenido."
+            )
+        effective_prompt = clean_prompt or DEFAULT_ATTACHMENT_PROMPT
+        prepared = await process_attachment_stream(
+            iter_b64_in_chunks(eff_file_b64),
+            request_id=request_id,
+            prompt=effective_prompt,
+            file_name=eff_file_name,
+            file_mime_type=eff_file_mime,
+            vault=state.vault,
+            blind_citizen_id=blind_id,
+            history_turns=history_pairs,
+        )
+        _verify_client_sha256(prepared.sha256_hex or "", eff_client_sha)
+        return dto, prepared
+
+    prepared = prepare_text_only_chat(
         request_id=request_id,
-        prompt=dto.prompt,
-        file_name=dto.file_name,
-        file_mime_type=dto.file_mime_type,
+        prompt=clean_prompt,
         vault=state.vault,
         blind_citizen_id=blind_id,
+        history_turns=history_pairs,
+        active_document_context=dto.active_document_context,
+        active_document_name=dto.active_document_name,
+        active_document_sha256=dto.active_document_sha256,
     )
-    _verify_client_sha256(prepared.sha256_hex, dto.client_file_sha256)
     return dto, prepared
 
 
@@ -291,38 +378,38 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
     request_id = str(uuid.uuid4())
     try:
         dto, prepared = await _prepare_chat_request(request, state, request_id)
-        analysis_text = prepared.reduced_masked_text if prepared is not None else dto.prompt
+        effective_prompt = dto.prompt.strip() or DEFAULT_ATTACHMENT_PROMPT
+        has_doc = prepared.sha256_hex is not None or prepared.document_context_masked is not None
         features = (
             dict(dto.features)
             if dto.features is not None
             else derive_chat_features(
-                analysis_text,
-                has_attachment=prepared is not None,
-                pii_count=prepared.shield_meta.pii_count if prepared is not None else 0,
-                detected_types=prepared.shield_meta.detected_types if prepared is not None else (),
+                prepared.reduced_masked_text,
+                has_attachment=has_doc,
+                pii_count=prepared.shield_meta.pii_count,
+                detected_types=prepared.shield_meta.detected_types,
             )
         )
 
         gateway_in = GatewayInput(
-            raw_text=dto.prompt,
+            raw_text=effective_prompt,
             citizen_cedula=dto.citizen_cedula,
             consent_granted=dto.consent_granted,
             purpose_code=dto.purpose_code,
             features=features,
             human_decision=dto.human_decision,
             override_justification=dto.override_justification,
-            attachment_sha256=prepared.sha256_hex if prepared else "NONE",
-            attachment_size_bytes=prepared.size_bytes if prepared else 0,
+            attachment_sha256=prepared.sha256_hex or "NONE",
+            attachment_size_bytes=prepared.size_bytes,
             user_role=dto.user_role,
             audit_action=dto.action,
-            pre_shielded_text=prepared.reduced_masked_text if prepared else None,
-            pre_shielded_meta=prepared.shield_meta if prepared else None,
+            pre_shielded_text=prepared.reduced_masked_text,
+            pre_shielded_meta=prepared.shield_meta,
             request_id_override=request_id,
         )
 
         packet = await state.pipeline.process(gateway_in)
     finally:
-        # Destrucción criptográfica garantizada si ocurre error antes de entrar al pipeline
         state.vault.zeroize(request_id)
 
     if isinstance(packet, BlockedPacket):
@@ -337,9 +424,9 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
             pii_count=0,
             detected_types=(),
             rif_mod11_verified=None,
-            file_name_sanitized=prepared.sanitized_name if prepared else None,
-            file_sha256=prepared.sha256_hex if prepared else None,
-            file_size_bytes=prepared.size_bytes if prepared else 0,
+            file_name_sanitized=prepared.sanitized_name,
+            file_sha256=prepared.sha256_hex,
+            file_size_bytes=prepared.size_bytes,
             model_recommendation="BLOQUEADO_SEGURIDAD",
             human_decision="BLOQUEADO_SEGURIDAD",
             human_override=False,
@@ -349,9 +436,10 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
             block_index=packet.ledger.block_index,
             chain_verified=packet.ledger.chain_verified,
             latency_ms=0.0,
-            chunks_processed=prepared.chunks_processed if prepared else 0,
+            chunks_processed=prepared.chunks_processed,
             user_role=dto.user_role,
             audit_action=dto.action,
+            document_context_masked=None,
         )
 
     total_latency = (
@@ -366,16 +454,16 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
         request_id=packet.request_id,
         timestamp_utc=packet.timestamp_utc,
         policy_status=packet.guard_out.policy_status,
-        masked_prompt=packet.masked_text,
+        masked_prompt=prepared.ui_masked_preview,
         sanitized_response=packet.guard_out.sanitized_response,
         restored_response=restored,
         ai_generated_notice=packet.llm.ai_generated_notice,
         pii_count=packet.shield.pii_count,
         detected_types=packet.shield.detected_types,
         rif_mod11_verified=packet.shield.rif_mod11_verified,
-        file_name_sanitized=prepared.sanitized_name if prepared else None,
-        file_sha256=prepared.sha256_hex if prepared else None,
-        file_size_bytes=prepared.size_bytes if prepared else 0,
+        file_name_sanitized=prepared.sanitized_name,
+        file_sha256=prepared.sha256_hex,
+        file_size_bytes=prepared.size_bytes,
         model_recommendation=packet.explica.model_recommendation,
         human_decision=packet.explica.human_decision,
         human_override=packet.explica.human_override,
@@ -385,9 +473,10 @@ async def _execute_chat_pipeline(request: Request) -> ChatIAResponse:
         block_index=packet.ledger.block_index,
         chain_verified=packet.ledger.chain_verified,
         latency_ms=total_latency,
-        chunks_processed=prepared.chunks_processed if prepared else 0,
+        chunks_processed=prepared.chunks_processed,
         user_role=dto.user_role,
         audit_action=dto.action,
+        document_context_masked=prepared.document_context_masked,
     )
 
 

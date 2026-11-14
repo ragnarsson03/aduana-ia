@@ -14,11 +14,23 @@ import {
   FileText,
   X,
   Eye,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
 } from 'lucide-react';
-import { api, ChatIAResponse, RecommendationType, errorMessage } from '../services/apiClient';
+import {
+  api,
+  ChatIAResponse,
+  ChatTurn,
+  RecommendationType,
+  errorMessage,
+} from '../services/apiClient';
 
 const MAX_CLIENT_ATTACHMENT_BYTES = 100 * 1024 * 1024; // 100 MB (Streaming Efímero)
 const STREAM_SLICE_BYTES = 64 * 1024; // 64 KB por fragmento
+
+const DEFAULT_ATTACHMENT_PROMPT =
+  'Analiza exhaustivamente el documento adjunto, resume sus hallazgos clave, verifica su cumplimiento normativo y emite un dictamen técnico.';
 
 const SHAP_LABELS: Record<string, string> = {
   tiempo_espera_dias: 'Tiempo de Espera (días)',
@@ -33,6 +45,12 @@ interface PendingAttachment {
   mimeType: string;
   sizeBytes: number;
   sha256Hex: string | null;
+}
+
+interface ActiveDocumentSession {
+  fileName: string;
+  sha256: string | null;
+  maskedSummary: string;
 }
 
 interface Message {
@@ -87,10 +105,6 @@ function bytesToHex(bytes: Uint8Array): string {
   return out;
 }
 
-/**
- * Calcula el hash SHA-256 en memoria usando Streams API (`file.stream()`) o `FileReader`
- * y `crypto.subtle.digest('SHA-256', ...)` para archivos de hasta 100 MB, purgando buffers.
- */
 async function computeFileSha256InStream(targetFile: File): Promise<string | null> {
   try {
     if (
@@ -134,9 +148,6 @@ async function computeFileSha256InStream(targetFile: File): Promise<string | nul
       }
     }
 
-    // Para archivos mayores de 16 MB (hasta 100 MB), validamos el primer fragmento con FileReader
-    // y delegamos el SHA-256 continuo de 100 MB a `hashlib.sha256` en el stream del backend
-    // para no exceder 128 MB de RAM en el cliente.
     await new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve();
@@ -176,7 +187,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       content:
         'Solicito revisión de expediente de salud para V-12345678 con informe de patología clínica adjunto.',
       maskedContent:
-        'Solicito revisión de expediente de salud para [CEDULA_1] con informe de [CLINICAL_1] adjunto.\n[DOCUMENTO_STREAM_MAP_REDUCE nombre=informe_clinico.txt sha256=8f31c9a0d2e471b2]:\nPaciente [CEDULA_1], RIF [RIF_1], contacto [PHONE_1].',
+        'Solicito revisión de expediente de salud para [CEDULA_1] con informe de [CLINICAL_1] adjunto. [Adjunto informe_clinico.txt]: Paciente [CEDULA_1], RIF [RIF_1], contacto [PHONE_1].',
       piiCount: 4,
       detectedTypes: ['CEDULA', 'CLINICAL', 'PHONE', 'RIF'],
       rifVerified: true,
@@ -192,9 +203,9 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       sender: 'assistant',
       timestamp: '09:14',
       content:
-        '[AVISO IA - MODO INSTITUCIONAL] Expediente registrado para V-12345678 (RIF J-12345678-4). Los recaudos del documento adjunto fueron anonimizados en SHIELD antes de la inferencia y rehidratados desde EphemeralVault en GUARD-OUT.',
+        'Dictamen Técnico Soberano: Expediente clínico-aduanal de V-12345678 (RIF J-12345678-4) validado con prioridad alta conforme a CRBV Arts. 28/60 y Ley de Infogobierno. Los recaudos del adjunto fueron anonimizados en SHIELD y rehidratados desde EphemeralVault.',
       sanitizedAuditResponse:
-        '[AVISO IA - MODO INSTITUCIONAL] Expediente registrado para [CEDULA_1] (RIF [RIF_1]). Los recaudos del documento adjunto fueron anonimizados en SHIELD antes de la inferencia y rehidratados desde EphemeralVault en GUARD-OUT.',
+        'Dictamen Técnico Soberano: Expediente clínico-aduanal de [CEDULA_1] (RIF [RIF_1]) validado con prioridad alta conforme a CRBV Arts. 28/60 y Ley de Infogobierno. Los recaudos del adjunto fueron anonimizados en SHIELD y rehidratados desde EphemeralVault.',
       policyStatus: 'CLEAN',
       explica: {
         recommendation: 'PRIORIDAD_ALTA',
@@ -236,10 +247,17 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
   ]);
 
   const [inputValue, setInputValue] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<ChatTurn[]>([]);
+  const [activeDocumentContext, setActiveDocumentContext] =
+    useState<ActiveDocumentSession | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Por defecto el contexto SHIELD y el desglose SHAP vienen minimizados para no saturar la vista
+  const [expandedShieldMap, setExpandedShieldMap] = useState<Record<string, boolean>>({});
+  const [expandedShapMap, setExpandedShapMap] = useState<Record<string, boolean>>({});
   const [showMaskedAuditMap, setShowMaskedAuditMap] = useState<Record<string, boolean>>({});
   const [selectedMessageForOverride, setSelectedMessageForOverride] = useState<string | null>(null);
   const [overrideText, setOverrideText] = useState('');
@@ -250,11 +268,15 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const msgCounterRef = useRef<number>(10);
 
+  // Alias compatible con setFile(null)
+  const setFile = setSelectedFile;
+
   /**
-   * Zero-PII en RAM del cliente: sobrescribe con 0x00 cualquier buffer temporal de archivo
-   * y limpia agresivamente `setFile(null)` y los inputs del DOM.
+   * Limpia exclusivamente el archivo pendiente del selector (`setSelectedFile(null)`)
+   * para permitir preguntas de seguimiento sin re-enviar el binario.
    */
   const purgeAttachmentBuffers = useCallback(() => {
+    setSelectedFile(null);
     setFile(null);
     if (rawBufferRef.current) {
       rawBufferRef.current.fill(0);
@@ -264,12 +286,21 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, []);
+  }, [setFile]);
 
-  // Destrucción criptográfica de buffers y cancelación de streams al desmontar el componente
+  const handleClearSessionMemory = useCallback(() => {
+    purgeAttachmentBuffers();
+    setActiveDocumentContext(null);
+    setConversationHistory([]);
+    onNotify?.('Contexto documental e historial en RAM purgados.');
+  }, [purgeAttachmentBuffers, onNotify]);
+
+  // Destrucción criptográfica total al desmontar el componente
   useEffect(() => {
     return () => {
-      setFile(null);
+      setSelectedFile(null);
+      setConversationHistory([]);
+      setActiveDocumentContext(null);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -290,21 +321,21 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setAttachmentError(null);
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+    const chosenFile = e.target.files?.[0];
+    if (!chosenFile) return;
 
-    if (selectedFile.size === 0) {
+    if (chosenFile.size === 0) {
       setAttachmentError('El archivo seleccionado está vacío.');
       purgeAttachmentBuffers();
       return;
     }
-    if (selectedFile.size > MAX_CLIENT_ATTACHMENT_BYTES) {
+    if (chosenFile.size > MAX_CLIENT_ATTACHMENT_BYTES) {
       setAttachmentError('El archivo supera el límite soberano de 100 MB.');
       purgeAttachmentBuffers();
       return;
     }
 
-    const lowerName = selectedFile.name.toLowerCase();
+    const lowerName = chosenFile.name.toLowerCase();
     const validExt =
       lowerName.endsWith('.txt') ||
       lowerName.endsWith('.csv') ||
@@ -320,7 +351,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
 
     try {
       const inferredMime =
-        selectedFile.type ||
+        chosenFile.type ||
         (lowerName.endsWith('.csv')
           ? 'text/csv'
           : lowerName.endsWith('.pdf')
@@ -329,12 +360,12 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
           ? 'application/json'
           : 'text/plain');
 
-      const shaHex = await computeFileSha256InStream(selectedFile);
-      setFile(selectedFile);
+      const shaHex = await computeFileSha256InStream(chosenFile);
+      setSelectedFile(chosenFile);
       setPendingAttachment({
-        fileName: selectedFile.name,
+        fileName: chosenFile.name,
         mimeType: inferredMime,
-        sizeBytes: selectedFile.size,
+        sizeBytes: chosenFile.size,
         sha256Hex: shaHex,
       });
     } catch {
@@ -355,38 +386,34 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       type: 'text/plain',
     });
     const shaHex = await computeFileSha256InStream(demoFile);
-    setFile(demoFile);
+    setSelectedFile(demoFile);
     setPendingAttachment({
       fileName: demoFile.name,
       mimeType: 'text/plain',
       sizeBytes: demoFile.size,
       sha256Hex: shaHex,
     });
-    if (!inputValue.trim()) {
-      setInputValue(
-        'Analiza el documento adjunto y verifica la prioridad del expediente para V-18660505.'
-      );
-    }
-    onNotify?.('Adjunto cargado en stream efímero RAM (listo para Map-Reduce y SHIELD).');
+    onNotify?.('Adjunto cargado en RAM (puede enviarlo directamente o añadir una instrucción).');
   };
 
   const handleSendMessage = async (overridePrompt?: string) => {
     const rawPrompt = (overridePrompt !== undefined ? overridePrompt : inputValue).trim();
     const attachmentToSend = pendingAttachment;
-    const fileToSend = file;
+    const fileToSend = selectedFile;
 
+    // Regla Directriz 1: válido siempre que exista prompt != "" O archivo adjunto
     if ((!rawPrompt && !attachmentToSend && !fileToSend) || isProcessing) return;
 
-    const effectivePrompt =
-      rawPrompt || `Analizar documento institucional adjunto (${attachmentToSend?.fileName}).`;
+    // Caso C: si solo hay archivo sin prompt, inyectar el prompt de auditoría por defecto
+    const effectivePrompt = rawPrompt || DEFAULT_ATTACHMENT_PROMPT;
 
-    // Limpieza inmediata del archivo (`setFile(null)`) y buffers de memoria antes de transmitir
+    // Limpiar inmediatamente el archivo pendiente del selector (`setSelectedFile(null)`)
+    // para que el siguiente turno no quede bloqueado ni re-envíe el binario
     setInputValue('');
     purgeAttachmentBuffers();
     setAttachmentError(null);
     setIsProcessing(true);
 
-    // Sincronizar token efímero exclusivamente desde window.__ADUANA_TOKEN__ en RAM
     const memToken = readEphemeralWindowToken();
     if (memToken) {
       api.setApiToken(memToken);
@@ -407,6 +434,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
         ? await api.streamChatAttachment({
             file: fileToSend,
             prompt: effectivePrompt,
+            history: conversationHistory.slice(-6),
             citizen_cedula: 'V-12345678',
             user_role: 'analista',
             action: 'CHAT_IA_STREAM_UPLOAD',
@@ -415,6 +443,10 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
           })
         : await api.sendChatMessage({
             prompt: effectivePrompt,
+            history: conversationHistory.slice(-6),
+            active_document_context: activeDocumentContext?.maskedSummary ?? null,
+            active_document_name: activeDocumentContext?.fileName ?? null,
+            active_document_sha256: activeDocumentContext?.sha256 ?? null,
             citizen_cedula: 'V-12345678',
             user_role: 'analista',
             action: 'CHAT_IA_CONSULTA',
@@ -423,13 +455,31 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
           });
 
       const isBlocked = res.policy_status !== 'CLEAN';
+      const maskedPreview =
+        res.masked_prompt ?? '[ENTRADA BLOQUEADA POR GUARDIÁN SOBERANO]';
+
+      // Actualizar memoria conversacional multi-turno en RAM y contexto documental activo
+      if (!isBlocked) {
+        if (res.document_context_masked && (fileToSend || attachmentToSend)) {
+          setActiveDocumentContext({
+            fileName: res.file_name_sanitized || attachmentToSend?.fileName || 'documento.pdf',
+            sha256: res.file_sha256,
+            maskedSummary: res.document_context_masked,
+          });
+        }
+        setConversationHistory((prev) => [
+          ...prev.slice(-10),
+          { role: 'user', masked_content: maskedPreview },
+          { role: 'assistant', masked_content: res.sanitized_response.slice(0, 500) },
+        ]);
+      }
 
       const userMessage: Message = {
         id: userMsgId,
         sender: 'user',
         timestamp: timeString,
         content: effectivePrompt,
-        maskedContent: res.masked_prompt ?? '[ENTRADA BLOQUEADA POR GUARDIÁN SOBERANO]',
+        maskedContent: maskedPreview,
         piiCount: res.pii_count,
         detectedTypes: res.detected_types,
         rifVerified: res.rif_mod11_verified,
@@ -548,6 +598,14 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
     onNotify?.('Human Override registrado con éxito. Justificación sellada en el Ledger.');
   };
 
+  const toggleShieldPreview = (msgId: string) => {
+    setExpandedShieldMap((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
+  const toggleShapBreakdown = (msgId: string) => {
+    setExpandedShapMap((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
   const toggleAuditView = (msgId: string) => {
     setShowMaskedAuditMap((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   };
@@ -566,7 +624,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Nexus IA — Asistente Soberano con Adjuntos Zero-Trust
+                  Nexus IA — Analista Auditor Soberano Multimodal
                 </h1>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -578,7 +636,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                 <strong className="text-slate-700 dark:text-slate-200">
                   {hasEphemeralWindowToken ? 'window.__ADUANA_TOKEN__ (Activo)' : 'Enclave RAM'}
                 </strong>{' '}
-                · Adjuntos: TXT, CSV, PDF, JSON (&le; 100 MB Stream Efímero) · Cero localStorage/disco
+                · Adjuntos: PDF, TXT, CSV, JSON (&le; 100 MB Stream Efímero) · Memoria Multi-Turno en RAM
               </p>
             </div>
           </div>
@@ -599,14 +657,14 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
       {/* 2. Área de Conversación */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col h-[640px] justify-between overflow-hidden">
         {/* Contenedor de Mensajes con Scroll */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
           {messages.map((msg) => (
             <div key={msg.id} className="space-y-2">
               {msg.sender === 'user' ? (
                 <div className="flex items-start justify-end gap-3">
-                  <div className="max-w-2xl space-y-2 text-right">
+                  <div className="max-w-2xl space-y-1.5 text-right">
                     {/* Burbuja de Texto Crudo + Chip de Archivo Adjunto */}
-                    <div className="inline-block text-left p-4 rounded-2xl rounded-tr-none bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs sm:text-sm leading-relaxed shadow-xs space-y-2">
+                    <div className="inline-block text-left p-3.5 rounded-2xl rounded-tr-none bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs sm:text-sm leading-relaxed shadow-xs space-y-2">
                       <p>{msg.content}</p>
                       {msg.attachmentMeta && (
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[11px] font-mono text-indigo-700 dark:text-indigo-300">
@@ -615,50 +673,64 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                           <span>({msg.attachmentMeta.sizeBytes} bytes)</span>
                           {msg.attachmentMeta.sha256 && (
                             <span className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-900 text-slate-600 dark:text-slate-400">
-                              SHA-256: {msg.attachmentMeta.sha256.slice(0, 14)}…
+                              SHA-256: {msg.attachmentMeta.sha256.slice(0, 12)}…
                             </span>
                           )}
                         </div>
                       )}
                     </div>
 
-                    {/* Transparencia de Perímetro Soberano SHIELD */}
-                    <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/50 rounded-xl p-3 text-left space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-mono text-indigo-900 dark:text-indigo-300 font-bold">
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-[#3525cd] dark:text-indigo-400" />
-                          <span>Perímetro SHIELD (Prompt + Adjunto Anonimizados en RAM)</span>
-                        </span>
-                        {msg.latencyMs !== undefined && (
-                          <span className="text-slate-500 dark:text-slate-400 font-normal">
-                            Latencia: <strong>{msg.latencyMs.toFixed(1)} ms</strong>
+                    {/* Barra Compacta / Minimizada de Perímetro SHIELD */}
+                    <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/50 rounded-xl px-3 py-2 text-left space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-indigo-900 dark:text-indigo-300">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <ShieldCheck className="w-3.5 h-3.5 text-[#3525cd] dark:text-indigo-400 shrink-0" />
+                          <span className="font-bold">SHIELD Zero-PII</span>
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 text-[10px] font-semibold">
+                            {typeof msg.piiCount === 'number' ? `${msg.piiCount} PII enmascaradas` : ' Protegido'}
                           </span>
-                        )}
-                      </div>
-
-                      <p className="text-xs font-mono text-indigo-950 dark:text-indigo-200 bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/40 break-words whitespace-pre-wrap">
-                        {msg.maskedContent}
-                      </p>
-
-                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] font-mono">
-                        <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-semibold">
-                          Zero-Plaintext-PII al LLM y Disco
-                        </span>
-                        {typeof msg.piiCount === 'number' && (
-                          <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                            PII Enmascaradas: {msg.piiCount}
-                          </span>
-                        )}
-                        {msg.detectedTypes &&
-                          msg.detectedTypes.map((type) => (
-                            <span
-                              key={type}
-                              className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300"
-                            >
-                              Detectado: {type}
+                          {msg.latencyMs !== undefined && (
+                            <span className="text-slate-500 dark:text-slate-400 text-[10px]">
+                              {msg.latencyMs.toFixed(1)} ms
                             </span>
-                          ))}
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleShieldPreview(msg.id)}
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#3525cd] dark:text-indigo-400 hover:underline"
+                        >
+                          <span>
+                            {expandedShieldMap[msg.id] ? 'Ocultar extracto' : 'Ver extracto SHIELD'}
+                          </span>
+                          {expandedShieldMap[msg.id] ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
                       </div>
+
+                      {expandedShieldMap[msg.id] && (
+                        <div className="space-y-1.5 pt-1 border-t border-indigo-200/60 dark:border-indigo-900/50">
+                          <p className="text-[11px] font-mono text-indigo-950 dark:text-indigo-200 bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/40 break-words whitespace-pre-wrap">
+                            {msg.maskedContent}
+                          </p>
+                          {msg.detectedTypes && msg.detectedTypes.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                              {msg.detectedTypes.map((type) => (
+                                <span
+                                  key={type}
+                                  className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300"
+                                >
+                                  Detectado: {type}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -667,26 +739,24 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                   </div>
                 </div>
               ) : (
-                /* Mensaje de la IA Asistente Institucional */
+                /* Mensaje del Analista Auditor Soberano (IA) */
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-[#3525cd] dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center shrink-0 shadow-xs">
                     <Bot className="w-4 h-4" />
                   </div>
 
-                  <div className="max-w-2xl space-y-3">
-                    {/* Aviso Mandatorio de IA (Art. 60 CRBV) */}
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 text-[11px] font-medium text-amber-800 dark:text-amber-300 shadow-xs">
-                      <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <div className="max-w-2xl space-y-2.5">
+                    {/* Aviso Mandatorio Compacto (Art. 60 CRBV) */}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 text-[10px] font-medium text-amber-800 dark:text-amber-300">
+                      <Info className="w-3 h-3 text-amber-600 shrink-0" />
                       <span>
-                        <strong>Aviso Oficial (Art. 60 CRBV):</strong> Respuesta orientativa
-                        asistida por IA. La decisión administrativa final es atribución exclusiva
-                        del funcionario público.
+                        <strong>Art. 60 CRBV:</strong> Dictamen orientativo asistido por IA. Decisión final exclusiva del funcionario.
                       </span>
                     </div>
 
                     {/* Contenido de Respuesta (Rehidratada en GUARD-OUT vs Sello Anonimizado) */}
                     <div
-                      className={`p-4 rounded-2xl rounded-tl-none border text-xs sm:text-sm leading-relaxed shadow-xs space-y-2 ${
+                      className={`p-3.5 rounded-2xl rounded-tl-none border text-xs sm:text-sm leading-relaxed shadow-xs space-y-2 ${
                         msg.isBlocked
                           ? 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200'
                           : 'bg-white dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-slate-100'
@@ -699,11 +769,11 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                       </p>
 
                       {!msg.isBlocked && msg.sanitizedAuditResponse && (
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-700/70 flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                        <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700/70 flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400">
                           <span>
                             {showMaskedAuditMap[msg.id]
-                              ? 'Vista: Salida Anonimizada (Sellada en Ledger)'
-                              : 'Vista: Rehidratada por GUARD-OUT (EphemeralVault zeroized)'}
+                              ? 'Vista: Sello Anonimizado (Ledger)'
+                              : 'Vista: Rehidratada (EphemeralVault zeroized)'}
                           </span>
                           <button
                             type="button"
@@ -721,40 +791,51 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                       )}
                     </div>
 
-                    {/* Tarjeta de Explicabilidad Vinculante (EXPLICA) */}
+                    {/* Tarjeta Compacta de Explicabilidad Vinculante (EXPLICA) */}
                     {msg.explica && (
-                      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 space-y-3 shadow-xs">
-                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2.5">
+                      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <Scale className="w-4 h-4 text-[#3525cd] dark:text-indigo-400" />
-                            <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
-                              Dictamen Explicable (White-Box AI)
+                            <Scale className="w-3.5 h-3.5 text-[#3525cd] dark:text-indigo-400" />
+                            <span className="text-[11px] font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
+                              EXPLICA
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                                msg.explica.recommendation === 'PRIORIDAD_ALTA'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300'
+                                  : msg.explica.recommendation === 'REVISION_ESTANDAR'
+                                  ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300'
+                                  : 'bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300'
+                              }`}
+                            >
+                              {msg.explica.recommendation} ({msg.explica.score}%)
                             </span>
                           </div>
 
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold ${
-                              msg.explica.recommendation === 'PRIORIDAD_ALTA'
-                                ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300'
-                                : msg.explica.recommendation === 'REVISION_ESTANDAR'
-                                ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300'
-                                : 'bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300'
-                            }`}
+                          <button
+                            type="button"
+                            onClick={() => toggleShapBreakdown(msg.id)}
+                            className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-[#3525cd] dark:text-indigo-400 hover:underline"
                           >
-                            {msg.explica.recommendation} ({msg.explica.score}%)
-                          </span>
+                            <span>
+                              {expandedShapMap[msg.id] ? 'Ocultar SHAP' : 'Ver pesos SHAP'}
+                            </span>
+                            {expandedShapMap[msg.id] ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
                         </div>
 
-                        {/* Desglose de Factores SHAP Lineales */}
-                        <div className="space-y-1.5">
-                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                            Contribución Lineal SHAP Determinista (φ_j = β_j · (x_j - μ_j)):
-                          </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {/* Desglose de Factores SHAP Lineales (Colapsable) */}
+                        {expandedShapMap[msg.id] && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700">
                             {msg.explica.shapFactors.map((factor, idx) => (
                               <div
                                 key={idx}
-                                className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-[11px] flex items-center justify-between"
+                                className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-[10px] flex items-center justify-between"
                               >
                                 <span className="text-slate-700 dark:text-slate-300 font-medium truncate mr-2">
                                   {factor.name}
@@ -771,56 +852,48 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                               </div>
                             ))}
                           </div>
-                        </div>
+                        )}
 
                         {/* Acciones de Decisión Vinculante (Human-in-the-Loop) */}
                         <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 text-xs font-mono">
-                            <span className="text-slate-500">Estado de Decisión:</span>
+                          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                            <span className="text-slate-500">Decisión:</span>
                             <span className="font-bold text-[#3525cd] dark:text-indigo-400">
-                              {msg.explica.humanDecision === 'PENDIENTE' &&
-                                '⏳ Pendiente por Funcionario'}
-                              {msg.explica.humanDecision === 'APROBADO' && '✅ Aprobado en Firme'}
-                              {msg.explica.humanDecision === 'REVISAR' && '🔍 Enviar a Revisión'}
-                              {msg.explica.humanDecision === 'OVERRIDE' &&
-                                '⚖️ Modificado con Override'}
+                              {msg.explica.humanDecision === 'PENDIENTE' && '⏳ Pendiente'}
+                              {msg.explica.humanDecision === 'APROBADO' && '✅ Aprobado'}
+                              {msg.explica.humanDecision === 'REVISAR' && '🔍 En Revisión'}
+                              {msg.explica.humanDecision === 'OVERRIDE' && '⚖️ Override'}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => handleActionDecision(msg.id, 'APROBADO')}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors"
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors"
                             >
                               Aprobar
                             </button>
                             <button
                               type="button"
                               onClick={() => handleActionDecision(msg.id, 'REVISAR')}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 transition-colors"
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 transition-colors"
                             >
                               Revisar
                             </button>
                             <button
                               type="button"
                               onClick={() => handleOpenOverrideModal(msg.id)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#3525cd] dark:border-indigo-400 text-[#3525cd] dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors"
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[#3525cd] dark:border-indigo-400 text-[#3525cd] dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors"
                             >
-                              Modificar (Override)
+                              Override
                             </button>
                           </div>
                         </div>
 
-                        {/* Justificación de Override Registrada */}
                         {msg.explica.overrideJustification && (
-                          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs space-y-1">
-                            <span className="font-mono font-bold text-amber-900 dark:text-amber-300">
-                              Justificación Vinculante de Override (&ge; 20 chars):
-                            </span>
-                            <p className="text-amber-950 dark:text-amber-200 font-mono">
-                              "{msg.explica.overrideJustification}"
-                            </p>
+                          <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-[11px] font-mono text-amber-950 dark:text-amber-200">
+                            <strong>Override:</strong> "{msg.explica.overrideJustification}"
                           </div>
                         )}
                       </div>
@@ -828,19 +901,17 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
 
                     {/* Badge de Trazabilidad Criptográfica en Ledger */}
                     {msg.ledgerReceipt && (
-                      <div className="inline-flex items-center gap-2 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-600 dark:text-slate-300">
-                        <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[11px] font-mono text-slate-600 dark:text-slate-300">
+                        <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
                         <span>
                           Recibo: <strong>{msg.ledgerReceipt.code}</strong>
                         </span>
                         <span>·</span>
-                        <span className="text-slate-400">
-                          Bloque #{msg.ledgerReceipt.blockIndex}
-                        </span>
+                        <span className="text-slate-400">Bloque #{msg.ledgerReceipt.blockIndex}</span>
                         <span>·</span>
                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
-                          Sello SHA-256 + HMAC Válido
+                          SHA-256 + HMAC
                         </span>
                       </div>
                     )}
@@ -859,7 +930,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
               <div className="p-3 rounded-2xl rounded-tl-none bg-slate-100 dark:bg-slate-800 text-xs font-mono text-slate-500 dark:text-slate-400 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#3525cd] animate-ping" />
                 <span>
-                  SHIELD + GUARD-IN en RAM · Anonimizando adjunto y verificando Canary HMAC...
+                  Analista Auditor Soberano procesando en RAM (SHIELD + GUARD-IN + Gemini)...
                 </span>
               </div>
             </div>
@@ -868,9 +939,31 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* 3. Barra de Entrada, Adjuntos y Presets */}
-        <div className="p-4 bg-slate-50/80 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 space-y-3">
-          {/* Chip de Archivo Adjunto en Memoria Efímera */}
+        {/* 3. Barra de Entrada, Contexto Activo Multi-Turno y Presets */}
+        <div className="p-4 bg-slate-50/80 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+          {/* Indicador de Contexto Documental Activo en RAM para Seguimiento sin Re-adjuntar */}
+          {activeDocumentContext && !pendingAttachment && (
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-[11px] font-mono">
+              <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-300 truncate">
+                <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>
+                  Contexto activo en RAM: <strong>{activeDocumentContext.fileName}</strong> (puede
+                  hacer preguntas de seguimiento sin volver a adjuntar)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSessionMemory}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-semibold shrink-0"
+                title="Purgar contexto documental de la sesión"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Limpiar</span>
+              </button>
+            </div>
+          )}
+
+          {/* Chip de Archivo Adjunto Pendiente de Envío */}
           {pendingAttachment && (
             <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-xs font-mono">
               <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 truncate">
@@ -880,14 +973,14 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
                   ({pendingAttachment.sizeBytes} B · {pendingAttachment.mimeType})
                 </span>
                 <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 text-[10px]">
-                  Buffer en RAM (se purga al enviar)
+                  Listo para auditar (con o sin texto adicional)
                 </span>
               </div>
               <button
                 type="button"
                 onClick={purgeAttachmentBuffers}
                 className="p-1 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900 text-slate-600 dark:text-slate-300"
-                title="Purgar adjunto de RAM"
+                title="Quitar archivo seleccionado"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -957,7 +1050,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
             </button>
           </div>
 
-          {/* Formulario de Entrada con Adjunto */}
+          {/* Formulario de Entrada Multimodal Flexible */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -978,7 +1071,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
-              title="Adjuntar documento (.txt, .csv, .pdf, .json)"
+              title="Adjuntar documento (.pdf, .txt, .csv, .json)"
               className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
             >
               <Paperclip className="w-4 h-4" />
@@ -990,13 +1083,19 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
               spellCheck={false}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Escriba su consulta o adjunte un documento (.txt, .csv, .pdf) — PII protegida en RAM..."
+              placeholder={
+                pendingAttachment
+                  ? 'Opcional: escriba una instrucción o presione Enviar para auditar el documento...'
+                  : activeDocumentContext
+                  ? `Haga una pregunta de seguimiento sobre ${activeDocumentContext.fileName} o escriba otra consulta...`
+                  : 'Escriba su consulta o adjunte un documento (.pdf, .txt, .csv) — PII protegida en RAM...'
+              }
               disabled={isProcessing}
               className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-[#3525cd] dark:focus:ring-indigo-500 shadow-2xs"
             />
             <button
               type="submit"
-              disabled={isProcessing || (!inputValue.trim() && !pendingAttachment)}
+              disabled={isProcessing || (!inputValue.trim() && !pendingAttachment && !selectedFile)}
               className="px-4 py-2.5 rounded-xl bg-[#3525cd] hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-xs transition-colors shrink-0"
             >
               <Send className="w-4 h-4" />

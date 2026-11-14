@@ -158,8 +158,27 @@ export interface SessionStatusResponse {
   user: LoginUserOut;
 }
 
+export interface AttachmentPayload {
+  file_name: string;
+  file_mime_type?: string;
+  file_content_b64?: string | null;
+  file_sha256?: string | null;
+  size_bytes?: number;
+}
+
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  masked_content: string;
+  content?: string;
+}
+
 export interface ChatIAUploadRequest {
-  prompt: string;
+  prompt?: string;
+  attachment?: AttachmentPayload | null;
+  history?: ChatTurn[];
+  active_document_context?: string | null;
+  active_document_name?: string | null;
+  active_document_sha256?: string | null;
   citizen_cedula?: string;
   user_role?: 'analista' | 'administrador' | 'auditor';
   action?: string;
@@ -176,7 +195,8 @@ export interface ChatIAUploadRequest {
 
 export interface ChatIAStreamUploadParams {
   file: File;
-  prompt: string;
+  prompt?: string;
+  history?: ChatTurn[];
   citizen_cedula?: string;
   user_role?: 'analista' | 'administrador' | 'auditor';
   action?: string;
@@ -210,6 +230,7 @@ export interface ChatIAResponse {
   chunks_processed?: number;
   user_role?: string;
   audit_action?: string;
+  document_context_masked?: string | null;
   is_offline_fallback?: boolean;
 }
 

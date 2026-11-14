@@ -9,10 +9,12 @@
  */
 
 import type {
+  AttachmentPayload,
   BenchmarkResponse,
   ChatIAResponse,
   ChatIAStreamUploadParams,
   ChatIAUploadRequest,
+  ChatTurn,
   GatewayProcessRequest,
   GatewayProcessResponse,
   HealthResponse,
@@ -26,10 +28,12 @@ import type {
 } from '../types/api';
 
 export type {
+  AttachmentPayload,
   BenchmarkResponse,
   ChatIAResponse,
   ChatIAStreamUploadParams,
   ChatIAUploadRequest,
+  ChatTurn,
   GatewayProcessRequest,
   GatewayProcessResponse,
   HealthResponse,
@@ -310,16 +314,23 @@ export class AduanaApiClient {
       params.signal.addEventListener('abort', onParentAbort, { once: true });
     }
 
+    const effectivePrompt =
+      (params.prompt || '').trim() ||
+      'Analiza exhaustivamente el documento adjunto, resume sus hallazgos clave, verifica su cumplimiento normativo y emite un dictamen técnico.';
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/octet-stream',
       'X-Aduana-Token': activeToken,
-      'X-Chat-Prompt': encodeURIComponent(params.prompt.trim()),
+      'X-Chat-Prompt': encodeURIComponent(effectivePrompt),
       'X-File-Name': encodeURIComponent(params.file.name || 'adjunto.txt'),
       'X-File-Mime': params.file.type || 'text/plain',
       'X-Citizen-Cedula': (params.citizen_cedula || 'V-12345678').trim(),
       'X-User-Role': params.user_role || 'analista',
       'X-Audit-Action': params.action || 'CHAT_IA_STREAM_UPLOAD',
       'X-Consent-Granted': 'true',
+      ...(params.history && params.history.length > 0
+        ? { 'X-Chat-History': encodeURIComponent(JSON.stringify(params.history.slice(-6))) }
+        : {}),
       ...(params.client_file_sha256 ? { 'X-Client-File-Sha256': params.client_file_sha256 } : {}),
       ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
     };
@@ -594,15 +605,29 @@ export class AduanaApiClient {
     let attachmentText = '';
     let fileBytes = 0;
     let fileSha = null as string | null;
+    const effFileName = payload.attachment?.file_name ?? payload.file_name ?? null;
+    const effB64 = payload.attachment?.file_content_b64 ?? payload.file_content_b64 ?? null;
 
-    if (payload.file_content_b64 && payload.file_name) {
+    if (effB64 && effFileName) {
       try {
-        const cleanB64 = payload.file_content_b64.includes(',')
-          ? payload.file_content_b64.split(',')[1]
-          : payload.file_content_b64;
+        const cleanB64 = effB64.includes(',') ? effB64.split(',')[1] : effB64;
         const bin = atob(cleanB64);
         fileBytes = bin.length;
-        attachmentText = bin;
+        if (bin.startsWith('%PDF-') || effFileName.toLowerCase().endsWith('.pdf')) {
+          const litMatches = bin.match(/\(([^()\\]*(?:\\.[^()\\]*)*)\)/g) || [];
+          const cleanParts = litMatches
+            .map((s) => s.slice(1, -1).replace(/\\([0-7]{1,3})/g, ' ').trim())
+            .filter(
+              (s) =>
+                s.length > 2 &&
+                !/Mozilla\/5\.0|HeadlessChrome|Skia\/PDF|AppleWebKit|Creator|Producer/i.test(s)
+            );
+          attachmentText =
+            cleanParts.join(' ').slice(0, 1200) ||
+            `Documento PDF auditado (${effFileName}, ${fileBytes} bytes).`;
+        } else {
+          attachmentText = bin.slice(0, 1200);
+        }
         let hashAcc = 0x811c9dc5;
         for (let i = 0; i < bin.length; i++) {
           hashAcc ^= bin.charCodeAt(i);
@@ -614,9 +639,15 @@ export class AduanaApiClient {
       }
     }
 
+    const effectivePrompt =
+      (payload.prompt || '').trim() ||
+      'Analiza exhaustivamente el documento adjunto, resume sus hallazgos clave, verifica su cumplimiento normativo y emite un dictamen técnico.';
+    const activeDocCtx = (payload.active_document_context || '').trim();
     const combined = attachmentText
-      ? `${payload.prompt.trim()}\n[DOCUMENTO_ADJUNTO nombre=${payload.file_name}]:\n${attachmentText}`
-      : payload.prompt.trim();
+      ? `${effectivePrompt}\n[Adjunto ${effFileName}]: ${attachmentText}`
+      : activeDocCtx
+      ? `${effectivePrompt}\n${activeDocCtx}`
+      : effectivePrompt;
 
     const lower = combined.toLowerCase();
     const isAttack =
@@ -715,18 +746,22 @@ export class AduanaApiClient {
     const finalDecision = payload.human_decision ?? modelRec;
     const isOverride = Boolean(payload.human_decision && payload.human_decision !== modelRec);
 
+    const uiMaskedPreview = effFileName
+      ? `${effectivePrompt.slice(0, 140)}\n[Adjunto ${effFileName}]: ${masked.slice(0, 110)}...`
+      : masked.slice(0, 220);
+
     return {
       request_id: `req-${reqHex}`,
       timestamp_utc: nowIso,
       policy_status: 'CLEAN',
-      masked_prompt: masked,
+      masked_prompt: uiMaskedPreview,
       sanitized_response: sanitizedResp,
       restored_response: restoredResp,
       ai_generated_notice: true,
       pii_count: piiCount,
       detected_types: detected,
       rif_mod11_verified: detected.includes('RIF') ? true : null,
-      file_name_sanitized: payload.file_name ?? null,
+      file_name_sanitized: effFileName,
       file_sha256: fileSha,
       file_size_bytes: fileBytes,
       model_recommendation: modelRec,
@@ -741,6 +776,7 @@ export class AduanaApiClient {
       chunks_processed: 1,
       user_role: payload.user_role || 'analista',
       audit_action: payload.action || 'CHAT_IA_STREAM_UPLOAD',
+      document_context_masked: attachmentText ? masked.slice(0, 1200) : activeDocCtx || null,
       is_offline_fallback: true,
     };
   }

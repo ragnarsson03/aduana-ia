@@ -424,13 +424,15 @@ def test_chat_stream_100mb_limit_mapreduce_and_ledger_audit_trace_only(
         assert data["user_role"] == "auditor"
         assert data["audit_action"] == "CHAT_IA_STREAM_UPLOAD"
 
-        # Map-Reduce comprimió >320 KB a un contexto seguro para el LLM (< 8000 chars)
-        assert len(data["masked_prompt"]) <= 8000
-        assert "[CEDULA_1]" in data["masked_prompt"]
-        assert "[RIF_1]" in data["masked_prompt"]
-        assert "[PHONE_1]" in data["masked_prompt"]
+        # Vista minimizada para el frontend (<= 280 chars) + contexto documental en RAM
+        assert len(data["masked_prompt"]) <= 280
+        assert data["document_context_masked"] is not None
+        assert "[CEDULA_1]" in data["document_context_masked"]
+        assert "[RIF_1]" in data["document_context_masked"]
+        assert "[PHONE_1]" in data["document_context_masked"]
         assert "V-18660505" not in data["masked_prompt"]
         assert "J-12345678-4" not in data["masked_prompt"]
+        assert "V-18660505" not in data["document_context_masked"]
 
         # Rehidratación en GUARD-OUT y zeroize en EphemeralVault
         assert "V-18660505" in data["restored_response"]
@@ -481,5 +483,100 @@ def test_stream_disconnect_destroys_buffers_and_zeroizes_vault() -> None:
     assert vault.active_sessions == 0
     with pytest.raises(VaultSessionNotFoundError):
         vault.get_map("req-disconnect-1")
+
+
+def test_nexus_ia_multimodal_three_cases_and_clean_pdf_extraction(
+    client: TestClient,
+) -> None:
+    """Valida los 3 casos multimodales: (1) solo prompt, (2) archivo PDF/TXT con o sin prompt,
+    y (3) pregunta de seguimiento multi-turno sin re-adjuntar el documento."""
+    # Caso 1: Solo texto (sin archivo adjunto)
+    r_text_only = client.post(
+        "/api/v1/chat/message",
+        headers=TOKEN_HEADERS,
+        json={
+            "prompt": "Consulta rápida de solvencia aduanal para V-18660505 y RIF J-12345678-4.",
+        },
+    )
+    assert r_text_only.status_code == 200, r_text_only.text
+    d1 = r_text_only.json()
+    assert d1["policy_status"] == "CLEAN"
+    assert "[CEDULA_1]" in d1["masked_prompt"]
+    assert "V-18660505" not in d1["masked_prompt"]
+    assert "V-18660505" in d1["restored_response"]
+
+    # Caso 2A: PDF real con CMap ToUnicode + ASCII85Decode (ADR-002-SDD-Backend-Architecture.pdf)
+    real_pdf_path = Path("docs/ADR-002-SDD-Backend-Architecture.pdf")
+    if real_pdf_path.exists():
+        real_pdf_b64 = base64.b64encode(real_pdf_path.read_bytes()).decode("ascii")
+        r_real_pdf = client.post(
+            "/api/v1/chat/message",
+            headers=TOKEN_HEADERS,
+            json={
+                "prompt": "",  # Caso C: Solo archivo sin prompt -> usa DEFAULT_ATTACHMENT_PROMPT
+                "attachment": {
+                    "file_name": "ADR-002-SDD-Backend-Architecture.pdf",
+                    "file_mime_type": "application/pdf",
+                    "file_content_b64": real_pdf_b64,
+                },
+            },
+        )
+        assert r_real_pdf.status_code == 200, r_real_pdf.text
+        d_real = r_real_pdf.json()
+        assert d_real["policy_status"] == "CLEAN"
+        assert "%PDF-1.4" not in (d_real["masked_prompt"] or "")
+        assert "%PDF-1.4" not in (d_real["document_context_masked"] or "")
+        assert "1 0 obj" not in (d_real["document_context_masked"] or "")
+        assert "Aduana IA" in (d_real["document_context_masked"] or "")
+
+    # Caso 2B: PDF estilo Chrome/Skia con metadatos HeadlessChrome + vulnerabilidades en página 2
+    skia_pdf = _make_pdf_bytes(
+        "Auditoria SIS-UNETI Pagina 2: Vulnerabilidad critica SQLi y exposicion de "
+        "credenciales del responsable V-18660505 en servidor RIF J-12345678-4."
+    )
+    r_turn1 = client.post(
+        "/api/v1/chat/message",
+        headers=TOKEN_HEADERS,
+        json={
+            "prompt": "",  # Solo archivo sin prompt
+            "attachment": {
+                "file_name": "Auditoria-SIS-UNETI.pdf",
+                "file_mime_type": "application/pdf",
+                "file_content_b64": base64.b64encode(skia_pdf).decode("ascii"),
+            },
+        },
+    )
+    assert r_turn1.status_code == 200, r_turn1.text
+    d_turn1 = r_turn1.json()
+    assert d_turn1["policy_status"] == "CLEAN"
+    assert len(d_turn1["masked_prompt"]) <= 280
+    assert "%PDF-1.4" not in d_turn1["masked_prompt"]
+    assert d_turn1["document_context_masked"] is not None
+    assert "[CEDULA_1]" in d_turn1["document_context_masked"]
+    assert "V-18660505" not in d_turn1["document_context_masked"]
+
+    # Caso 3: Pregunta de seguimiento en el Turno 2 SIN re-adjuntar el archivo
+    r_turn2 = client.post(
+        "/api/v1/chat/message",
+        headers=TOKEN_HEADERS,
+        json={
+            "prompt": "¿Qué vulnerabilidades encontraste en la página 2 para V-18660505?",
+            "history": [
+                {"role": "user", "masked_content": d_turn1["masked_prompt"]},
+                {"role": "assistant", "masked_content": d_turn1["sanitized_response"]},
+            ],
+            "active_document_context": d_turn1["document_context_masked"],
+            "active_document_name": d_turn1["file_name_sanitized"],
+            "active_document_sha256": d_turn1["file_sha256"],
+        },
+    )
+    assert r_turn2.status_code == 200, r_turn2.text
+    d_turn2 = r_turn2.json()
+    assert d_turn2["policy_status"] == "CLEAN"
+    assert len(d_turn2["masked_prompt"]) <= 280
+    assert "[CEDULA_1]" in d_turn2["masked_prompt"]
+    assert "V-18660505" not in d_turn2["masked_prompt"]
+    assert "V-18660505" in d_turn2["restored_response"]
+
 
 
