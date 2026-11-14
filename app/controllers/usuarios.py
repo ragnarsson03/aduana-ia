@@ -37,7 +37,8 @@ class UsuariosController(Controller):
     def create_user(self, request: Request, data: JSONBody[CreateUserRequest]) -> UsuarioPublic:
         state: AppState = request.app.state.aduana
         try:
-            user = state.identity.create_user(  # type: ignore[union-attr]
+            user = state.identity.create_user_as(  # type: ignore[union-attr]
+                request.scope["aduana_user"],
                 codigo_usuario=data.codigo_usuario,
                 identificador=data.identificador,
                 rol=data.rol,
@@ -50,8 +51,10 @@ class UsuariosController(Controller):
     @post("/{codigo:str}/suspender", status_code=200, sync_to_thread=True)
     def suspend(self, request: Request, codigo: FromPath[str]) -> UsuarioPublic:
         state: AppState = request.app.state.aduana
-        identity = state.identity
-        target = next((u for u in identity.list_users() if u.codigo_usuario == codigo), None)  # type: ignore[union-attr]
-        if target is None:
-            raise HTTPException(status_code=404, detail="ERR_NOT_FOUND")
-        return _public(identity.suspend_user(target.user_id))  # type: ignore[union-attr]
+        try:
+            suspended = state.identity.suspend_user_as(  # type: ignore[union-attr]
+                request.scope["aduana_user"], codigo
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="ERR_NOT_FOUND") from exc
+        return _public(suspended)

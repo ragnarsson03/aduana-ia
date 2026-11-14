@@ -8,7 +8,7 @@ from litestar import Controller, Request, post
 from litestar.params import JSONBody
 
 from app.dependencies import AppState
-from app.rbac_guards import SCOPE_USER_KEY, require_any_permission, require_permission
+from app.rbac_guards import SCOPE_USER_KEY, require_any_permission
 from app.schemas import (
     GatewayProcessRequest,
     GatewayProcessResponse,
@@ -100,7 +100,11 @@ class ShieldController(Controller):
     guards = [api_guard]
 
     # sync_to_thread: trabajo CPU, no bloquear el event loop
-    @post("/inspect", guards=[require_permission("shield:inspect")], sync_to_thread=True)
+    @post(
+        "/inspect",
+        guards=[require_any_permission("shield:inspect", "chat:ia")],  # el Chat IA usa esta ruta
+        sync_to_thread=True,
+    )
     def inspect(
         self, request: Request, data: JSONBody[ShieldInspectRequest]
     ) -> ShieldInspectResponse:

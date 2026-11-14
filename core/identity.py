@@ -24,7 +24,7 @@ from core.auth import (
 from core.context import AduanaRoleType, AuthToken, UsuarioAduana
 from core.errors import AccountLockedError, AuthenticationError, AuthorizationError
 from core.keyring import KeyRing
-from core.rbac import Permission, has_permission
+from core.rbac import Permission, can_manage_role, has_permission
 from core.rbac_db import UsuariosRepository
 
 AUTH_ERROR_MESSAGE: Final = "Credenciales inválidas."
@@ -137,6 +137,56 @@ class IdentityService:
 
     def change_role(self, user_id: str, rol: AduanaRoleType) -> UsuarioAduana:
         return self._repo.set_rol(user_id, rol)
+
+    # --- administración con control del actor (anti-escalada) ----------------------------------
+
+    def _fresh_manager(self, actor: UsuarioAduana) -> UsuarioAduana:
+        """Relee al actor (Zero-Trust: no se confía en el objeto recibido) y exige users:manage."""
+        current = self._repo.get_by_id(actor.user_id)
+        if current is None or current.estado != "ACTIVO":
+            raise AuthorizationError(FORBIDDEN_MESSAGE)
+        self.authorize(current, "users:manage")
+        return current
+
+    def create_user_as(
+        self,
+        actor: UsuarioAduana,
+        *,
+        codigo_usuario: str,
+        identificador: str,
+        rol: AduanaRoleType,
+        password: str,
+    ) -> UsuarioAduana:
+        """Alta hecha por un usuario: el rol creado debe estar dentro de sus atribuciones."""
+        manager = self._fresh_manager(actor)
+        if not can_manage_role(manager.rol, rol):
+            raise AuthorizationError(FORBIDDEN_MESSAGE)
+        return self.create_user(
+            codigo_usuario=codigo_usuario, identificador=identificador, rol=rol, password=password
+        )
+
+    def _manageable_target(self, manager: UsuarioAduana, codigo_usuario: str) -> UsuarioAduana:
+        target = next(
+            (u for u in self._repo.list_users() if u.codigo_usuario == codigo_usuario), None
+        )
+        if target is None:
+            raise LookupError("usuario inexistente")
+        if target.user_id == manager.user_id or not can_manage_role(manager.rol, target.rol):
+            raise AuthorizationError(FORBIDDEN_MESSAGE)  # ni a sí mismo ni a roles superiores
+        return target
+
+    def suspend_user_as(self, actor: UsuarioAduana, codigo_usuario: str) -> UsuarioAduana:
+        manager = self._fresh_manager(actor)
+        return self.suspend_user(self._manageable_target(manager, codigo_usuario).user_id)
+
+    def change_role_as(
+        self, actor: UsuarioAduana, codigo_usuario: str, rol: AduanaRoleType
+    ) -> UsuarioAduana:
+        manager = self._fresh_manager(actor)
+        target = self._manageable_target(manager, codigo_usuario)
+        if not can_manage_role(manager.rol, rol):
+            raise AuthorizationError(FORBIDDEN_MESSAGE)
+        return self.change_role(target.user_id, rol)
 
     # --- autorización -------------------------------------------------------------------------
 

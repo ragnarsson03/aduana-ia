@@ -45,10 +45,14 @@ def svc(repo: UsuariosRepository, keys: KeyRing) -> IdentityService:
     )
 
 
+# 6 roles (uno por rol) + 4 usuarios normales de mínimo privilegio + 2 con acceso a los chats.
+EXPECTED_USERS = 12
+
+
 def test_seed_users_shape() -> None:
-    assert isinstance(SEED_USERS, tuple) and len(SEED_USERS) == 10
+    assert isinstance(SEED_USERS, tuple) and len(SEED_USERS) == EXPECTED_USERS
     codes = [u.codigo_usuario for u in SEED_USERS]
-    assert len(set(codes)) == 10
+    assert len(set(codes)) == EXPECTED_USERS
     roles = Counter(u.rol for u in SEED_USERS)
     assert set(roles) == set(ALL_ROLES)
     assert roles["AGENTE_ADUANAL_CERTIFICADO"] == 3
@@ -64,10 +68,12 @@ def test_seed_users_shape() -> None:
         "agente.03",
         "almacen.02",
         "almacen.03",
+        "chat.analista.01",
+        "chat.analista.02",
     ):
         assert code in codes
     idents = {normalize_identifier(u.identificador) for u in SEED_USERS}
-    assert len(idents) == 10
+    assert len(idents) == EXPECTED_USERS
 
 
 def test_seed_identifiers_are_obviously_fictitious() -> None:
@@ -82,9 +88,9 @@ def test_seed_users_is_immutable() -> None:
 
 def test_seed_creates_all_and_is_idempotent(svc: IdentityService) -> None:
     created = seed_users(svc, _passwords())
-    assert len(created) == 10 and len(svc.list_users()) == 10
+    assert len(created) == EXPECTED_USERS and len(svc.list_users()) == EXPECTED_USERS
     assert seed_users(svc, _passwords()) == []
-    assert len(svc.list_users()) == 10
+    assert len(svc.list_users()) == EXPECTED_USERS
 
 
 def test_seed_skips_existing_by_codigo(svc: IdentityService) -> None:
@@ -236,7 +242,7 @@ def test_cli_seeds_and_writes_credentials_once(
         assert len(entry["password"]) >= 12
         assert entry["password"] not in captured.out + captured.err
         assert entry["identificador"] not in captured.out + captured.err
-    assert str(out) in captured.out and "10" in captured.out
+    assert str(out) in captured.out and str(EXPECTED_USERS) in captured.out
     if os.name != "nt":
         assert (out.stat().st_mode & 0o777) == 0o600
     # las credenciales escritas permiten iniciar sesión realmente
@@ -272,7 +278,7 @@ def test_cli_force_overwrites(cli: ModuleType, tmp_path: Path) -> None:
     out = tmp_path / "cred.json"
     out.write_text("{}", encoding="utf-8")
     assert cli.main(["--output", str(out), "--iterations", "1000", "--force"], _env(tmp_path)) == 0
-    assert len(json.loads(out.read_text(encoding="utf-8"))) == 10
+    assert len(json.loads(out.read_text(encoding="utf-8"))) == EXPECTED_USERS
 
 
 def test_cli_rerun_on_seeded_db_creates_nothing_and_keeps_file(

@@ -34,6 +34,10 @@ SEED_USERS: Final[tuple[SeedUser, ...]] = (
     SeedUser("agente.03", "E-99000008", "AGENTE_ADUANAL_CERTIFICADO"),
     SeedUser("almacen.02", "V-99000009", "OPERADOR_LOGISTICO_ALMACEN"),
     SeedUser("almacen.03", "E-99000010", "OPERADOR_LOGISTICO_ALMACEN"),
+    # Dos usuarios con acceso al chat con la IA y al canal seguro entre funcionarios (chat:ia y
+    # chat:canal): pueden conversar entre sí.
+    SeedUser("chat.analista.01", "V-99000011", "ANALISTA_VALORACION_ADUANERA"),
+    SeedUser("chat.analista.02", "E-99000012", "ANALISTA_VALORACION_ADUANERA"),
 )
 
 

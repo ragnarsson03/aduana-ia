@@ -19,7 +19,7 @@ Autenticar a funcionarios y agentes y autorizar cada ruta por **rol operativo ad
 
 ## 3. Permisos y matriz
 
-Permisos (`Permission`): `tramite:submit`, `tramite:override`, `shield:inspect`, `explica:read`, `ledger:receipt`, `ledger:audit`, `audit:fiscal`, `metrics:read`, `users:manage`.
+Permisos (`Permission`): `tramite:submit`, `tramite:override`, `shield:inspect`, `explica:read`, `ledger:receipt`, `ledger:audit`, `audit:fiscal`, `metrics:read`, `users:manage`, `chat:ia`, `chat:canal`. La tabla siguiente cubre los nueve primeros; los de chat se describen en §3.1.
 
 | Permiso | INSPECTOR | AGENTE | FISCAL | OPERADOR | SUPERVISOR | ANALISTA |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -34,6 +34,19 @@ Permisos (`Permission`): `tramite:submit`, `tramite:override`, `shield:inspect`,
 | `users:manage` |  |  |  |  | ✔ |  |
 
 Mínimo privilegio: el fiscal solo tiene `explica:read`; el operador solo `ledger:receipt`; el agente solo `tramite:submit`.
+
+### 3.1 Permisos de chat (`chat:ia` y `chat:canal`)
+
+Los tiene únicamente `ANALISTA_VALORACION_ADUANERA` (además de `explica:read` y `shield:inspect`); no son permisos de escritura, así que el rol sigue siendo de solo lectura.
+
+| Permiso | Qué habilita | Estado en el backend |
+|---|---|---|
+| `chat:ia` | Chat con la IA institucional. El front lo atiende con `POST /shield/inspect`, cuya guarda acepta `shield:inspect` **o** `chat:ia`. | Implementado. |
+| `chat:canal` | Canal seguro de chat entre funcionarios. | **Solo permiso**: el Canal Seguro del front es una interfaz simulada y no existe endpoint de mensajería. Hasta crearlo, el permiso no protege ninguna ruta. |
+
+### 3.2 Anti-escalada de privilegios
+
+Quien tiene `users:manage` solo puede **crear y gestionar roles operativos** (`AGENTE_ADUANAL_CERTIFICADO`, `FISCAL_ANTI_CONTRABANDO`, `OPERADOR_LOGISTICO_ALMACEN`, `ANALISTA_VALORACION_ADUANERA`; `core.rbac.MANAGEABLE_ROLES`). Las cuentas de inspector y de supervisor no se crean ni se modifican por la API: se siembran o se dan de alta fuera de banda. Nadie puede suspenderse ni cambiarse el rol a sí mismo, ni actuar sobre un rol superior. `IdentityService.create_user_as`, `suspend_user_as` y `change_role_as` reconsultan al actor en la BD en cada llamada.
 
 ### Invariantes SoD (verificadas por test sobre la matriz)
 1. Ningún rol tiene `users:manage` junto a `tramite:submit` o `tramite:override`.
@@ -172,7 +185,7 @@ class IdentityService:
 
 ## 8. Seeders (`core/rbac_seed.py` y `scripts/seed_usuarios.py`)
 
-10 usuarios sintéticos (identificadores obviamente ficticios): **uno por cada uno de los 6 roles** y **4 usuarios "normales"** (cuentas de mínimo privilegio: 2 `AGENTE_ADUANAL_CERTIFICADO` y 2 `OPERADOR_LOGISTICO_ALMACEN`). Idempotente (omite los ya existentes por `codigo_usuario`). Las contraseñas **no están en el repositorio**: el script las genera con `secrets` y las escribe una vez en `data/seed_credenciales.local.json` (permisos restrictivos, ignorado por git); la función `seed_users` las recibe por parámetro (los tests pasan contraseñas propias).
+12 usuarios sintéticos (identificadores obviamente ficticios): **uno por cada uno de los 6 roles**, **4 usuarios "normales"** (cuentas de mínimo privilegio: 2 `AGENTE_ADUANAL_CERTIFICADO` y 2 `OPERADOR_LOGISTICO_ALMACEN`) y **2 usuarios con acceso a los dos chats** (`chat.analista.01` y `chat.analista.02`, rol `ANALISTA_VALORACION_ADUANERA`, con `chat:ia` y `chat:canal`), distintos entre sí para poder conversar. Idempotente (omite los ya existentes por `codigo_usuario`). Las contraseñas **no están en el repositorio**: el script las genera con `secrets` y las escribe una vez en `data/seed_credenciales.local.json` (permisos restrictivos, ignorado por git); la función `seed_users` las recibe por parámetro (los tests pasan contraseñas propias).
 
 ## 9. Criterios de aceptación (tests)
 

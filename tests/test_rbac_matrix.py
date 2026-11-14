@@ -71,9 +71,13 @@ def test_logistics_operator_sees_neither_pii_nor_payload() -> None:
 def test_agent_and_inspector_are_isolated() -> None:
     """Núcleo de CA-07: el agente aduanal y el inspector del SENIAT no comparten ningún permiso."""
     assert not ROLE_PERMISSIONS[AGENTE] & ROLE_PERMISSIONS[INSPECTOR]
-    assert has_permission(AGENTE, "tramite:submit") and not has_permission(INSPECTOR, "tramite:submit")
+    assert has_permission(AGENTE, "tramite:submit") and not has_permission(
+        INSPECTOR, "tramite:submit"
+    )
     assert has_permission(INSPECTOR, "audit:fiscal") and not has_permission(AGENTE, "audit:fiscal")
-    assert has_permission(INSPECTOR, "tramite:override") and not has_permission(AGENTE, "tramite:override")
+    assert has_permission(INSPECTOR, "tramite:override") and not has_permission(
+        AGENTE, "tramite:override"
+    )
 
 
 @pytest.mark.parametrize(
@@ -83,7 +87,7 @@ def test_agent_and_inspector_are_isolated() -> None:
         (AGENTE, {"tramite:submit"}),
         (OPERADOR, {"ledger:receipt"}),
         (SUPERVISOR, {"users:manage", "ledger:audit", "metrics:read"}),
-        (ANALISTA, {"explica:read", "shield:inspect"}),
+        (ANALISTA, {"explica:read", "shield:inspect", "chat:ia", "chat:canal"}),
     ],
 )
 def test_least_privilege_sets(role: str, expected: set[str]) -> None:
@@ -93,3 +97,14 @@ def test_least_privilege_sets(role: str, expected: set[str]) -> None:
 def test_only_inspector_can_audit_importers_and_only_supervisor_manages_users() -> None:
     assert [r for r in ALL_ROLES if has_permission(r, "audit:fiscal")] == [INSPECTOR]  # type: ignore[arg-type]
     assert [r for r in ALL_ROLES if has_permission(r, "users:manage")] == [SUPERVISOR]  # type: ignore[arg-type]
+
+
+def test_only_the_valuation_analyst_can_use_both_chats() -> None:
+    """Chat con la IA (chat:ia) y canal seguro entre funcionarios (chat:canal)."""
+    assert [r for r in ALL_ROLES if has_permission(r, "chat:ia")] == [ANALISTA]  # type: ignore[arg-type]
+    assert [r for r in ALL_ROLES if has_permission(r, "chat:canal")] == [ANALISTA]  # type: ignore[arg-type]
+
+
+def test_chat_permissions_are_not_write_permissions() -> None:
+    assert not {"chat:ia", "chat:canal"} & WRITE_PERMISSIONS
+    assert not ROLE_PERMISSIONS[ANALISTA] & WRITE_PERMISSIONS  # sigue siendo de solo lectura
