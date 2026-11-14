@@ -13,8 +13,10 @@ from litestar import Litestar, Request, Response
 from litestar.config.allowed_hosts import AllowedHostsConfig
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException
+from litestar.middleware import DefineMiddleware
 from litestar.static_files import create_static_files_router
 
+from app.headers_middleware import security_headers_middleware
 from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
 from app.controllers.ledger import DemoLedgerController, LedgerController
@@ -30,6 +32,7 @@ from core.errors import (
     AduanaError,
     ConsentError,
     ImmutableLedgerError,
+    InvalidFeaturesError,
     LLMUnavailableError,
     OverrideJustificationError,
     RateLimitError,
@@ -60,6 +63,7 @@ _ERROR_TABLE: Final[dict[type[AduanaError], tuple[int, str]]] = {
     RateLimitError: (429, "ERR_RATE_LIMIT"),
     ImmutableLedgerError: (409, "ERR_IMMUTABLE_LEDGER"),
     OverrideJustificationError: (422, "ERR_OVERRIDE_JUSTIFICATION"),
+    InvalidFeaturesError: (422, "ERR_INVALID_FEATURES"),
     ShieldResidualPiiError: (422, "ERR_UNSAFE_INPUT"),
     LLMUnavailableError: (503, "ERR_LLM_UNAVAILABLE"),
 }
@@ -121,6 +125,9 @@ def create_app(
         },
         allowed_hosts=AllowedHostsConfig(allowed_hosts=allowed_hosts),
         response_headers=SECURITY_HEADERS,
+        # Los estáticos (/ y /assets) y los 404 no pasan por response_headers: sin esto salían
+        # sin CSP justo en la página que ejecuta el JavaScript.
+        middleware=[DefineMiddleware(security_headers_middleware, headers=SECURITY_HEADERS)],
         request_max_body_size=MAX_BODY_BYTES,
         state=State({"aduana": state}),
         on_shutdown=[_shutdown_handler],

@@ -1,6 +1,6 @@
 # Framework Web Moderno 2026 (ASGI) y Servidor de Alto Rendimiento
 litestar>=2.10.0,<3.0.0
-granian>=1.6.0,<2.0.0
+granian>=1.6.0,<3.0.0
 msgspec>=0.18.6,<1.0.0
 
 # Aplicación de Escritorio Nativa (Windows 10/11 y Linux)

@@ -81,7 +81,7 @@ class LedgerVerifyResponse(msgspec.Struct, frozen=True):
 
 class TamperSimRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     scenario: TamperScenario
-    block_index: Annotated[int, msgspec.Meta(ge=1)]
+    block_index: Annotated[int, msgspec.Meta(ge=0)]  # 0 = bloque génesis, también simulable
 
 
 class TamperSimResponse(msgspec.Struct, frozen=True):

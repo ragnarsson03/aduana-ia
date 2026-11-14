@@ -37,16 +37,29 @@ def _serve(port: int, token: str | None = None) -> None:
         """Ejecuta el worker ASGI en este mismo subproceso (sin nietos huérfanos al cerrar)."""
 
         def _serve(self, spawn_target: Any, target_loader: Any) -> None:
-            sock = self.startup(spawn_target, target_loader)
-            worker = self._spawn_proc(
-                idx=0,
-                target=spawn_target,
-                callback_loader=target_loader,
-                socket_loader=lambda: sock,
-            )
-            spawn_target(*worker.proc._args)  # noqa: SLF001
+            if hasattr(self, "_spawn_proc"):
+                # Granian 1.x
+                sock = self.startup(spawn_target, target_loader)
+                worker = self._spawn_proc(
+                    idx=0,
+                    target=spawn_target,
+                    callback_loader=target_loader,
+                    socket_loader=lambda: sock,
+                )
+                spawn_target(*worker.proc._args)  # noqa: SLF001
+            else:
+                # Granian 2.x
+                self.startup(spawn_target, target_loader)
+                worker = self._spawn_worker(
+                    idx=0,
+                    target=spawn_target,
+                    callback_loader=target_loader,
+                )
+                proc_obj = getattr(worker, "inner", getattr(worker, "proc", None))
+                if proc_obj is not None:
+                    proc_obj._target(*proc_obj._args)  # noqa: SLF001
 
-        def _spawn_workers(self, sock: Any, spawn_target: Any, target_loader: Any) -> None:
+        def _spawn_workers(self, *args: Any, **kwargs: Any) -> None:
             return
 
     _SingleProcessGranian(
