@@ -26,7 +26,9 @@ def _seal_one(client: TestClient) -> None:
     assert response.status_code == 201, response.text
 
 
-@pytest.mark.parametrize("scenario", ["flip_payload_bit", "recompute_sha_without_key", "flip_override"])
+@pytest.mark.parametrize(
+    "scenario", ["flip_payload_bit", "recompute_sha_without_key", "flip_override"]
+)
 def test_tamper_on_genesis_block_is_detected(demo_client: TestClient, scenario: str) -> None:
     _seal_one(demo_client)
     response = demo_client.post(

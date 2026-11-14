@@ -48,7 +48,7 @@ _LEGITIMATE_CONTEXT: Final[tuple[re.Pattern[str], ...]] = (
     ),
 )
 
-# Patrones adversarios de inyección / override / evasión (tolerantes a tildes y variantes sintácticas)
+# Patrones adversarios de inyección / override / evasión (tolerantes a tildes y variantes)
 _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
     # System prompt override / desatención de reglas (español por intención)
     (
@@ -62,7 +62,9 @@ _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
         "OVERRIDE_INSTRUCTIONS",
     ),
     (
-        re.compile(r"\bnuevo\s+objetivo\s*:\s*(?:decirme|aprobar|confirmar|ignora)\b", re.IGNORECASE),
+        re.compile(
+            r"\bnuevo\s+objetivo\s*:\s*(?:decirme|aprobar|confirmar|ignora)\b", re.IGNORECASE
+        ),
         0.85,
         "OVERRIDE_NEW_OBJECTIVE",
     ),
@@ -117,7 +119,11 @@ _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
     ),
     (re.compile(r"\bdirectrices\s+ocultas\b", re.IGNORECASE), 0.85, "EXFIL_HIDDEN_RULES"),
     (re.compile(r"\bplantilla\s+del\s+sistema\b", re.IGNORECASE), 0.80, "EXFIL_SYSTEM_TEMPLATE"),
-    (re.compile(r"\b(?:token\s+canary|canary\s+token)\b", re.IGNORECASE), 0.85, "EXFIL_CANARY_TOKEN"),
+    (
+        re.compile(r"\b(?:token\s+canary|canary\s+token)\b", re.IGNORECASE),
+        0.85,
+        "EXFIL_CANARY_TOKEN",
+    ),
     (
         re.compile(r"\b(?:prompt\s+inicial|prompt\s+base|prompt\s+original)\b", re.IGNORECASE),
         0.80,
@@ -125,33 +131,71 @@ _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
     ),
     (re.compile(r"\bADUANA_MASTER_KEY\b", re.IGNORECASE), 0.85, "EXFIL_MASTER_KEY"),
     (re.compile(r"\bcanary-hmac\b", re.IGNORECASE), 0.85, "EXFIL_CANARY_HMAC"),
-    (re.compile(r"\binstruccion_institucional_inmutable\b", re.IGNORECASE), 0.90, "EXFIL_IMMUTABLE_TAG"),
+    (
+        re.compile(r"\binstruccion_institucional_inmutable\b", re.IGNORECASE),
+        0.90,
+        "EXFIL_IMMUTABLE_TAG",
+    ),
     (re.compile(r"\bentrada_ciudadano\b", re.IGNORECASE), 0.85, "EXFIL_TAG_NAME"),
     # Jailbreak & personas
-    (re.compile(r"\b(?:eres\s+ahora\s+dan|act[uú]a\s+como\s+dan|ahora\s+eres\s+dan)\b", re.IGNORECASE), 0.90, "JAILBREAK_DAN"),
+    (
+        re.compile(
+            r"\b(?:eres\s+ahora\s+dan|act[uú]a\s+como\s+dan|ahora\s+eres\s+dan)\b", re.IGNORECASE
+        ),
+        0.90,
+        "JAILBREAK_DAN",
+    ),
     (re.compile(r"\bmodo\s+desarrollador\b", re.IGNORECASE), 0.85, "JAILBREAK_DEV_MODE"),
     (
-        re.compile(r"\b(?:act[uú]a|juega|imagina|finge)\s+(?:a\s+)?(?:que\s+eres|como|ser)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:act[uú]a|juega|imagina|finge)\s+(?:a\s+)?(?:que\s+eres|como|ser)\b",
+            re.IGNORECASE,
+        ),
         0.80,
         "ROLEPLAY_PERSONA",
     ),
     (re.compile(r"\bburlar\s+(?:el\s+)?algoritmo\b", re.IGNORECASE), 0.80, "BYPASS_ALGORITHM"),
-    (re.compile(r"\bfines\s+puramente\s+pedag[oó]gicos\b", re.IGNORECASE), 0.80, "PEDAGOGICAL_PRETEXT"),
+    (
+        re.compile(r"\bfines\s+puramente\s+pedag[oó]gicos\b", re.IGNORECASE),
+        0.80,
+        "PEDAGOGICAL_PRETEXT",
+    ),
     (
         re.compile(r"\bterminal\s+administrativa\s+con\s+privilegios\b", re.IGNORECASE),
         0.80,
         "ADMIN_TERMINAL",
     ),
     (re.compile(r"\bmodo\s+sin\s+censura\b", re.IGNORECASE), 0.85, "JAILBREAK_NO_CENSOR"),
-    (re.compile(r"\bpretend\b[^\n]{0,60}?\brules\b[^\n]{0,40}?\bdo\s+not\s+exist\b", re.IGNORECASE), 0.85, "JAILBREAK_PRETEND_EN"),
+    (
+        re.compile(
+            r"\bpretend\b[^\n]{0,60}?\brules\b[^\n]{0,40}?\bdo\s+not\s+exist\b", re.IGNORECASE
+        ),
+        0.85,
+        "JAILBREAK_PRETEND_EN",
+    ),
     (re.compile(r"\bmodo\s+dios\b", re.IGNORECASE), 0.85, "JAILBREAK_GOD_MODE"),
     (re.compile(r"\blibre\s+de\s+filtros\b", re.IGNORECASE), 0.85, "NO_FILTERS"),
     (re.compile(r"\bdesactiva\s+el\s+filtro\b", re.IGNORECASE), 0.85, "DISABLE_FILTER"),
-    (re.compile(r"\bmodo\s+mantenimiento\s+de\s+emergencia\b", re.IGNORECASE), 0.85, "EMERGENCY_MAINTENANCE"),
-    (re.compile(r"\bomite\s+todas\s+las\s+validaciones\b", re.IGNORECASE), 0.85, "OMIT_VALIDATIONS"),
+    (
+        re.compile(r"\bmodo\s+mantenimiento\s+de\s+emergencia\b", re.IGNORECASE),
+        0.85,
+        "EMERGENCY_MAINTENANCE",
+    ),
+    (
+        re.compile(r"\bomite\s+todas\s+las\s+validaciones\b", re.IGNORECASE),
+        0.85,
+        "OMIT_VALIDATIONS",
+    ),
     (re.compile(r"\bunrestricted\s+auditor\b", re.IGNORECASE), 0.85, "UNRESTRICTED_EN"),
     # Autoridad fingida
-    (re.compile(r"\borden\s+del\s+(?:ministro|director|presidente|jefe|superior|administrador)\b", re.IGNORECASE), 0.85, "AUTHORITY_ORDER"),
+    (
+        re.compile(
+            r"\borden\s+del\s+(?:ministro|director|presidente|jefe|superior|administrador)\b",
+            re.IGNORECASE,
+        ),
+        0.85,
+        "AUTHORITY_ORDER",
+    ),
     (
         re.compile(
             r"\bsoy\s+el\s+(?:administrador|admin|supervisor|auditor|ministro)\b[^\n]{0,80}?\b(?:autorizo|ordeno|aprueba|omite|desactiva)\b",
@@ -169,13 +213,32 @@ _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
         "AUTHORITY_CLAIM_EN",
     ),
     # Multiturn assembly & comentarios indirectos
-    (re.compile(r"\bparte\s+\d+/\d+[^\n]{0,80}?\bejecuta\s+la\s+uni[oó]n\b", re.IGNORECASE), 0.85, "MULTITURN_ASSEMBLY"),
-    (re.compile(r"<!--[^\n>]{0,40}?asistente[^\n>]{0,60}?(?:ignora|reglas|aprueba|override)", re.IGNORECASE), 0.85, "INDIRECT_INJECTION"),
+    (
+        re.compile(r"\bparte\s+\d+/\d+[^\n]{0,80}?\bejecuta\s+la\s+uni[oó]n\b", re.IGNORECASE),
+        0.85,
+        "MULTITURN_ASSEMBLY",
+    ),
+    (
+        re.compile(
+            r"<!--[^\n>]{0,40}?asistente[^\n>]{0,60}?(?:ignora|reglas|aprueba|override)",
+            re.IGNORECASE,
+        ),
+        0.85,
+        "INDIRECT_INJECTION",
+    ),
     # Delimitadores de sistema
     (re.compile(r"SYSTEM:\s*nuevas\s+reglas\b", re.IGNORECASE), 0.90, "DELIMITER_SYSTEM_RULES"),
-    (re.compile(r"<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>", re.IGNORECASE), 0.90, "DELIMITER_CHAT_TOKEN"),
+    (
+        re.compile(r"<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>", re.IGNORECASE),
+        0.90,
+        "DELIMITER_CHAT_TOKEN",
+    ),
     # SQLi y Path traversal
-    (re.compile(r"'\s*(?:or|and)\s*['\"]?1['\"]?\s*=\s*['\"]?1", re.IGNORECASE), 0.90, "SQLI_OR_1_1"),
+    (
+        re.compile(r"'\s*(?:or|and)\s*['\"]?1['\"]?\s*=\s*['\"]?1", re.IGNORECASE),
+        0.90,
+        "SQLI_OR_1_1",
+    ),
     (re.compile(r"\bunion\s+(?:all\s+)?select\b", re.IGNORECASE), 0.90, "SQLI_UNION_SELECT"),
     (re.compile(r"\bselect\b[^;\n]{1,200}?\bfrom\b", re.IGNORECASE), 0.85, "SQLI_SELECT_FROM"),
     (re.compile(r";\s*drop\s+table\b", re.IGNORECASE), 0.90, "SQLI_DROP_TABLE"),
@@ -183,11 +246,19 @@ _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
     (re.compile(r"(?:\.\.[\\/]){2,}", re.IGNORECASE), 0.90, "PATH_TRAVERSAL"),
     # Código malicioso / breakout
     (re.compile(r"</entrada_ciudadano>", re.IGNORECASE), 0.95, "XML_TAG_BREAKOUT"),
-    (re.compile(r"<instruccion_institucional_inmutable>", re.IGNORECASE), 0.95, "XML_TAG_INJECTION"),
+    (
+        re.compile(r"<instruccion_institucional_inmutable>", re.IGNORECASE),
+        0.95,
+        "XML_TAG_INJECTION",
+    ),
     (re.compile(r"<script[\s>]", re.IGNORECASE), 0.90, "CODE_INJECTION_SCRIPT"),
     (re.compile(r"\bjavascript:", re.IGNORECASE), 0.85, "CODE_INJECTION_JS"),
     (re.compile(r"\b__import__\s*\(", re.IGNORECASE), 0.90, "CODE_INJECTION_IMPORT"),
-    (re.compile(r"\bsubprocess\.(?:popen|run)\b", re.IGNORECASE), 0.90, "CODE_INJECTION_SUBPROCESS"),
+    (
+        re.compile(r"\bsubprocess\.(?:popen|run)\b", re.IGNORECASE),
+        0.90,
+        "CODE_INJECTION_SUBPROCESS",
+    ),
     (re.compile(r"\bexec\s*\(", re.IGNORECASE), 0.85, "CODE_INJECTION_EXEC"),
     (re.compile(r"\beval\s*\(", re.IGNORECASE), 0.85, "CODE_INJECTION_EVAL"),
 )
@@ -321,8 +392,8 @@ def _deobfuscate_views(text: str) -> list[str]:
     for hm in hex_m:
         try:
             views.append(bytes.fromhex(re.sub(r"\s+", "", hm)).decode("utf-8", errors="ignore"))
-        except Exception:
-            pass
+        except ValueError:
+            continue
 
     return views
 

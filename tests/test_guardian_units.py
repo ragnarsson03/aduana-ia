@@ -7,15 +7,11 @@ contextos legítimos, manejo de excepciones y saneamiento de salida.
 from __future__ import annotations
 
 import base64
-import html
-import time
 from unittest.mock import MagicMock
 
 import pytest
 
 from app.desktop import _free_port, stop_server_process
-from core.context import PolicyStatus
-from core.crypto import canary_token
 from core.keyring import KeyRing
 from pipeline.stage2_guard_in import (
     _LEGITIMATE_CONTEXT,
@@ -25,7 +21,7 @@ from pipeline.stage2_guard_in import (
     _detect_encoded_payloads,
     guard_in,
 )
-from pipeline.stage3_guard_out import _CANARY_HEX_RE, _XSS_PATTERNS, guard_out
+from pipeline.stage3_guard_out import guard_out
 
 TEST_KEYS = KeyRing(bytes(range(32)))
 SAMPLE_CANARY = "[[CANARY-HMAC-1234567890ABCDEF]]"

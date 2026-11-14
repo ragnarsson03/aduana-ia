@@ -21,8 +21,11 @@ def synthetic_tramite() -> dict[str, object]:
         "citizen_cedula": "V-12345678",
         "consent": {"granted": True, "purpose_code": "BECA"},
         "features": {
-            "tiempo_espera_dias": 30.0, "vulnerabilidad_socioeconomica": 0.6,
-            "completitud_recaudos": 1.0, "urgencia_medica": 0.0, "complejidad_caso": 0.2,
+            "tiempo_espera_dias": 30.0,
+            "vulnerabilidad_socioeconomica": 0.6,
+            "completitud_recaudos": 1.0,
+            "urgencia_medica": 0.0,
+            "complejidad_caso": 0.2,
         },
     }
 
@@ -56,10 +59,13 @@ def test_referenced_assets(live_http: httpx.Client) -> None:
 
 
 @pytest.mark.parametrize("route", ["/", "/api/v1/health/system", "/api/v1/ledger/verify"])
-@pytest.mark.parametrize("header,expected", [
-    ("content-security-policy", "default-src 'self'"),
-    ("x-content-type-options", "nosniff"),
-])
+@pytest.mark.parametrize(
+    "header,expected",
+    [
+        ("content-security-policy", "default-src 'self'"),
+        ("x-content-type-options", "nosniff"),
+    ],
+)
 def test_security_headers(live_http: httpx.Client, route: str, header: str, expected: str) -> None:
     response = live_http.get(route)
     assert response.status_code == 200
@@ -72,7 +78,8 @@ def test_security_headers(live_http: httpx.Client, route: str, header: str, expe
 def test_rejects_missing_token(live_stack: LiveStack, route: str) -> None:
     with httpx.Client(base_url=live_stack.url, trust_env=False) as client:
         response = (
-            client.get(route) if "/ledger/" in route
+            client.get(route)
+            if "/ledger/" in route
             else client.post(route, json={"raw_text": "Sintetico"})
         )
         assert response.status_code == 401
@@ -80,7 +87,9 @@ def test_rejects_missing_token(live_stack: LiveStack, route: str) -> None:
 
 def test_rejects_plain_text(live_http: httpx.Client) -> None:
     response = live_http.post(
-        "/api/v1/shield/inspect", content="Sintetico", headers={"Content-Type": "text/plain"},
+        "/api/v1/shield/inspect",
+        content="Sintetico",
+        headers={"Content-Type": "text/plain"},
     )
     assert response.status_code == 415
 
@@ -96,7 +105,8 @@ def test_full_api_flow_and_disk_privacy(live_http: httpx.Client, live_stack: Liv
     assert shield.json()["pii_count"] >= 1
     assert_no_cedula(shield.content, "Shield response")
     # The redacted text is safe to forward, unlike the mandatory raw ingress DTO.
-    assert_no_cedula(json.dumps({"raw_text": shield.json()["masked_text"]}).encode(), "masked request")
+    masked_json = json.dumps({"raw_text": shield.json()["masked_text"]}).encode()
+    assert_no_cedula(masked_json, "masked request")
     processed = live_http.post("/api/v1/gateway/process", json=payload)
     assert processed.status_code == 201
     assert_no_cedula(processed.content, "Gateway response")
@@ -116,7 +126,10 @@ def test_full_api_flow_and_disk_privacy(live_http: httpx.Client, live_stack: Liv
     assert verification.json()["is_valid"] is True
     assert verification.json()["blocks_checked"] >= 1
     for scenario in (
-        "flip_payload_bit", "recompute_sha_without_key", "break_prev_link", "flip_override",
+        "flip_payload_bit",
+        "recompute_sha_without_key",
+        "break_prev_link",
+        "flip_override",
     ):
         simulation = live_http.post(
             "/api/v1/ledger/tamper-sim",
@@ -151,14 +164,18 @@ def test_ingress_request_bodies_do_not_expose_cedula(live_http: httpx.Client, ro
     response = live_http.post(route, json=body)
     assert response.status_code == 201
     assert_no_cedula(response.content, "API response")
-    assert_no_cedula(response.request.content, "ingress body (FINDING: API requires clear synthetic cedula)")
+    ingress_msg = "ingress body (FINDING: API requires clear synthetic cedula)"
+    assert_no_cedula(response.request.content, ingress_msg)
 
 
 def test_duration_shuts_down_and_removes_temporary_db() -> None:
-    completed = subprocess.run(
+    completed = subprocess.run(  # noqa: S603
         [sys.executable, str(ROOT / "scripts/run_e2e_stack.py"), "--duration", "0.2"],
-        cwd=ROOT, env={**os.environ, "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
-        capture_output=True, text=True, timeout=45,
+        cwd=ROOT,
+        env={**os.environ, "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+        timeout=45,
     )
     assert completed.returncode == 0, "Duration shutdown failed; output redacted"
     lines = completed.stdout.splitlines()
