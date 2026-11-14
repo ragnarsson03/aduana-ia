@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Lock, 
   Unlock, 
@@ -31,6 +31,88 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
+
+  // Parallax animation refs from code.html & DESIGN.md
+  const bgRef = useRef<HTMLImageElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    let targetX = 0, targetY = 0;
+    let currentX = 0, currentY = 0;
+    let animationFrameId: number | null = null;
+
+    const updateCardMouseCoords = (clientX: number, clientY: number) => {
+      if (!cardRef.current) return;
+      const rect = cardRef.current.getBoundingClientRect();
+      const cardX = ((clientX - rect.left) / rect.width) * 100;
+      const cardY = ((clientY - rect.top) / rect.height) * 100;
+      cardRef.current.style.setProperty('--mouse-x', `${cardX}%`);
+      cardRef.current.style.setProperty('--mouse-y', `${cardY}%`);
+    };
+
+    const animateLoop = () => {
+      // Smooth lerp (momentum easing)
+      const lerpFactor = 0.08;
+      currentX += (targetX - currentX) * lerpFactor;
+      currentY += (targetY - currentY) * lerpFactor;
+
+      // Background parallax counter-translation
+      if (bgRef.current) {
+        const bgTranslateX = -currentX * 32;
+        const bgTranslateY = -currentY * 32;
+        bgRef.current.style.transform = `scale(1.1) translate3d(${bgTranslateX.toFixed(2)}px, ${bgTranslateY.toFixed(2)}px, 0)`;
+      }
+
+      // Card tilt & perspective translation
+      if (cardRef.current) {
+        const cardTranslateX = currentX * 16;
+        const cardTranslateY = currentY * 16;
+        const cardRotateY = currentX * 7.5;
+        const cardRotateX = -currentY * 7.5;
+        cardRef.current.style.transform = `translate3d(${cardTranslateX.toFixed(2)}px, ${cardTranslateY.toFixed(2)}px, 0) rotateX(${cardRotateX.toFixed(2)}deg) rotateY(${cardRotateY.toFixed(2)}deg)`;
+      }
+
+      animationFrameId = requestAnimationFrame(animateLoop);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { innerWidth: width, innerHeight: height } = window;
+      targetX = (e.clientX / width) - 0.5; // -0.5 to 0.5
+      targetY = (e.clientY / height) - 0.5; // -0.5 to 0.5
+
+      updateCardMouseCoords(e.clientX, e.clientY);
+
+      if (!animationFrameId) {
+        animationFrameId = requestAnimationFrame(animateLoop);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      targetX = 0;
+      targetY = 0;
+      if (cardRef.current) {
+        cardRef.current.style.setProperty('--mouse-x', '50%');
+        cardRef.current.style.setProperty('--mouse-y', '50%');
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    document.body.addEventListener('mouseleave', handleMouseLeave);
+
+    // Initial animation loop start
+    animationFrameId = requestAnimationFrame(animateLoop);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      document.body.removeEventListener('mouseleave', handleMouseLeave);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, []);
 
   const demoAccounts: { role: UserRole; label: string; email: string; pass: string; clearance: string }[] = [
     {
@@ -97,22 +179,30 @@ export const LoginView: React.FC<LoginViewProps> = ({
   return (
     <div className="relative min-h-screen flex flex-col justify-center items-center bg-[#0f131d] text-[#dfe2f1] overflow-x-hidden selection:bg-indigo-600 selection:text-white select-none">
       
-      {/* Ambient Cinematic Deep Background with Cryptographic NOC Mesh */}
+      {/* Ambient Cinematic Deep Background with Cryptographic NOC Mesh & Parallax */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <img 
+          ref={bgRef}
           alt="Aduana IA Control Center" 
           src={loginBgImg} 
-          className="w-full h-full object-cover object-center opacity-30 filter brightness-[0.45] contrast-125 scale-105"
+          className="parallax-layer-bg w-full h-full object-cover object-center opacity-30 filter brightness-[0.45] contrast-125 scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f131d] via-[#0f131d]/85 to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(79,70,229,0.22)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 cyber-scanline pointer-events-none" />
       </div>
 
-      {/* Main Login Canvas / Glass Enclave Container */}
-      <main className="relative z-10 w-full max-w-[480px] px-4 py-8 mx-auto flex flex-col items-center">
+      {/* Main Login Canvas / 3D Perspective Tilt Container */}
+      <main className="relative z-10 w-full max-w-[480px] px-4 py-8 mx-auto flex flex-col items-center card-perspective-container">
         
-        {/* Glass Specimen Card */}
-        <div className="w-full rounded-2xl p-6 sm:p-8 backdrop-blur-2xl bg-[#0d1527]/80 border border-indigo-500/30 shadow-[0_0_35px_-4px_rgba(79,70,229,0.35)] relative overflow-hidden transition-all duration-300">
+        {/* Glass Specimen Card with Dynamic Specular Highlight & Parallax Tilt */}
+        <div 
+          ref={cardRef}
+          className="w-full rounded-2xl p-6 sm:p-8 backdrop-blur-2xl border border-indigo-500/30 relative overflow-hidden transition-all duration-300 card-parallax-tilt neon-border-glow"
+          style={{
+            background: 'radial-gradient(circle 380px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.08), transparent 80%), rgba(13, 21, 39, 0.82)'
+          }}
+        >
           
           {/* Top Hairline Gradient Accent */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#4f46e5] to-transparent opacity-85" />
@@ -212,7 +302,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <button
                 type="submit"
                 disabled={isAuthenticating}
-                className="w-full py-3.5 sm:py-4 px-6 rounded-full bg-[#dfe2f1] text-[#0a0e18] font-bold text-xs sm:text-sm tracking-wider hover:bg-white hover:shadow-[0_0_24px_rgba(255,255,255,0.4)] active:scale-[0.99] transition-all duration-150 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-70"
+                className="w-full py-3.5 sm:py-4 px-6 rounded-full bg-[#dfe2f1] text-[#0a0e18] font-bold text-xs sm:text-sm tracking-wider hover:bg-white hover:shadow-[0_0_24px_rgba(255,255,255,0.4)] active:scale-[0.99] transition-all duration-150 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-70 shimmer-btn"
               >
                 <span>{isAuthenticating ? 'VALIDANDO EN ENCLAVE...' : 'INICIAR SESIÓN SEGURA'}</span>
                 <ArrowRight className="w-4 h-4" />
