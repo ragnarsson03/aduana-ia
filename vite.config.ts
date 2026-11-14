@@ -25,6 +25,9 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        headers: {
+          'X-Aduana-Token': 'aduana-dev-token-local-2026-32bytes',
+        },
       },
     },
   }
