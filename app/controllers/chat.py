@@ -484,6 +484,10 @@ class ChatController(Controller):
     path = f"{API_PREFIX}/chat"
     guards = [chat_api_guard]
 
+    @post("", status_code=HTTP_200_OK, request_max_body_size=MAX_CHAT_REQUEST_BYTES)
+    async def chat_root(self, request: Request) -> ChatIAResponse:
+        return await _execute_chat_pipeline(request)
+
     @post("/stream", status_code=HTTP_200_OK, request_max_body_size=MAX_CHAT_REQUEST_BYTES)
     async def stream_upload(self, request: Request) -> ChatIAResponse:
         return await _execute_chat_pipeline(request)
