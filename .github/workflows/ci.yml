@@ -1,0 +1,62 @@
+name: CI Aduana IA (Linter & Tests)
+
+on:
+  push:
+    branches: [main, develop, Find-Landing]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend-qa:
+    name: Backend Lint & Tests (Python 3.11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias del Backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Ejecutar Linter Ruff (Reglas pyproject.toml / SDD)
+        run: |
+          ruff check core pipeline app tests
+
+      - name: Ejecutar Suite de Tests Automatizados (Pytest CA-01 a CA-06)
+        run: |
+          pytest -v
+
+  frontend-qa:
+    name: Frontend Lint & Tests (Node.js 20)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependencias del Frontend
+        run: |
+          npm ci || npm install
+
+      - name: Ejecutar Pruebas Unitarias de Frontend (Vitest)
+        run: |
+          npm test
+
+      - name: Compilar Frontend (TypeScript + Vite)
+        run: |
+          npm run build

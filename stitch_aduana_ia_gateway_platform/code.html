@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"on-secondary":"#ffffff","on-surface-variant":"#464555","primary":"#3525cd","on-error":"#ffffff","tertiary-fixed":"#ffddb8","on-tertiary-container":"#ffd4a4","primary-fixed-dim":"#c3c0ff","surface-container":"#eeedf7","surface-container-low":"#f4f2fd","on-primary-fixed-variant":"#3323cc","tertiary-fixed-dim":"#ffb95f","on-primary":"#ffffff","secondary-fixed":"#6ffbbe","primary-container":"#4f46e5","outline":"#777587","on-secondary-fixed":"#002113","on-tertiary":"#ffffff","surface-container-lowest":"#ffffff","on-secondary-container":"#00714d","tertiary":"#684000","primary-fixed":"#e2dfff","inverse-on-surface":"#f1effa","error":"#ba1a1a","on-error-container":"#93000a","surface":"#fbf8ff","inverse-primary":"#c3c0ff","on-primary-fixed":"#0f0069","on-background":"#1a1b22","surface-container-high":"#e8e7f1","surface-container-highest":"#e3e1ec","surface-bright":"#fbf8ff","outline-variant":"#c7c4d8","on-secondary-fixed-variant":"#005236","inverse-surface":"#2f3038","surface-tint":"#4d44e3","error-container":"#ffdad6","tertiary-container":"#885500","secondary":"#006c49","on-primary-container":"#dad7ff","on-tertiary-fixed":"#2a1700","surface-dim":"#dad9e3","secondary-container":"#6cf8bb","on-tertiary-fixed-variant":"#653e00","surface-variant":"#e3e1ec","on-surface":"#1a1b22","secondary-fixed-dim":"#4edea3","background":"#fbf8ff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-md":"1rem","margin":"2.5rem","space-xs":"0.25rem","space-lg":"1.5rem","gutter":"1.5rem","gutter-mobile":"1rem","space-xl":"2.5rem","margin-mobile":"1.25rem","space-sm":"0.5rem"},fontFamily:{"headline-sm":["Inter"],"headline-lg":["Inter"],"body-lg":["Inter"],"code-md":["JetBrains Mono"],"code-sm":["JetBrains Mono"],"body-sm":["Inter"],"display-lg":["Inter"],"display-lg-mobile":["Inter"],"label-md":["Inter"],"body-md":["Inter"]},fontSize:{"headline-sm":["20px",{lineHeight:"28px",letterSpacing:"-0.01em",fontWeight:"600"}],"headline-lg":["28px",{lineHeight:"36px",letterSpacing:"-0.015em",fontWeight:"600"}],"body-lg":["16px",{lineHeight:"24px",fontWeight:"400"}],"code-md":["13px",{lineHeight:"18px",fontWeight:"500"}],"code-sm":["11px",{lineHeight:"14px",letterSpacing:"0.03em",fontWeight:"500"}],"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"display-lg":["40px",{lineHeight:"48px",letterSpacing:"-0.02em",fontWeight:"600"}],"display-lg-mobile":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"600"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"500"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}]}}}}</script></head><body class="bg-surface font-body-md text-on-surface antialiased selection:bg-primary selection:text-on-primary"><header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/30 shadow-[0_1px_8px_rgba(0,0,0,0.02)]"><div class="h-16 w-full px-margin flex items-center justify-between"><div class="flex items-center gap-space-lg"><a class="flex items-center gap-space-sm group" data-path="pasarela" href="#"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface">Aduana <span class="text-primary font-headline-sm">IA</span></span><span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary-container/40 border border-secondary/20 ml-2"><span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span><span class="font-code-sm text-code-sm uppercase tracking-wider text-secondary font-semibold">En Línea</span></span></a></div><nav class="hidden md:flex items-center gap-space-md" data-active-classes="bg-surface-container-high text-on-surface font-medium rounded-lg"><a class="px-space-md py-space-xs font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all duration-150" data-path="pasarela" href="#">Pasarela</a><a aria-current="page" class="px-space-md py-space-xs transition-all duration-150 bg-surface-container-high text-on-surface font-medium rounded-lg" data-path="ledger" href="#">Ledger</a><a class="px-space-md py-space-xs font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all duration-150" data-path="explicabilidad" href="#">Explicabilidad</a></nav><div class="flex items-center gap-space-md"><button aria-label="Cambiar tema" class="flex items-center justify-center w-9 h-9 rounded-lg border border-outline-variant/50 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" onclick="document.documentElement.classList.toggle('dark')" type="button"><span class="material-symbols-outlined text-[18px] dark:hidden">dark_mode</span><span class="material-symbols-outlined text-[18px] hidden dark:inline">light_mode</span></button><div class="h-4 w-px bg-outline-variant/40"></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-16 bg-surface min-h-[calc(100vh-4rem)]"><div class="flex flex-col w-full">
+<div class="w-full px-margin py-space-xl flex flex-col gap-space-xl">
+<!-- Top Bar Header -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="font-code-sm text-code-sm uppercase tracking-widest text-primary font-semibold">Consorcio GovTech • Nodo Soberano #01</span>
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Red Nacional de Integridad</span>
+</div>
+<h1 class="font-display-lg text-display-lg text-on-surface tracking-tight">Registro de Auditoría Inalterable</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl">Trazabilidad criptográfica SHA-256 de todas las inferencias y decisiones públicas del sistema aduanero.</p>
+</div>
+<div class="flex items-center gap-space-sm self-start lg:self-center">
+<button class="h-10 px-4 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-body-md text-body-md font-medium transition-all duration-150 flex items-center gap-2 shadow-sm" id="btn-tamper" onclick="toggleTamperSimulation()">
+<span class="material-symbols-outlined text-[18px] text-tertiary">pest_control</span>
+<span>Simular Alteración</span>
+</button>
+<button class="h-10 px-4 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-body-md text-body-md font-medium transition-all duration-150 flex items-center gap-2 shadow-sm" id="btn-verify" onclick="triggerVerification()">
+<span class="material-symbols-outlined text-[18px]" id="verify-spinner">verified_user</span>
+<span id="verify-text">Verificar Integridad</span>
+</button>
+</div>
+</div>
+<!-- Demonstration Alert Banner -->
+<div class="w-full rounded-xl bg-error-container/60 p-space-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md transition-all duration-300" id="tamper-alert">
+<div class="flex items-start md:items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-error text-on-error flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">gpp_bad</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-error-container font-semibold">Alerta de Manipulación Detectada</span>
+<span class="px-2 py-0.5 rounded-full bg-error text-on-error font-code-sm text-code-sm uppercase tracking-wider">Desajuste SHA-256</span>
+</div>
+<p class="font-body-md text-body-md text-on-error-container/90 mt-0.5">El Bloque #004 fue modificado externamente. La firma digital y el hash del bloque previo no coinciden con el cálculo estricto en memoria.</p>
+</div>
+</div>
+<button class="px-4 py-2 rounded-lg bg-error text-on-error hover:bg-on-error-container font-body-sm text-body-sm font-medium transition-colors shrink-0 flex items-center gap-2 shadow-sm self-start md:self-auto" onclick="restoreBlockOriginal()">
+<span class="material-symbols-outlined text-[16px]">restart_alt</span>
+<span>Restaurar Bloque Original</span>
+</button>
+</div>
+<!-- Metrics Strip -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-md">
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Profundidad del Registro</span>
+<span class="font-headline-lg text-headline-lg text-on-surface">4 Bloques</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> 100% persistencia local
+        </span>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Frecuencia de Sellado</span>
+<span class="font-headline-lg text-headline-lg text-on-surface">7m 35s</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Promedio por inferencia</span>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Firmas Autorizadas</span>
+<span class="font-headline-lg text-headline-lg text-on-surface">8/8 Custodios</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary"></span> Quórum Gov-Ed25519
+        </span>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Estado de Cadena</span>
+<span class="font-headline-lg text-headline-lg text-error" id="metric-health-text">En Aislamiento</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-error" id="metric-health-dot"></span> 1 nodo en cuarentena
+        </span>
+</div>
+</div>
+<!-- Main View: Clean Vertical Timeline -->
+<div class="relative w-full max-w-4xl mx-auto flex flex-col gap-space-lg">
+<!-- Central Hairline connector -->
+<div class="absolute left-6 md:left-8 top-8 bottom-8 w-px bg-surface-container-highest pointer-events-none"></div>
+<!-- Bloque #001 (Genesis) -->
+<div class="relative flex items-start gap-space-md md:gap-space-lg">
+<div class="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-center shrink-0 z-10 text-secondary">
+<span class="material-symbols-outlined text-[24px]">flag_circle</span>
+</div>
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface">Bloque #001</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant px-2 py-0.5 rounded bg-surface-container">14:15:02 UTC</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Génesis</span>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container/40 text-secondary font-code-sm text-code-sm font-semibold self-start sm:self-auto">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Verificado
+            </span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Propósito Transaccional</span>
+<p class="font-body-md text-body-md text-on-surface font-medium">Inicialización de Políticas Gov-2025 y Carga de Guardián</p>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-2 min-w-0">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase">Hash Actual:</span>
+<span class="font-code-md text-code-md text-on-surface truncate select-all">0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors shrink-0" onclick="navigator.clipboard.writeText('0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')" title="Copiar Hash">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+<div class="flex items-center gap-space-md pt-space-xs font-code-sm text-code-sm text-on-surface-variant">
+<span>Firma Raíz: <span class="text-on-surface">ED-PUBKEY-9821</span></span>
+<span>•</span>
+<span>Gas: <span class="text-on-surface">0.00 GWEI</span></span>
+<span>•</span>
+<span>Inmutable</span>
+</div>
+</div>
+</div>
+<!-- Bloque #002 -->
+<div class="relative flex items-start gap-space-md md:gap-space-lg">
+<div class="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-center shrink-0 z-10 text-secondary">
+<span class="material-symbols-outlined text-[24px]">task_alt</span>
+</div>
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface">Bloque #002</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant px-2 py-0.5 rounded bg-surface-container">14:22:45 UTC</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Aduana Express</span>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container/40 text-secondary font-code-sm text-code-sm font-semibold self-start sm:self-auto">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Verificado
+            </span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Propósito Transaccional</span>
+<p class="font-body-md text-body-md text-on-surface font-medium">Trámite Solvencia Fiscal • Cédula [V-XX.XXX.XXX] sanitizada con cifrado homomórfico</p>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-2 min-w-0">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase">Hash Actual:</span>
+<span class="font-code-md text-code-md text-on-surface truncate select-all">0x7d2f9a1b8c0e5d4a3f2b1a0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors shrink-0" onclick="navigator.clipboard.writeText('0x7d2f9a1b8c0e5d4a3f2b1a0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c')" title="Copiar Hash">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+<div class="flex items-center gap-space-md pt-space-xs font-code-sm text-code-sm text-on-surface-variant">
+<span>Hash Previo: <span class="text-on-surface font-code-sm">0xe3b0c442...</span></span>
+<span>•</span>
+<span>Declaración Aduanera: <span class="text-on-surface">DOC-89211</span></span>
+</div>
+</div>
+</div>
+<!-- Bloque #003 -->
+<div class="relative flex items-start gap-space-md md:gap-space-lg">
+<div class="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-center shrink-0 z-10 text-secondary">
+<span class="material-symbols-outlined text-[24px]">school</span>
+</div>
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface">Bloque #003</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant px-2 py-0.5 rounded bg-surface-container">14:30:19 UTC</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Programa Social</span>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container/40 text-secondary font-code-sm text-code-sm font-semibold self-start sm:self-auto">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Verificado
+            </span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Propósito Transaccional</span>
+<p class="font-body-md text-body-md text-on-surface font-medium">Evaluación de Beca Estudiantil #894 • Dictamen Favorable Aprobado sin observaciones</p>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-2 min-w-0">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase">Hash Actual:</span>
+<span class="font-code-md text-code-md text-on-surface truncate select-all">0x9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors shrink-0" onclick="navigator.clipboard.writeText('0x9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b')" title="Copiar Hash">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+<div class="flex items-center gap-space-md pt-space-xs font-code-sm text-code-sm text-on-surface-variant">
+<span>Hash Previo: <span class="text-on-surface font-code-sm">0x7d2f9a1b...</span></span>
+<span>•</span>
+<span>Puntaje Mérito: <span class="text-on-surface font-semibold">98.4 / 100</span></span>
+</div>
+</div>
+</div>
+<!-- Bloque #004 (Altered / Tampered) -->
+<div class="relative flex items-start gap-space-md md:gap-space-lg" id="block-4-container">
+<div class="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-error-container text-error shadow-sm flex items-center justify-center shrink-0 z-10 transition-colors" id="block-4-icon-wrapper">
+<span class="material-symbols-outlined text-[24px]" id="block-4-icon">crisis_alert</span>
+</div>
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md transition-all" id="block-4-card">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface">Bloque #004</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant px-2 py-0.5 rounded bg-surface-container">14:38:12 UTC</span>
+<span class="font-code-sm text-code-sm text-error bg-error/10 px-2 py-0.5 rounded" id="block-4-tamper-tag">Alerta de Seguridad</span>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-error font-code-sm text-code-sm font-semibold self-start sm:self-auto" id="block-4-badge">
+<span class="w-2 h-2 rounded-full bg-error"></span> Corrupto / Alterado
+            </span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Propósito Transaccional</span>
+<p class="font-body-md text-body-md text-on-surface font-medium" id="block-4-summary">Modificación no autorizada de subvención pública [Parámetro de subsidio forzado al 100%]</p>
+</div>
+<!-- Discrepancy Box -->
+<div class="bg-error-container/30 rounded-lg p-space-md flex flex-col gap-space-xs" id="block-4-discrepancy">
+<div class="flex items-center justify-between">
+<span class="font-code-sm text-code-sm font-semibold text-error uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">warning</span> Ruptura de Consenso Criptográfico
+              </span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Discrepancia detectada en memoria</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm mt-1">
+<div class="flex flex-col gap-0.5 bg-surface-container-lowest/80 p-2.5 rounded">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase">Hash Previo Esperado:</span>
+<span class="font-code-md text-code-md text-secondary font-semibold truncate select-all">0x9b8a7c6d5e4f3a2b1c0d9e...</span>
+</div>
+<div class="flex flex-col gap-0.5 bg-surface-container-lowest/80 p-2.5 rounded">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase">Hash Calculado Corrupto:</span>
+<span class="font-code-md text-code-md text-error font-semibold truncate select-all" id="block-4-current-hash">0xff4a12ec7809da331908bf...</span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs flex-wrap gap-space-sm">
+<div class="flex items-center gap-space-md font-code-sm text-code-sm text-on-surface-variant">
+<span>Firma: <span class="text-error font-semibold">INVÁLIDA</span></span>
+<span>•</span>
+<span>Vector de Ataque: <span class="text-on-surface">Sobrescritura Directa de DB</span></span>
+</div>
+<button class="px-3.5 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-body-sm text-body-sm font-medium transition-colors flex items-center gap-1.5 shadow-sm" id="btn-edit-test" onclick="openEditTestModal()">
+<span class="material-symbols-outlined text-[16px]">edit_note</span>
+<span>Editar para probar</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive Edit / Tamper Modal (Hidden by default) -->
+<div class="hidden fixed inset-0 z-50 flex items-center justify-center p-space-md bg-inverse-surface/40 backdrop-blur-sm" id="edit-modal">
+<div class="bg-surface-container-lowest rounded-xl max-w-lg w-full p-space-xl shadow-xl flex flex-col gap-space-md animate-in fade-in zoom-in-95 duration-150">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Simulador de Manipulación de Payload</h3>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors" onclick="closeEditTestModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+          Modifique la carga útil de la transacción en el Bloque #004. Al alterar cualquier carácter, el hash SHA-256 cambiará de forma irreversible y la firma quedará descalificada.
+        </p>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Payload JSON de Transacción</label>
+<textarea class="w-full bg-surface-container-low font-code-sm text-code-sm text-on-surface p-3 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-primary" id="modal-payload-input" rows="4">{"bloque": 4, "beneficiario": "EXP-AGRO-771", "subsidio_pct": 100, "autorizado_por": "ADMIN_OVERRIDE_0x89"}</textarea>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm font-medium transition-colors" onclick="closeEditTestModal()">
+            Cancelar
+          </button>
+<button class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-body-sm text-body-sm font-medium transition-colors shadow-sm" onclick="applyManualTamper()">
+            Recalcular &amp; Forzar Estado
+          </button>
+</div>
+</div>
+</div>
+<!-- Interactive Verification Toast (Hidden by default) -->
+<div class="hidden fixed bottom-6 right-6 z-50 bg-inverse-surface text-inverse-on-surface px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200" id="verify-toast">
+<span class="material-symbols-outlined text-secondary-fixed-dim text-[20px]">verified</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-body-md font-semibold text-inverse-on-surface">Verificación Completa</span>
+<span class="font-body-sm text-body-sm text-inverse-on-surface/80" id="verify-toast-desc">3 bloques válidos • Bloque #004 aislado</span>
+</div>
+</div>
+<!-- Cryptographic Proof Footer Pills Strip -->
+<div class="w-full pt-space-md border-t border-outline-variant/30 flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex flex-wrap items-center gap-space-sm">
+<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high font-code-sm text-code-sm text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-primary">key</span>
+<span>Consenso: <span class="font-semibold">Ed25519 Institucional</span></span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high font-code-sm text-code-sm text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-primary">lock_clock</span>
+<span>Algoritmo: <span class="font-semibold">SHA-256 Gov-Hardened</span></span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high font-code-sm text-code-sm text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-secondary">check_circle</span>
+<span id="footer-valid-blocks">Bloques Válidos: <span class="font-semibold">3/4</span></span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-error-container text-error font-code-sm text-code-sm font-semibold" id="footer-isolation-pill">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span id="footer-isolation-text">Estado: En Aislamiento Preventivo</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md font-code-sm text-code-sm text-on-surface-variant">
+<span>Último sync: <span class="text-on-surface">Hace 12 seg</span></span>
+<span>•</span>
+<span>Red: <span class="text-secondary font-medium">Sincronizada</span></span>
+</div>
+</div>
+</div>
+</div>
+<script>
+  let isAltered = true;
+
+  function toggleTamperSimulation() {
+    if (isAltered) {
+      restoreBlockOriginal();
+    } else {
+      triggerAlteration();
+    }
+  }
+
+  function triggerAlteration() {
+    isAltered = true;
+    const alertBanner = document.getElementById('tamper-alert');
+    if (alertBanner) alertBanner.classList.remove('hidden');
+
+    const card = document.getElementById('block-4-card');
+    const iconWrapper = document.getElementById('block-4-icon-wrapper');
+    const icon = document.getElementById('block-4-icon');
+    const badge = document.getElementById('block-4-badge');
+    const tag = document.getElementById('block-4-tamper-tag');
+    const summary = document.getElementById('block-4-summary');
+    const discrepancy = document.getElementById('block-4-discrepancy');
+    const metricHealth = document.getElementById('metric-health-text');
+    const metricDot = document.getElementById('metric-health-dot');
+    const footerIsolation = document.getElementById('footer-isolation-pill');
+    const footerValid = document.getElementById('footer-valid-blocks');
+
+    if (card) {
+      iconWrapper.className = 'w-12 h-12 md:w-16 md:h-16 rounded-xl bg-error-container text-error shadow-sm flex items-center justify-center shrink-0 z-10 transition-colors';
+      icon.innerText = 'crisis_alert';
+      badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-error font-code-sm text-code-sm font-semibold self-start sm:self-auto';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-error"></span> Corrupto / Alterado';
+      tag.className = 'font-code-sm text-code-sm text-error bg-error/10 px-2 py-0.5 rounded';
+      tag.innerText = 'Alerta de Seguridad';
+      summary.innerText = 'Modificación no autorizada de subvención pública [Parámetro de subsidio forzado al 100%]';
+      if (discrepancy) discrepancy.classList.remove('hidden');
+    }
+
+    if (metricHealth) {
+      metricHealth.innerText = 'En Aislamiento';
+      metricHealth.className = 'font-headline-lg text-headline-lg text-error';
+      metricDot.className = 'w-2 h-2 rounded-full bg-error';
+    }
+
+    if (footerIsolation) {
+      footerIsolation.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-error-container text-error font-code-sm text-code-sm font-semibold';
+      document.getElementById('footer-isolation-text').innerText = 'Estado: En Aislamiento Preventivo';
+    }
+
+    if (footerValid) {
+      footerValid.innerHTML = 'Bloques Válidos: <span class="font-semibold">3/4</span>';
+    }
+
+    showToast('Alerta: Bloque #004 alterado intencionalmente para pruebas.');
+  }
+
+  function restoreBlockOriginal() {
+    isAltered = false;
+    const alertBanner = document.getElementById('tamper-alert');
+    if (alertBanner) alertBanner.classList.add('hidden');
+
+    const card = document.getElementById('block-4-card');
+    const iconWrapper = document.getElementById('block-4-icon-wrapper');
+    const icon = document.getElementById('block-4-icon');
+    const badge = document.getElementById('block-4-badge');
+    const tag = document.getElementById('block-4-tamper-tag');
+    const summary = document.getElementById('block-4-summary');
+    const discrepancy = document.getElementById('block-4-discrepancy');
+    const metricHealth = document.getElementById('metric-health-text');
+    const metricDot = document.getElementById('metric-health-dot');
+    const footerIsolation = document.getElementById('footer-isolation-pill');
+    const footerValid = document.getElementById('footer-valid-blocks');
+
+    if (card) {
+      iconWrapper.className = 'w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-container-lowest text-secondary shadow-sm flex items-center justify-center shrink-0 z-10 transition-colors';
+      icon.innerText = 'verified_user';
+      badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container/40 text-secondary font-code-sm text-code-sm font-semibold self-start sm:self-auto';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-secondary"></span> Verificado';
+      tag.className = 'font-code-sm text-code-sm text-on-surface-variant px-2 py-0.5 rounded bg-surface-container';
+      tag.innerText = 'Subvención Agrícola';
+      summary.innerText = 'Adjudicación Regular de Subsidio para Fertilizantes Orgánicos • Aprobado 35% tasa estándar';
+      if (discrepancy) discrepancy.classList.add('hidden');
+    }
+
+    if (metricHealth) {
+      metricHealth.innerText = '100% Íntegro';
+      metricHealth.className = 'font-headline-lg text-headline-lg text-secondary';
+      metricDot.className = 'w-2 h-2 rounded-full bg-secondary';
+    }
+
+    if (footerIsolation) {
+      footerIsolation.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary-container/40 text-secondary font-code-sm text-code-sm font-semibold';
+      document.getElementById('footer-isolation-text').innerText = 'Estado: Cadena Segura y Validada';
+    }
+
+    if (footerValid) {
+      footerValid.innerHTML = 'Bloques Válidos: <span class="font-semibold">4/4</span>';
+    }
+
+    showToast('Bloque restaurado con éxito. Hash original recalculado: 0x3c99f1...');
+  }
+
+  function triggerVerification() {
+    const btn = document.getElementById('btn-verify');
+    const spinner = document.getElementById('verify-spinner');
+    const text = document.getElementById('verify-text');
+
+    spinner.innerText = 'sync';
+    spinner.classList.add('animate-spin');
+    text.innerText = 'Auditando hashes...';
+    btn.disabled = true;
+
+    setTimeout(() => {
+      spinner.classList.remove('animate-spin');
+      spinner.innerText = 'verified_user';
+      text.innerText = 'Verificar Integridad';
+      btn.disabled = false;
+
+      if (isAltered) {
+        showToast('Firma discrepante detectada en Bloque #004. Consenso rechazado.');
+      } else {
+        showToast('Cadena 100% íntegra. Raíz de Merkle verificada correctamente.');
+      }
+    }, 800);
+  }
+
+  function openEditTestModal() {
+    document.getElementById('edit-modal').classList.remove('hidden');
+  }
+
+  function closeEditTestModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+  }
+
+  function applyManualTamper() {
+    closeEditTestModal();
+    triggerAlteration();
+    showToast('Payload actualizado. Firma computada diverge de clave matriz.');
+  }
+
+  function showToast(message) {
+    const toast = document.getElementById('verify-toast');
+    const desc = document.getElementById('verify-toast-desc');
+    if (!toast || !desc) return;
+    desc.innerText = message;
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 3800);
+  }
+</script></main><footer class="w-full bg-surface border-t border-outline-variant/30 py-space-lg"><div class="w-full px-margin flex flex-col md:flex-row items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm"><span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span><span class="font-code-sm text-code-sm text-on-surface-variant">Aduana IA — Supervisión Algorítmica Soberana y Ciberseguridad GovTech</span></div><div class="flex items-center gap-space-md font-code-sm text-code-sm text-on-surface-variant"><span>SHA-256 Validated</span><span class="text-outline-variant">•</span><span>ISO/IEC 27001</span><span class="text-outline-variant">•</span><span>© 2025</span></div></div></footer></body></html>
