@@ -80,6 +80,7 @@ export const EditBlockModal: React.FC<EditBlockModalProps> = ({
               Cuerpo Transaccional del Bloque (Payload)
             </label>
             <textarea
+              autoComplete="off"
               rows={3}
               value={payload}
               onChange={(e) => setPayload(e.target.value)}

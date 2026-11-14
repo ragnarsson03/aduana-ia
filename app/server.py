@@ -102,13 +102,18 @@ def create_app(
     if settings.demo_mode:
         handlers.append(DemoLedgerController)
 
+    allowed_hosts = [
+        candidate
+        for host in settings.allowed_hosts
+        for candidate in (host, f"{host}:{settings.port}")
+    ]
     return Litestar(
         route_handlers=handlers,
         exception_handlers={
             AduanaError: _domain_error_handler,
             Exception: _unhandled_error_handler,
         },
-        allowed_hosts=AllowedHostsConfig(allowed_hosts=list(settings.allowed_hosts)),
+        allowed_hosts=AllowedHostsConfig(allowed_hosts=allowed_hosts),
         response_headers=SECURITY_HEADERS,
         request_max_body_size=MAX_BODY_BYTES,
         state=State({"aduana": state}),

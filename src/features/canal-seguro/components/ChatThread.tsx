@@ -107,6 +107,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
         <div className="relative flex items-center">
           <input 
             type="text"
+            autoComplete="off"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}

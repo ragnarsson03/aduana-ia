@@ -556,6 +556,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
           >
             <input
               type="text"
+              autoComplete="off"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Escriba su solicitud administrativa (datos sensibles serán protegidos en RAM)..."
@@ -601,6 +602,7 @@ export const ChatIAView: React.FC<ChatIAViewProps> = ({
 
             <div className="space-y-1.5">
               <textarea
+                autoComplete="off"
                 value={overrideText}
                 onChange={(e) => setOverrideText(e.target.value)}
                 placeholder="Escriba la motivación técnica o legal de la modificación (mínimo 20 caracteres)..."

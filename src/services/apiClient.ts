@@ -71,7 +71,10 @@ export class AduanaApiClient {
   constructor(config: ApiClientConfig = {}) {
     // Si no se especifica, usa /api/v1 relativo (para Cloudflare / Nginx / Litestar servido local)
     this.baseUrl = config.baseUrl || (typeof window !== 'undefined' && (window as any).__ADUANA_API_URL__) || '/api/v1';
-    this.apiToken = config.apiToken || 'aduana-dev-token-secret-2026';
+    this.apiToken =
+      config.apiToken ||
+      (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) ||
+      'aduana-dev-token-secret-2026';
     this.timeoutMs = config.timeoutMs ?? 4000;
   }
 
@@ -87,6 +90,8 @@ export class AduanaApiClient {
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const activeToken =
+      (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) || this.apiToken;
 
     try {
       const response = await fetch(url, {
@@ -94,7 +99,7 @@ export class AduanaApiClient {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          'X-Aduana-Token': this.apiToken,
+          'X-Aduana-Token': activeToken,
           ...(options.headers || {}),
         },
       });

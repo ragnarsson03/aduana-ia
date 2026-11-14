@@ -30,6 +30,7 @@ export const ContactDirectory: React.FC<ContactDirectoryProps> = ({
         </span>
         <input
           type="text"
+          autoComplete="off"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Buscar"

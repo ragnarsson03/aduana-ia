@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-14. Estado: 383 tests pasan, 2 xfailed, 3 xpassed. Gatillo 2, Gatillo 3 y Gatillo 5 completos y verificados.
+> Última actualización: 2026-11-14. Estado: 392 tests pasan, 2 xfailed, 3 xpassed. Gatillo 2, Gatillo 3, Gatillo 5 y Gatillo 7 completos y verificados.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -72,6 +72,13 @@
 - [x] `CircuitBreaker`: máquina de estados `CLOSED`/`OPEN`/`HALF_OPEN` con `failure_threshold=3`, `cooldown_s=30.0`, `timeout_s=3.5` y `clock` inyectable.
 - [x] `tests/test_ca06_resilience.py`: 12 tests pasando (primario, fallo inmediato < 100 ms, timeout, propagación 3.5 s, `OPEN`/`HALF_OPEN`, repetibilidad offline sin sockets, anti-canary, GUARD-OUT tras fallback, Ollama/OpenAI-compat con `MockTransport`). Removido xfail de CA-06 en `tests/test_acceptance_matrix.py`.
 
+### Gatillo 7 — Escritorio PyWebView + Granian y Frontend Air-Gapped (completo y verificado)
+- [x] `app/desktop.py`: ejecución real de Granian en subproceso de proceso único (`_SingleProcessGranian`, compatible con `signal.signal` y sin nietos huérfanos al cerrar), `multiprocessing.freeze_support()`, puerto efímero, `_wait_ready`, inyección de `window.__ADUANA_TOKEN__` vía `evaluate_js` (nunca en URL) y `private_mode=True`.
+- [x] `app/server.py`: `AllowedHostsConfig` acepta `host` y `host:port` para el puerto configurado (corrige `400 invalid host header` en navegador y PyWebView).
+- [x] `iniciar_escritorio.bat` (Windows) e `iniciar_escritorio.sh` (Linux).
+- [x] `index.html`, `vite.config.ts`, `src/` y `static/`: eliminados los `<link>` a Google Fonts CDN y URLs externas en bundle, `autoComplete="off"` en todos los `<input>`/`<textarea>`, lectura dinámica de `window.__ADUANA_TOKEN__` en `AduanaApiClient`, cero `innerHTML`/`dangerouslySetInnerHTML`.
+- [x] `tests/test_ca07_desktop_and_frontend.py`: 5 tests pasando (incluyendo arranque real del subproceso Granian, verificación CSP, 401/200 con token, auditoría de `https?://` en `static/` y `autoComplete="off"`).
+
 ## EN CURSO
 - [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
 - [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
@@ -94,11 +101,6 @@
 - [ ] DTO de salida propio (usa `sanitized_response`, **omite `raw_response` y el canary**), `POST /gateway/process`, mapeo de errores a 403/429/409/422/503, `RateLimitError` → 429 + `Retry-After`.
 - [ ] Lifespan de Litestar: purga periódica de la bóveda, `zeroize_all` y cierre del repo al apagar.
 - [ ] Test de integración CA-05 completo (caplog/capsys + `.db`/`-wal`/`-shm`).
-
-### P3 — Gatillo 7 y frontend
-- [ ] Instalar y **probar de verdad** `granian` y `pywebview` (nunca se han ejecutado): servidor en hilo vs subproceso, puerto efímero, espera de readiness, token a la ventana (`evaluate_js`, no en URL), `private_mode`, `freeze_support` para PyInstaller.
-- [ ] `iniciar_escritorio.bat` e `iniciar_escritorio.sh`.
-- [ ] `static/`: panel funcionario + panel auditoría, **sin CDNs**, render con `textContent` (nunca `innerHTML`), `autocomplete="off"` en inputs con PII, CSP estricta sin inline; test que busque `https?://` en `static/`.
 
 ### P4 — Calidad, seguridad y empaquetado
 - [ ] Instalar y pasar `ruff`, `mypy --strict`, `bandit`, `pip-audit` (hoy no corridos); CI.

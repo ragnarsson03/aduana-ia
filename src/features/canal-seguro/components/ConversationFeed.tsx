@@ -151,6 +151,7 @@ export const ConversationFeed: React.FC<ConversationFeedProps> = ({
         <div className="relative flex items-center">
           <input
             type="text"
+            autoComplete="off"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
