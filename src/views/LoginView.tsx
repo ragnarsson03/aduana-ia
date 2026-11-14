@@ -5,8 +5,6 @@ import {
   Unlock, 
   User, 
   ArrowRight, 
-  Sun, 
-  Moon, 
   AlertCircle,
   KeyRound,
   X
@@ -110,17 +108,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(79,70,229,0.22)_0%,transparent_70%)]" />
       </div>
 
-      {/* Top Floating Controls */}
-      <div className="absolute top-4 right-6 z-30 flex items-center gap-3">
-        <button
-          onClick={onToggleDarkMode}
-          aria-label="Alternar tema"
-          className="p-2 rounded-xl text-slate-400 hover:text-white bg-[#171b26]/70 hover:bg-[#262a35] border border-white/10 backdrop-blur-md transition-all"
-        >
-          {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
-        </button>
-      </div>
-
       {/* Main Login Canvas / Glass Enclave Container */}
       <main className="relative z-10 w-full max-w-[480px] px-4 py-8 mx-auto flex flex-col items-center">
         
@@ -143,12 +130,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <p className="text-xs text-[#c7c4d8] mt-1 font-sans">
               Infraestructura Crítica de Control Fronterizo y Aduanal
             </p>
-
-            {/* Hardware Secure Enclave Validated Pill */}
-            <div className="inline-flex items-center space-x-1.5 mt-3 px-3 py-1 rounded-full bg-[#0a0e18]/85 border border-white/10 text-[11px] font-mono text-[#4edea3]">
-              <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse" />
-              <span>Hardware Secure Enclave Validated (AES-256 / SHA-256)</span>
-            </div>
           </div>
 
           {/* Error Banner */}
