@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
+import logoImg from '../../../assets/Logo.png';
 
 interface CanalHeaderProps {
   darkMode: boolean;
@@ -19,10 +20,15 @@ export const CanalHeader: React.FC<CanalHeaderProps> = ({
         onClick={onNavigateHome}
         className="flex items-center gap-2.5 text-left focus:outline-hidden group"
       >
-        <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-          Aduana IA <span className="text-slate-400 dark:text-slate-500 font-normal">—</span> Canal Seguro
+        <img 
+          src={logoImg} 
+          alt="Aduana IA" 
+          className="h-10 sm:h-12 w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+        />
+        <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+          <span className="text-slate-400 dark:text-slate-500 font-normal">—</span> Canal Seguro
         </span>
-        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse mt-1" />
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse mt-0.5" />
       </button>
 
       {/* Day / Night switch pill on the right */}

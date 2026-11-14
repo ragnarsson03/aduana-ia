@@ -7,6 +7,7 @@ import {
   Moon 
 } from 'lucide-react';
 import { NavTabId, NavTabItem } from '../../types';
+import logoImg from '../../assets/Logo.png';
 
 interface NavbarProps {
   activeTab: NavTabId;
@@ -40,11 +41,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center space-x-3 shrink-0">
           <button 
             onClick={() => onTabChange('pasarela')}
-            className="flex items-baseline space-x-2 focus:outline-hidden text-left"
+            className="flex items-center focus:outline-hidden text-left group"
           >
-            <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-              Aduana <span className="text-[#4f46e5] dark:text-indigo-400">IA</span>
-            </span>
+            <img 
+              src={logoImg} 
+              alt="Aduana IA" 
+              className="h-10 sm:h-12 w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+            />
           </button>
 
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
