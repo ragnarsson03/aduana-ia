@@ -158,17 +158,50 @@ export interface SessionStatusResponse {
   user: LoginUserOut;
 }
 
+export interface AttachmentPayload {
+  file_name: string;
+  file_mime_type?: string;
+  file_content_b64?: string | null;
+  file_sha256?: string | null;
+  size_bytes?: number;
+}
+
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  masked_content: string;
+  content?: string;
+}
+
 export interface ChatIAUploadRequest {
-  prompt: string;
+  prompt?: string;
+  attachment?: AttachmentPayload | null;
+  history?: ChatTurn[];
+  active_document_context?: string | null;
+  active_document_name?: string | null;
+  active_document_sha256?: string | null;
   citizen_cedula?: string;
+  user_role?: 'analista' | 'administrador' | 'auditor';
+  action?: string;
   purpose_code?: string;
   consent_granted?: boolean;
   file_name?: string | null;
   file_mime_type?: string | null;
   file_content_b64?: string | null;
+  client_file_sha256?: string | null;
   features?: Record<string, number> | null;
   human_decision?: RecommendationType | null;
   override_justification?: string | null;
+}
+
+export interface ChatIAStreamUploadParams {
+  file: File;
+  prompt?: string;
+  history?: ChatTurn[];
+  citizen_cedula?: string;
+  user_role?: 'analista' | 'administrador' | 'auditor';
+  action?: string;
+  client_file_sha256?: string | null;
+  signal?: AbortSignal;
 }
 
 export interface ChatIAResponse {
@@ -194,6 +227,10 @@ export interface ChatIAResponse {
   block_index: number;
   chain_verified: boolean;
   latency_ms: number;
+  chunks_processed?: number;
+  user_role?: string;
+  audit_action?: string;
+  document_context_masked?: string | null;
   is_offline_fallback?: boolean;
 }
 

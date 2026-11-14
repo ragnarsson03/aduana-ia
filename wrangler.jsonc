@@ -11,7 +11,8 @@
 	},
 	// Activos estáticos del frontend React (compilado por Vite en static/)
 	"assets": {
-		"directory": "./static"
+		"directory": "./static",
+		"not_found_handling": "single-page-application"
 	},
 	// Variables de entorno públicas del entorno Edge
 	"vars": {

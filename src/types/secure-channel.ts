@@ -40,6 +40,11 @@ export interface FileAttachment {
   dataUrl: string;
   sha256Hex: string;
   isClassified?: boolean;
+  isEncrypted?: boolean;
+  algorithm?: string;
+  ivHex?: string;
+  ciphertextPreview?: string;
+  authTagValid?: boolean;
 }
 
 export interface CryptoProcessVerification {
