@@ -1,10 +1,21 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-13. Estado: 252 tests pasan, 4 CA en `xfail(strict=True)`. Nada commiteado.
+> Última actualización: 2026-11-13. Estado: 265 tests pasan, 2 CA en `xfail(strict=True)`. Gatillo 2 y Gatillo 3 completos y certificados.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
+
+## Cómo se usa y protocolo de trabajo
+- **Estados de tarea:** Cada tarea lleva un estado: `[x]` hecha, `[~]` en curso (quién/fecha), `[ ]` pendiente y `[?]` que requiere tu decisión humana.
+- **Reserva de tarea:** Quien tome una tarea debe marcarla `[~]` con su nombre antes de empezar, y no tocar los archivos de otra tarea en curso.
+- **Finalización:** Al terminar la marca `[x]` y corre la suite con `.venv/Scripts/python -m pytest -q` (debe quedar en verde).
+- **Para continuar en otro equipo / con otra IA:**
+  1. Clonar el repositorio y entrar a la carpeta `aduana-ia`: `cd aduana-ia`.
+  2. Activar el entorno virtual de Python 3.11+: `.venv\Scripts\activate` (Windows) o `source .venv/bin/activate` (Linux).
+  3. Ejecutar la suite: `.venv/Scripts/python -m pytest -q` para certificar el estado base.
+  4. Leer este archivo `PROGRESO.md`, elegir la tarea siguiente en `## PENDIENTE`, marcarla con `[~]` y tu nombre antes de codificar.
+  5. Respetar estrictamente los archivos de otras tareas en `## EN CURSO`.
 
 ## Cómo trabajar aquí (reglas de oro, de SPEC/PROMPT_MAESTRO/.cursorrules)
 - Python ≥ 3.11, **Litestar** (prohibido FastAPI), msgspec, criptografía solo stdlib (`hashlib`, `hmac`, `secrets`, `unicodedata`). **Prohibido `random`**.
@@ -47,6 +58,15 @@
 - [x] `app/controllers/metrics.py`: `GET /api/v1/metrics/benchmark` (cachear resultado, 1/min, `sync_to_thread=True`).
 - [x] Tests CA-02 en `tests/test_ca02_guardian.py`: 14 tests pasando (TPR ≥ 88 %, FPR ≤ 4 %, < 25 ms/prompt, 100 % de fugas de canary neutralizadas). Removido xfail de `tests/test_acceptance_matrix.py`.
 
+### Gatillo 3 — Ledger y persistencia restrictiva (CA-03, CA-05 parte `.db`, completo y verificado)
+- [x] `pipeline/stage4_ledger.py`: `SQLiteLedgerRepository` (`PRAGMA journal_mode=WAL`, `synchronous=FULL`, `secure_delete=ON`, `trusted_schema=OFF`, triggers `BEFORE UPDATE/DELETE` → `RAISE(ABORT,'ERR_IMMUTABLE_LEDGER')`, `append_chained` atómico con `BEGIN IMMEDIATE` y `RLock`, `iter_blocks`, permisos 0600).
+- [x] `seal_entry` y `verify_chain(blocks, *, keys, anchor)`: orden INDEX_GAP → enlace previo/génesis → HASH_MISMATCH → HMAC forjado; ancla (`count`, `head_hash`) contra truncado de cola; latencia < 50 ms.
+- [x] `override_justification` nunca en claro en el ledger (solo HMAC hex con clave dominio `justification`).
+- [x] `app/controllers/ledger.py`: `GET /api/v1/ledger/verify` (expone `head_hash` y latencia < 50 ms) y `POST /api/v1/ledger/tamper-sim` (`flip_payload_bit`, `recompute_sha_without_key`, `break_prev_link`, `flip_override`) operando 100% sobre copia en RAM con `simulated: true`.
+- [x] `tests/test_ca03_ledger.py`: 12 tests pasando (verificación de cadena, hardening SQLite, bit flips, link broken, firmas falsificadas, truncado y endpoints).
+- [x] `tests/test_ca05_restrictive_storage.py`: convertido en test real `test_ca05_db_and_wal_hold_zero_plaintext_pii_after_20_requests` (20 trámites simulados, auditoría binaria de `.db`, `-wal`, `-shm` con 0 bytes de PII).
+- [x] Removido xfail de CA-03 en `tests/test_acceptance_matrix.py`.
+
 ## EN CURSO
 - [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
 - [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
@@ -58,14 +78,6 @@
 - [x] **Alcance de CA-01 decidido (usuario, opción A):** < 20 ms para textos de hasta 10 000 caracteres; la API sigue aceptando hasta 20 000 (`MAX_RAW_TEXT_CHARS`) sin garantía de 20 ms por encima de 10 000. Documentado en `specs/01_shield.spec.md` y fijado en `tests/test_ca01_shield.py`.
 - [ ] Reescribir `specs/01_shield.spec.md` (firmas reales; **corregir vector `J-00000000-9`: el verificador correcto es 0**; mover "inconsistencias" a "decisiones tomadas").
 - [ ] Límites conocidos sin cubrir (documentados en `core/pii_patterns.py`): nombres sin marcador/minúsculas, base32/ROT13/entidades HTML/`%NN`, números en palabras, clínicos con variantes (`seropositivo`, `d i a b e t e s`), falsos positivos clínicos en texto comercial ("depresión del mercado").
-
-### P1 — Gatillo 3: Ledger (CA-03, CA-05 parte `.db`)
-- [ ] `SQLiteLedgerRepository` en un módulo de repositorio: `PRAGMA journal_mode=WAL`, `synchronous=FULL`, `secure_delete=ON`, `trusted_schema=OFF`, triggers `BEFORE UPDATE/DELETE` → `RAISE(ABORT,'ERR_IMMUTABLE_LEDGER')`; `append_chained` atómico (`BEGIN IMMEDIATE` + lock); `iter_blocks`; permisos restrictivos del archivo; I/O fuera del event loop.
-- [ ] `seal_entry` y `verify_chain(blocks, *, keys, anchor)`: orden INDEX_GAP → enlace previo/génesis → HASH_MISMATCH → HMAC forjado; ancla (`count`, `head_hash`) contra truncado de cola; < 50 ms.
-- [ ] `override_justification` **nunca en claro** en el ledger (solo hash, vía `KeyRing` dominio `justification`).
-- [ ] `GET /ledger/verify` (expone `head_hash`); `tamper-sim` con escenarios cerrados (`flip_payload_bit`, `recompute_sha_without_key`, `break_prev_link`, `flip_override`) sobre **copia en RAM**, nunca el archivo real; `block_index` en rango; respuesta `simulated: true`.
-- [ ] Convertir el xfail de CA-03 y la parte `.db` de CA-05 (20 trámites; auditoría binaria de `.db`, `-wal`, `-shm`, stdout/stderr buscando variantes de cédula/RIF/teléfono) en tests reales. Spec: `specs/03_ledger.spec.md`.
-- [ ] Decidir mapeo de veredictos GUARD-IN/GUARD-OUT → `LedgerEntry.security_verdict` (documentarlo en la spec).
 
 ### P2 — Gatillo 4: EXPLICA (CA-04)
 - [ ] `data/synthetic_tramites.csv` (sintético, determinista) y coeficientes β/μ fijos (5 variables); `explain(features, human_decision, override_justification)`.
@@ -108,7 +120,7 @@
 |---|---|
 | Contratos/config | `core/context.py`, `config.py`, `errors.py`, `protocols.py`, `keyring.py` |
 | Cripto/bóveda | `core/crypto.py`, `ephemeral_vault.py`, `text_normalizer.py`, `pii_patterns.py` |
-| Pipeline | `pipeline/stage0_consent.py`, `stage1_shield.py` (hechos); `stage2_guard_in.py`, `stage3_guard_out.py`, `stage4_ledger.py`, `stage5_explica.py`, `llm_adapter.py`, `orchestrator.py` (stubs `NotImplementedError`) |
+| Pipeline | `pipeline/stage0_consent.py`, `stage1_shield.py`, `stage2_guard_in.py`, `stage3_guard_out.py`, `stage4_ledger.py` (hechos); `stage5_explica.py`, `llm_adapter.py`, `orchestrator.py` (pendientes) |
 | API | `app/server.py`, `security.py`, `schemas.py`, `dependencies.py`, `controllers/*`, `desktop.py` (sin probar) |
 | Tests | `tests/` (conftest con `client`, `demo_client`, `keys`; token `API_TOKEN`/`TOKEN_HEADERS`) |
-| Specs | `specs/00_architecture.spec.md`, `00_kernel`, `01_shield` (desactualizada), `02_guardian`, `03_ledger`, `04_explica`, `05_interconnect` |
+| Specs | `specs/00_architecture.spec.md`, `00_kernel`, `01_shield` (desactualizada), `02_guardian`, `03_ledger`, `04_explica`, `05_interconnect`, `06_files_and_chat_frontend` |

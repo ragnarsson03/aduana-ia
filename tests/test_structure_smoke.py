@@ -74,7 +74,6 @@ def test_health_is_public_and_minimal(client: TestClient) -> None:
 @pytest.mark.parametrize(
     ("method", "path", "body"),
     [
-        ("get", "/api/v1/ledger/verify", None),
         ("post", "/api/v1/gateway/process", GATEWAY_BODY),
     ],
 )

@@ -65,7 +65,8 @@ def test_tamper_sim_registered_in_demo_mode(demo_client: TestClient) -> None:
         json={"scenario": "flip_override", "block_index": 1},
         headers=TOKEN_HEADERS,
     )
-    assert response.status_code == 501  # pendiente Gatillo 3, pero la ruta existe
+    # Ruta registrada y activa: valida parámetros (400 si índice fuera de rango, 200 si simula)
+    assert response.status_code in (200, 400)
 
 
 @pytest.mark.parametrize(
