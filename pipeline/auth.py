@@ -73,6 +73,13 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_aduana_role
 
 CREATE INDEX IF NOT EXISTS idx_usuarios_aduana_is_active
     ON usuarios_aduana (is_active);
+
+CREATE TABLE IF NOT EXISTS canal_seguro_channels (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL
+);
 """
 
 
@@ -276,6 +283,8 @@ class SQLiteAuthRepository:
 
     def __init__(self, db_path: str, keys: KeyRing | None = None) -> None:
         self._db_path = db_path
+        self._keys = keys
+        self._seeded = False
         self._lock = threading.RLock()
         p = Path(db_path)
         if not p.parent.exists():
@@ -286,24 +295,25 @@ class SQLiteAuthRepository:
             cur = self._conn.cursor()
             cur.execute("PRAGMA foreign_keys = ON;")
             cur.executescript(_AUTH_SCHEMA_SQL)
-            if keys is not None:
-                self._seed_if_empty_locked(cur, keys)
             self._conn.commit()
             cur.close()
 
-    def _seed_if_empty_locked(self, cur: sqlite3.Cursor, keys: KeyRing) -> None:
+    def _seed_if_empty_locked(self, cur: sqlite3.Cursor) -> None:
+        if self._seeded or self._keys is None:
+            return
         cur.execute("SELECT COUNT(*) FROM usuarios_aduana")
         count = cur.fetchone()[0]
-        if count > 0:
-            return
-        from scripts.generate_d1_seed import build_seed_sql
+        if count == 0:
+            from scripts.generate_d1_seed import build_seed_sql
 
-        cur.executescript(build_seed_sql(keys))
+            cur.executescript(build_seed_sql(self._keys))
+        self._seeded = True
 
     def find_active_by_blind_id(self, blind_id: str) -> tuple[AuthenticatedUser, str] | None:
         """Busca un funcionario activo exclusivamente por su ``blind_citizen_id``."""
         with self._lock:
             cur = self._conn.cursor()
+            self._seed_if_empty_locked(cur)
             cur.execute(
                 """
                 SELECT

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
 from litestar import Controller, Request, get, post
 from litestar.exceptions import HTTPException, NotAuthorizedException
+from litestar.params import Body
 
 from app.dependencies import AppState
 from app.schemas import (
@@ -57,7 +59,11 @@ class AuthController(Controller):
     path = f"{API_PREFIX}/auth"
 
     @post("/login", guards=[api_guard], status_code=200, sync_to_thread=True)
-    def login(self, data: LoginRequest, request: Request) -> LoginResponse:
+    def login(
+        self,
+        data: Annotated[LoginRequest, Body()],
+        request: Request,
+    ) -> LoginResponse:
         state: AppState = request.app.state.aduana
         try:
             blind_id = compute_blind_citizen_id(state.keys, data.cedula)

@@ -21,7 +21,11 @@ AUTH_HEADERS = {
 
 def _make_client(tmp_path: Path) -> tuple[TestClient, Path]:
     db_path = tmp_path / "auth_test.db"
-    settings = Settings(db_path=db_path, demo_mode=True)
+    settings = Settings(
+        db_path=db_path,
+        demo_mode=True,
+        allowed_hosts=("testserver.local",),
+    )
     app = create_app(
         settings=settings,
         keys=KeyRing(bytes(range(32))),

@@ -106,7 +106,7 @@ class HealthResponse(msgspec.Struct, frozen=True):
 
 
 class LoginRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
-    cedula: Cedula
+    cedula: Annotated[str, msgspec.Meta(min_length=5, max_length=32)]
     password: Annotated[str, msgspec.Meta(min_length=1, max_length=128)]
 
     def __repr__(self) -> str:  # Zero-Leak
