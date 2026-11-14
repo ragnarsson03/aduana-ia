@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar, NavTab } from './components/Navbar';
-import { Footer } from './components/Footer';
+import { Navbar } from './components/layout/Navbar';
+import { Footer } from './components/layout/Footer';
+import { PasarelaView } from './views/PasarelaView';
 import { LedgerView } from './views/LedgerView';
 import { ExplicabilidadView } from './views/ExplicabilidadView';
-import { PasarelaView } from './views/PasarelaView';
+import { CanalSeguroView } from './views/CanalSeguroView';
+import { NavTabId } from './types';
 import { CheckCircle2 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTab>('ledger');
+  const [activeTab, setActiveTab] = useState<NavTabId>('pasarela');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    // Check localStorage or system preference
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('aduana_dark_mode');
       if (saved !== null) return saved === 'true';
@@ -38,22 +39,32 @@ export const App: React.FC = () => {
     }, 3500);
   };
 
+  const handleNavigate = (tab: NavTabId) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-slate-800 dark:bg-[#0c101d] dark:text-slate-100 transition-colors selection:bg-[#3525cd] selection:text-white">
+    <div className="min-h-screen flex flex-col bg-[#F4F6FB] text-slate-800 dark:bg-[#030712] dark:text-slate-100 transition-colors selection:bg-[#4f46e5] selection:text-white">
       
       {/* Top Header Navbar */}
       <Navbar
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onTabChange={handleNavigate}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 w-full animate-in fade-in duration-200">
+        {activeTab === 'pasarela' && (
+          <PasarelaView 
+            onNavigateToLedger={() => handleNavigate('ledger')}
+            onNavigateToExplica={() => handleNavigate('explicabilidad')}
+            onNotify={showNotification}
+          />
+        )}
+
         {activeTab === 'ledger' && (
           <LedgerView onCopyText={showNotification} />
         )}
@@ -62,10 +73,10 @@ export const App: React.FC = () => {
           <ExplicabilidadView onNotify={showNotification} />
         )}
 
-        {activeTab === 'pasarela' && (
-          <PasarelaView 
-            onNotify={showNotification} 
-            onGoToLedger={() => setActiveTab('ledger')}
+        {activeTab === 'canal' && (
+          <CanalSeguroView 
+            onBackToPasarela={() => handleNavigate('pasarela')}
+            onNotify={showNotification}
           />
         )}
       </main>
