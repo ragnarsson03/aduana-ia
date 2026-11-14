@@ -297,3 +297,71 @@ def test_chat_attachment_prompt_injection_and_canary_leak_blocked(
         assert canary_data["restored_response"] == ""
         assert "CANARY-HMAC" not in r_canary.text
         assert app.state.aduana.vault.active_sessions == 0
+
+
+def test_gemini_adapter_zero_trust_and_redacted_repr(tmp_path: Path) -> None:
+    import asyncio
+    import json as std_json
+
+    import httpx
+
+    from core.config import load_gemini_from_env
+    from pipeline.llm_adapter import GeminiAdapter
+
+    dotenv_file = tmp_path / ".env"
+    dotenv_file.write_text("AQ.FakeTestKey1234567890\n", encoding="utf-8")
+    loaded_key, loaded_model = load_gemini_from_env({}, dotenv_path=dotenv_file)
+    assert loaded_key == "AQ.FakeTestKey1234567890"
+    assert loaded_model == "gemini-3.5-flash-lite"
+
+    captured_payloads: list[dict] = []
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers.get("x-goog-api-key") == "AQ.FakeTestKey1234567890"
+        body = std_json.loads(request.content.decode("utf-8"))
+        captured_payloads.append(body)
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        "Expediente analizado por Gemini para [CEDULA_1] "
+                                        "y entidad [RIF_1] con contacto [PHONE_1]."
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    adapter = GeminiAdapter(
+        api_key="AQ.FakeTestKey1234567890",
+        model="gemini-3.5-flash-lite",
+        enabled=True,
+        transport=httpx.MockTransport(_handler),
+    )
+    assert "AQ.FakeTestKey1234567890" not in repr(adapter)
+    assert "api_key='<redacted>'" in repr(adapter)
+
+    sandbox_prompt = (
+        "<instruccion_institucional_inmutable>\n"
+        "Canary transaccional: [[CANARY-HMAC-AABBCCDD11223344]]\n"
+        "</instruccion_institucional_inmutable>\n"
+        "<entrada_ciudadano>\n"
+        "Evaluar solicitud de [CEDULA_1] y [RIF_1].\n"
+        "</entrada_ciudadano>"
+    )
+    out = asyncio.run(adapter.complete(sandbox_prompt, timeout_s=5.0))
+    assert "[CEDULA_1]" in out
+    assert "[RIF_1]" in out
+    assert len(captured_payloads) == 1
+    sent_text = captured_payloads[0]["contents"][0]["parts"][0]["text"]
+    assert "CANARY-HMAC" not in sent_text
+    assert "[CEDULA_1]" in sent_text
+

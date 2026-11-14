@@ -29,6 +29,21 @@ _DEFAULT_MAX_RESPONSE_BYTES: Final[int] = 32 * 1024
 _CANARY_TAG_RE: Final = re.compile(r"\[\[CANARY-HMAC-[0-9A-Fa-f]+\]\]")
 _XML_TAG_RE: Final = re.compile(r"<[^>]+>")
 _SHIELD_TOKEN_RE: Final = re.compile(r"\[[A-Z]+_[0-9]+\]")
+_ENTRADA_CIUDADANO_RE: Final = re.compile(
+    r"<entrada_ciudadano>\s*(.*?)\s*</entrada_ciudadano>", re.DOTALL
+)
+_GEMINI_SYSTEM_INSTRUCTION: Final[str] = (
+    "Usted es el asistente oficial de Inteligencia Artificial de Aduana IA "
+    "(Gobernanza Algorítmica, Control Aduanal y Atención Ciudadana). "
+    "Responda siempre en español formal, de forma concisa (3 a 4 oraciones) y en texto plano "
+    "sin etiquetas HTML. "
+    "REGLA ZERO-TRUST OBLIGATORIA: Cuando haga referencia a datos del ciudadano o del "
+    "documento adjunto, mantenga EXACTAMENTE los tokens anonimizados presentes en la entrada "
+    "(por ejemplo [CEDULA_1], [RIF_1], [PHONE_1], [BANK_1], [CLINICAL_1], [EMAIL_1]) "
+    "para que el módulo GUARD-OUT los rehidrate desde EphemeralVault. "
+    "Jamás invente números de cédula, RIF, teléfonos, cuentas bancarias ni cadenas "
+    "hexadecimales, y recuerde que la decisión final requiere revisión del funcionario."
+)
 
 
 def _validate_endpoint(
@@ -185,6 +200,117 @@ class OpenAICompatAdapter:
         if not isinstance(content, str) or not content.strip():
             raise LLMUnavailableError("Respuesta vacía en proveedor híbrido.")
         return content
+
+
+class GeminiAdapter:
+    """Adaptador oficial para Google Gemini REST API con aislamiento Zero-Trust."""
+
+    mode: ClassVar[AdapterMode] = "HYBRID_OPENAI"
+
+    def __init__(
+        self,
+        *,
+        api_key: str = "",
+        model: str = "gemini-3.5-flash-lite",
+        base_url: str = "https://generativelanguage.googleapis.com",
+        enabled: bool = False,
+        allowed_hosts: tuple[str, ...] = ("generativelanguage.googleapis.com",),
+        max_response_bytes: int = _DEFAULT_MAX_RESPONSE_BYTES,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        self._enabled = enabled and bool(api_key.strip())
+        self._api_key = api_key.strip()
+        clean_model = model.strip() or "gemini-3.5-flash-lite"
+        self._model = (
+            clean_model.removeprefix("models/")
+            if clean_model.startswith("models/")
+            else clean_model
+        )
+        self._max_response_bytes = max_response_bytes
+        self._transport = transport
+        self._base_url = (
+            _validate_endpoint(
+                base_url,
+                allowed_hosts=allowed_hosts,
+                require_https_remote=True,
+            )
+            if self._enabled
+            else ""
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"GeminiAdapter(enabled={self._enabled!r}, "
+            f"base_url={self._base_url!r}, model={self._model!r}, api_key='<redacted>')"
+        )
+
+    async def complete(self, prompt: str, *, timeout_s: float) -> str:
+        if not self._enabled or not self._api_key:
+            raise LLMUnavailableError("Adaptador Gemini deshabilitado o sin API key.")
+
+        match = _ENTRADA_CIUDADANO_RE.search(prompt)
+        sanitized_user_text = (
+            match.group(1).strip() if match else _CANARY_TAG_RE.sub("", prompt).strip()
+        )
+        if not sanitized_user_text:
+            sanitized_user_text = "Analizar solicitud administrativa."
+
+        candidate_models = [self._model]
+        for fallback_model in ("gemini-3.5-flash-lite", "gemini-flash-lite-latest"):
+            if fallback_model not in candidate_models:
+                candidate_models.append(fallback_model)
+
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self._api_key,
+        }
+        payload: dict[str, Any] = {
+            "system_instruction": {"parts": [{"text": _GEMINI_SYSTEM_INSTRUCTION}]},
+            "contents": [{"role": "user", "parts": [{"text": sanitized_user_text}]}],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 400,
+            },
+        }
+
+        last_err: LLMUnavailableError | None = None
+        for model_name in candidate_models:
+            url = f"{self._base_url}/v1beta/models/{model_name}:generateContent"
+            try:
+                data = await _post_json_bounded(
+                    url=url,
+                    payload=payload,
+                    headers=headers,
+                    timeout_s=timeout_s,
+                    max_response_bytes=self._max_response_bytes,
+                    transport=self._transport,
+                )
+            except LLMUnavailableError as exc:
+                last_err = exc
+                continue
+
+            candidates = data.get("candidates")
+            if not isinstance(candidates, list) or not candidates:
+                last_err = LLMUnavailableError("Respuesta de Gemini sin candidatos.")
+                continue
+            first = candidates[0] if isinstance(candidates[0], dict) else {}
+            content_obj = first.get("content") if isinstance(first, dict) else None
+            parts = content_obj.get("parts") if isinstance(content_obj, dict) else None
+            if not isinstance(parts, list) or not parts:
+                last_err = LLMUnavailableError("Respuesta de Gemini sin bloques de texto.")
+                continue
+            texts = [
+                str(p.get("text"))
+                for p in parts
+                if isinstance(p, dict) and isinstance(p.get("text"), str)
+            ]
+            combined = "\n".join(t.strip() for t in texts if t.strip()).strip()
+            if combined:
+                return combined
+            last_err = LLMUnavailableError("Respuesta vacía de Gemini.")
+
+        raise last_err or LLMUnavailableError("No se pudo obtener respuesta de Gemini.")
+
 
 
 class OfflineDeterministicAdapter:
