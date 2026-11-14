@@ -8,6 +8,7 @@ from litestar import Controller, Request, post
 from litestar.params import JSONBody
 
 from app.dependencies import AppState
+from app.rbac_guards import SCOPE_USER_KEY, require_any_permission, require_permission
 from app.schemas import (
     GatewayProcessRequest,
     GatewayProcessResponse,
@@ -17,19 +18,31 @@ from app.schemas import (
 from app.security import api_guard
 from core.config import API_PREFIX
 from core.context import BlockedPacket
+from core.rbac import Permission
 from pipeline.orchestrator import GatewayInput
 from pipeline.stage1_shield import shield
+
+
+def _authorize_gateway_action(request: Request, data: GatewayProcessRequest) -> None:
+    """Con RBAC: decidir (override) exige ``tramite:override``; enviar exige ``tramite:submit``."""
+    user = request.scope.get(SCOPE_USER_KEY)
+    if user is None:  # RBAC apagado
+        return
+    is_override = data.human_decision is not None or data.override_justification is not None
+    needed: Permission = "tramite:override" if is_override else "tramite:submit"
+    request.app.state.aduana.identity.authorize(user, needed)
 
 
 class GatewayController(Controller):
     path = f"{API_PREFIX}/gateway"
     guards = [api_guard]
 
-    @post("/process")
+    @post("/process", guards=[require_any_permission("tramite:submit", "tramite:override")])
     async def process(
         self, request: Request, data: JSONBody[GatewayProcessRequest]
     ) -> GatewayProcessResponse:
         state: AppState = request.app.state.aduana
+        _authorize_gateway_action(request, data)
         gateway_in = GatewayInput(
             raw_text=data.raw_text,
             citizen_cedula=data.citizen_cedula,
@@ -86,7 +99,8 @@ class ShieldController(Controller):
     path = f"{API_PREFIX}/shield"
     guards = [api_guard]
 
-    @post("/inspect", sync_to_thread=True)  # trabajo CPU: no bloquear el event loop
+    # sync_to_thread: trabajo CPU, no bloquear el event loop
+    @post("/inspect", guards=[require_permission("shield:inspect")], sync_to_thread=True)
     def inspect(
         self, request: Request, data: JSONBody[ShieldInspectRequest]
     ) -> ShieldInspectResponse:
