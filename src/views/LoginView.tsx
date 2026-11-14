@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
   UserCheck, 
   KeyRound, 
-  Building2, 
   ArrowRight, 
   Sun, 
   Moon, 
   CheckCircle2, 
   AlertCircle,
-  Fingerprint
+  Fingerprint,
+  X,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types/auth';
 import { LOGIN_PRESETS, MOCK_AUTH_USERS } from '../constants/mockAuth';
@@ -28,32 +30,36 @@ export const LoginView: React.FC<LoginViewProps> = ({
   darkMode,
   onToggleDarkMode,
 }) => {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('auditor');
-  const [emailInput, setEmailInput] = useState<string>(MOCK_AUTH_USERS.auditor.email);
-  const [passwordInput, setPasswordInput] = useState<string>('auditor2026');
+  // Selected role is null initially so the manual verification box is hidden by default
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const [emailInput, setEmailInput] = useState<string>('');
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
 
-  // When clicking a preset card, auto-fill the login form
-  const handleSelectPreset = (presetRole: UserRole) => {
-    setSelectedRole(presetRole);
-    const preset = LOGIN_PRESETS.find(p => p.role === presetRole);
-    if (preset) {
-      setEmailInput(preset.user.email);
+  // When clicking on a role's "Acceder como [Rol]" button, activate that role and reveal the credential prompt
+  const handleSelectRole = (role: UserRole) => {
+    setSelectedRole(role);
+    const targetUser = MOCK_AUTH_USERS[role];
+    const preset = LOGIN_PRESETS.find(p => p.role === role);
+    if (targetUser && preset) {
+      setEmailInput(targetUser.email);
       setPasswordInput(preset.defaultPass);
       setErrorMsg(null);
     }
+    // Smooth scroll down to the credential verification box
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 120);
   };
 
-  const handleQuickLogin = (role: UserRole) => {
-    const targetUser = MOCK_AUTH_USERS[role];
-    if (targetUser) {
-      setIsAuthenticating(true);
-      setTimeout(() => {
-        setIsAuthenticating(false);
-        onLogin(targetUser);
-      }, 350);
-    }
+  const handleCancelSelection = () => {
+    setSelectedRole(null);
+    setEmailInput('');
+    setPasswordInput('');
+    setErrorMsg(null);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -85,6 +91,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
       onLogin(matchedUser);
     }, 400);
   };
+
+  const activePreset = selectedRole ? LOGIN_PRESETS.find(p => p.role === selectedRole) : null;
+  const activeUser = selectedRole ? MOCK_AUTH_USERS[selectedRole] : null;
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#F4F6FB] dark:bg-[#060a12] text-slate-800 dark:text-slate-100 transition-colors select-none">
@@ -149,11 +158,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
               return (
                 <div
                   key={preset.role}
-                  onClick={() => handleSelectPreset(preset.role)}
+                  onClick={() => handleSelectRole(preset.role)}
                   className={`cursor-pointer rounded-2xl p-5 border transition-all duration-200 flex flex-col justify-between text-left relative ${
                     isSelected
-                      ? 'bg-white dark:bg-[#111827] border-primary shadow-lg ring-2 ring-primary/20 scale-[1.02]'
-                      : 'bg-white/80 dark:bg-[#0c121e] border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-sm'
+                      ? 'bg-white dark:bg-[#111827] border-primary shadow-xl ring-2 ring-primary/40 scale-[1.02]'
+                      : 'bg-white/80 dark:bg-[#0c121e] border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-sm hover:shadow-md'
                   }`}
                 >
                   <div className="space-y-3">
@@ -181,23 +190,26 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     </p>
 
                     <div className="pt-2 text-[10px] font-mono text-neutral-400 dark:text-neutral-500 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
-                      <div>Usuario: <span className="text-neutral-700 dark:text-neutral-300">{preset.user.email}</span></div>
-                      <div>Clave: <span className="text-neutral-700 dark:text-neutral-300">{preset.defaultPass}</span></div>
+                      <div>Usuario: <span className="text-neutral-700 dark:text-neutral-300 font-medium">{preset.user.email}</span></div>
+                      <div>Clave: <span className="text-neutral-700 dark:text-neutral-300 font-medium">{preset.defaultPass}</span></div>
                     </div>
                   </div>
 
-                  {/* Direct One-Click Enter Button */}
+                  {/* Acceder como [Rol] Button */}
                   <div className="pt-4">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleQuickLogin(preset.role);
+                        handleSelectRole(preset.role);
                       }}
-                      disabled={isAuthenticating}
-                      className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-primary hover:bg-indigo-700 text-white shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs ${
+                        isSelected 
+                          ? 'bg-primary text-white shadow-md' 
+                          : 'bg-primary/90 hover:bg-primary text-white'
+                      }`}
                     >
-                      <span>Acceder como {preset.roleName}</span>
+                      <span>{isSelected ? `Ingresando como ${preset.roleName}` : `Acceder como ${preset.roleName}`}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -206,65 +218,121 @@ export const LoginView: React.FC<LoginViewProps> = ({
             })}
           </div>
 
-          {/* Manual Credentials Box */}
-          <div className="max-w-md mx-auto p-6 rounded-2xl bg-white dark:bg-[#0c121e] border border-neutral-200 dark:border-neutral-800 shadow-md space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-neutral-100 dark:border-neutral-800">
-              <span className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
-                Verificación Manual de Credenciales
-              </span>
-              <span className="text-[10px] font-mono text-neutral-400">Ed25519 Enclave</span>
-            </div>
+          {/* Conditional Credential Verification Form — Only appears when a role is selected */}
+          {selectedRole && activePreset && activeUser && (
+            <div 
+              ref={formRef}
+              className="max-w-md mx-auto p-6 rounded-2xl bg-white dark:bg-[#0c121e] border-2 border-primary/30 dark:border-primary/40 shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300"
+            >
+              {/* Form Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary dark:text-indigo-400 font-bold text-xs flex items-center justify-center border border-primary/20">
+                    {activeUser.avatarText}
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
+                      Verificación de Credenciales
+                    </h3>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Rol: <span className="font-semibold text-primary dark:text-indigo-400">{activePreset.roleName}</span> ({activeUser.name})
+                    </p>
+                  </div>
+                </div>
 
-            {errorMsg && (
-              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleFormSubmit} className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                  <UserCheck className="w-3.5 h-3.5 text-neutral-400" />
-                  <span>Usuario o Correo Institucional:</span>
-                </label>
-                <input
-                  type="text"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="ej. auditor@aduana.gob.ve"
-                  required
-                  className="w-full px-3 py-2 rounded-xl text-xs bg-neutral-50 dark:bg-[#141b29] border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-neutral-400" />
-                  <span>Contraseña o Passkey Criptográfica:</span>
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  className="w-full px-3 py-2 rounded-xl text-xs bg-neutral-50 dark:bg-[#141b29] border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              <div className="pt-2">
                 <button
-                  type="submit"
-                  disabled={isAuthenticating}
-                  className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={handleCancelSelection}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  title="Cancelar y cambiar de rol"
                 >
-                  <Fingerprint className="w-4 h-4" />
-                  <span>{isAuthenticating ? 'Validando en Enclave...' : 'Iniciar Sesión Segura'}</span>
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
-          </div>
+
+              {/* Clearance badge */}
+              <div className="p-2.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/50 dark:border-indigo-800/40 text-[11px] font-mono text-indigo-700 dark:text-indigo-300 flex items-center justify-between">
+                <span>{activeUser.credentials.clearanceLevel}</span>
+                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Nodo Local
+                </span>
+              </div>
+
+              {/* Error Alert */}
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {/* Form Inputs */}
+              <form onSubmit={handleFormSubmit} className="space-y-3.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-neutral-400" />
+                    <span>Usuario o Correo Institucional:</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="ej. auditor@aduana.gob.ve"
+                    required
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-neutral-50 dark:bg-[#141b29] border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-neutral-400" />
+                      <span>Contraseña o Passkey Criptográfica:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 flex items-center gap-1"
+                    >
+                      {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showPassword ? 'Ocultar' : 'Mostrar'}</span>
+                    </button>
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="••••••••••••"
+                    required
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-neutral-50 dark:bg-[#141b29] border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+                  />
+                  <p className="text-[10px] text-neutral-400 font-mono">
+                    Clave de prueba: <span className="text-neutral-600 dark:text-neutral-300 font-semibold">{activePreset.defaultPass}</span>
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCancelSelection}
+                    className="py-2.5 px-3 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    Elegir otro rol
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isAuthenticating}
+                    className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <Fingerprint className="w-4 h-4" />
+                    <span>{isAuthenticating ? 'Validando en Enclave...' : `Confirmar y Entrar como ${activePreset.roleName}`}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </main>
 
