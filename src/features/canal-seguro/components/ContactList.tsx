@@ -29,6 +29,7 @@ export const ContactList: React.FC<ContactListProps> = ({
         </span>
         <input 
           type="text"
+          autoComplete="off"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Buscar expediente o contacto..." 

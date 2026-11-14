@@ -1,4 +1,4 @@
-"""Pruebas de integración del Gatillo 6: Orquestador y API completa (POST /api/v1/gateway/process)."""
+"""Pruebas de integración del Gatillo 6: Orquestador y API (POST /api/v1/gateway/process)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from core.context import (
     LLMExchangeResult,
 )
 from core.ephemeral_vault import EphemeralVault
-from core.errors import OverrideJustificationError, RateLimitError, VaultSessionNotFoundError
+from core.errors import RateLimitError, VaultSessionNotFoundError
 from core.keyring import KeyRing
 from pipeline.llm_adapter import CircuitBreaker, OfflineDeterministicAdapter
 from pipeline.orchestrator import GatewayInput, GatewayPipeline
@@ -29,6 +29,7 @@ class CanaryLeakerAdapter:
     async def complete(self, prompt: str, *, timeout_s: float) -> str:
         # Extraer el canary del prompt y fugarlo intencionalmente
         import re
+
         match = re.search(r"\[\[CANARY-HMAC-[0-9A-Fa-f]+\]\]", prompt)
         canary = match.group(0) if match else "[[CANARY-HMAC-FAIL]]"
         return f"Respuesta maliciosa que fuga el token {canary}"
@@ -50,7 +51,9 @@ class LeakerGateway:
         )
 
 
-def _build_pipeline(tmp_path: Path, rate_limit: int = 100) -> tuple[GatewayPipeline, KeyRing, EphemeralVault, SQLiteLedgerRepository]:
+def _build_pipeline(
+    tmp_path: Path, rate_limit: int = 100
+) -> tuple[GatewayPipeline, KeyRing, EphemeralVault, SQLiteLedgerRepository]:
     keys = KeyRing(bytes(range(32)))
     vault = EphemeralVault()
     repo = SQLiteLedgerRepository(str(tmp_path / "test_gateway.db"))
@@ -71,7 +74,9 @@ def test_gateway_pipeline_success(tmp_path: Path) -> None:
     async def _run() -> None:
         pipeline, keys, vault, repo = _build_pipeline(tmp_path)
         data = GatewayInput(
-            raw_text="Solicito revisión para V-12.345.678 y teléfono 0412-1234567 sobre apoyo de beca.",
+            raw_text=(
+                "Solicito revisión para V-12.345.678 y teléfono 0412-1234567 sobre apoyo de beca."
+            ),
             citizen_cedula="V12345678",
             consent_granted=True,
             purpose_code="BECA_UNIVERSITARIA",
@@ -236,7 +241,10 @@ def test_gateway_pipeline_human_override(tmp_path: Path) -> None:
             purpose_code="BECA",
             features={"f1": 0.0, "f2": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0},
             human_decision="PRIORIDAD_ALTA",  # Si el modelo recomienda REVISION_ESTANDAR
-            override_justification="El ciudadano cumple con condiciones especiales de vulnerabilidad comprobadas en campo.",
+            override_justification=(
+                "El ciudadano cumple con condiciones especiales "
+                "de vulnerabilidad comprobadas en campo."
+            ),
         )
 
         packet = await pipeline.process(data)
@@ -244,7 +252,7 @@ def test_gateway_pipeline_human_override(tmp_path: Path) -> None:
         assert packet.explica.human_override is True
         assert packet.explica.human_decision == "PRIORIDAD_ALTA"
 
-        # Verificar que el bloque en SQLite contiene el hash HMAC de la justificación, nunca el texto
+        # Verificar que el bloque en SQLite contiene el hash HMAC, nunca el texto
         block = repo.last_block()
         assert block is not None
         assert block.override_justification_hash is not None
@@ -292,7 +300,8 @@ def test_gateway_http_endpoint_end_to_end(client: TestClient) -> None:
 
 
 def test_ca05_complete_integration_20_requests_zero_pii(tmp_path: Path) -> None:
-    """CA-05 Transversal completo: 20 trámites reales por GatewayPipeline dejan 0 bytes de PII en disco."""
+    """CA-05 Transversal: 20 trámites reales por GatewayPipeline dejan 0 bytes de PII en disco."""
+
     async def _run() -> None:
         pipeline, keys, vault, repo = _build_pipeline(tmp_path)
 
@@ -302,7 +311,10 @@ def test_ca05_complete_integration_20_requests_zero_pii(tmp_path: Path) -> None:
 
         for i in range(20):
             data = GatewayInput(
-                raw_text=f"Trámite confidencial para titular con cédula {cedulas[i]}, RIF {rifs[i]} y móvil {phones[i]}.",
+                raw_text=(
+                    f"Trámite confidencial para titular con cédula {cedulas[i]}, "
+                    f"RIF {rifs[i]} y móvil {phones[i]}."
+                ),
                 citizen_cedula=cedulas[i],
                 consent_granted=True,
                 purpose_code="AUDITORIA_INTEGRAL",

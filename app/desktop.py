@@ -1,20 +1,21 @@
 """Aplicación de escritorio: Litestar (Granian, 1 worker) + ventana nativa PyWebView.
 
-Puerto efímero libre, token por sesión inyectado a la ventana (no en la URL), ventana en modo
-privado (sin autofill ni caché persistentes). SIN VERIFICAR: Granian en hilo y webview no
-se han ejecutado todavía (Gatillo 7).
+Ejecuta Granian en un subproceso dedicado de proceso único (compatible con ``signal.signal`` y
+``multiprocessing.freeze_support()`` para PyInstaller), en puerto efímero libre, inyectando el
+token por sesión a la ventana vía ``evaluate_js`` (nunca en la URL) y con ``private_mode=True``.
 """
 
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import secrets
 import socket
 import tempfile
-import threading
 import time
 import urllib.request
+from typing import Any
 
 READY_TIMEOUT_S = 15.0
 
@@ -25,10 +26,30 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _serve(port: int) -> None:
+def _serve(port: int, token: str | None = None) -> None:
     from granian import Granian
 
-    Granian(
+    os.environ["ADUANA_PORT"] = str(port)
+    if token is not None:
+        os.environ["ADUANA_API_TOKEN"] = token
+
+    class _SingleProcessGranian(Granian):
+        """Ejecuta el worker ASGI en este mismo subproceso (sin nietos huérfanos al cerrar)."""
+
+        def _serve(self, spawn_target: Any, target_loader: Any) -> None:
+            sock = self.startup(spawn_target, target_loader)
+            worker = self._spawn_proc(
+                idx=0,
+                target=spawn_target,
+                callback_loader=target_loader,
+                socket_loader=lambda: sock,
+            )
+            spawn_target(*worker.proc._args)  # noqa: SLF001
+
+        def _spawn_workers(self, sock: Any, spawn_target: Any, target_loader: Any) -> None:
+            return
+
+    _SingleProcessGranian(
         "app.server:create_app",
         interface="asgi",
         factory=True,
@@ -36,6 +57,26 @@ def _serve(port: int) -> None:
         address="127.0.0.1",
         port=port,
     ).serve()
+
+
+def start_server_process(port: int, token: str) -> multiprocessing.Process:
+    proc = multiprocessing.Process(
+        target=_serve,
+        args=(port, token),
+        name="aduana-granian-desktop",
+        daemon=True,
+    )
+    proc.start()
+    return proc
+
+
+def stop_server_process(proc: multiprocessing.Process, timeout_s: float = 5.0) -> None:
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=timeout_s)
+    if proc.is_alive():
+        proc.kill()
+        proc.join(timeout=1.0)
 
 
 def _wait_ready(port: int) -> None:
@@ -46,26 +87,30 @@ def _wait_ready(port: int) -> None:
             with urllib.request.urlopen(url, timeout=1):  # noqa: S310 (loopback fijo)
                 return
         except OSError:
-            time.sleep(0.2)
+            time.sleep(0.15)
     raise TimeoutError("El servidor local no arrancó a tiempo.")
 
 
 def main() -> None:
+    multiprocessing.freeze_support()
     import webview  # import perezoso: el servidor no depende de pywebview
 
     port = _free_port()
     token = secrets.token_urlsafe(32)
-    os.environ["ADUANA_PORT"] = str(port)
-    os.environ["ADUANA_API_TOKEN"] = token
-    threading.Thread(target=_serve, args=(port,), daemon=True).start()
-    _wait_ready(port)
-
-    window = webview.create_window("Aduana IA — Perímetro Soberano", f"http://127.0.0.1:{port}")
-    window.events.loaded += lambda: window.evaluate_js(
-        f"window.__ADUANA_TOKEN__={json.dumps(token)}"
-    )
-    with tempfile.TemporaryDirectory(prefix="aduana-wv-") as storage:
-        webview.start(private_mode=True, storage_path=storage, debug=False)
+    proc = start_server_process(port, token)
+    try:
+        _wait_ready(port)
+        window = webview.create_window(
+            "Aduana IA — Perímetro Soberano",
+            f"http://127.0.0.1:{port}",
+        )
+        window.events.loaded += lambda: window.evaluate_js(
+            f"window.__ADUANA_TOKEN__={json.dumps(token)}"
+        )
+        with tempfile.TemporaryDirectory(prefix="aduana-wv-") as storage:
+            webview.start(private_mode=True, storage_path=storage, debug=False)
+    finally:
+        stop_server_process(proc)
 
 
 if __name__ == "__main__":

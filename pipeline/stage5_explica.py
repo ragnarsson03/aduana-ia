@@ -108,7 +108,7 @@ def resolve_model(
     if feature_keys == set(INSTITUTIONAL_MODEL.feature_names):
         return INSTITUTIONAL_MODEL
 
-    # Si comparte variables con un modelo conocido, asociarlo a ese modelo para reportar faltantes/sobrantes
+    # Si comparte variables con un modelo conocido, asociarlo para reportar faltantes/sobrantes
     oracle_set = set(ORACLE_MODEL.feature_names)
     inst_set = set(INSTITUTIONAL_MODEL.feature_names)
     if feature_keys.issubset(oracle_set) or any(k in oracle_set for k in feature_keys):
@@ -218,13 +218,14 @@ def explain(
         stripped = override_justification.strip()
         if len(stripped) < OVERRIDE_MIN_JUSTIFICATION_CHARS:
             raise OverrideJustificationError(
-                f"La justificación de override debe contener al menos {OVERRIDE_MIN_JUSTIFICATION_CHARS} "
-                f"caracteres (recibidos: {len(stripped)})."
+                "La justificación de override debe contener al menos "
+                f"{OVERRIDE_MIN_JUSTIFICATION_CHARS} caracteres (recibidos: {len(stripped)})."
             )
         if len(override_justification) > OVERRIDE_MAX_JUSTIFICATION_CHARS:
             raise OverrideJustificationError(
-                f"La justificación de override no puede superar los {OVERRIDE_MAX_JUSTIFICATION_CHARS} "
-                f"caracteres (recibidos: {len(override_justification)})."
+                "La justificación de override no puede superar los "
+                f"{OVERRIDE_MAX_JUSTIFICATION_CHARS} caracteres "
+                f"(recibidos: {len(override_justification)})."
             )
 
         clean_justification = stripped

@@ -15,7 +15,6 @@ from __future__ import annotations
 import csv
 import itertools
 import math
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -23,8 +22,6 @@ import pytest
 from core.config import LOGIT_RECONSTRUCTION_TOLERANCE, PROJECT_ROOT
 from core.errors import OverrideJustificationError
 from pipeline.stage5_explica import (
-    INSTITUTIONAL_MODEL,
-    ORACLE_MODEL,
     explain,
     stable_sigmoid,
 )
@@ -109,7 +106,7 @@ def test_deterministic_grid() -> None:
     """
     grid_vals = (0.0, 0.5, 1.0)
     for combo in itertools.product(grid_vals, repeat=5):
-        vec = {f"f{i+1}": combo[i] for i in range(5)}
+        vec = {f"f{i + 1}": combo[i] for i in range(5)}
         res1 = explain(vec)
         res2 = explain(vec)
 
@@ -204,7 +201,7 @@ def test_institutional_synthetic_dataset() -> None:
     csv_file = PROJECT_ROOT / "data" / "synthetic_tramites.csv"
     assert csv_file.exists(), "data/synthetic_tramites.csv debe existir"
 
-    with open(csv_file, mode="r", encoding="utf-8") as f:
+    with open(csv_file, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         count = 0
         for row in reader:

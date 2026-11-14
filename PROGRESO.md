@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 6 completos y certificados.
+> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 7 completos y certificados.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -86,6 +86,13 @@
 - [x] `app/dependencies.py` y `app/server.py`: inyección de dependencias de `GatewayPipeline`, hook `on_shutdown` con `zeroize_all` y cierre de repositorio.
 - [x] `tests/test_gateway_pipeline.py`: 8 tests de integración pasando (happy path end-to-end, bloqueos de consentimiento/inyección/canary leak, rate guard, override humano en ledger, endpoint HTTP, y auditoría forense CA-05 con 20 trámites sin PII en disco).
 
+### Gatillo 7 — Escritorio PyWebView + Granian y Frontend Air-Gapped (completo y verificado)
+- [x] `app/desktop.py`: ejecución real de Granian en subproceso de proceso único (`_SingleProcessGranian`, compatible con `signal.signal` y sin nietos huérfanos al cerrar), `multiprocessing.freeze_support()`, puerto efímero, `_wait_ready`, inyección de `window.__ADUANA_TOKEN__` vía `evaluate_js` (nunca en URL) y `private_mode=True`.
+- [x] `app/server.py`: `AllowedHostsConfig` acepta `host` y `host:port` para el puerto configurado (corrige `400 invalid host header` en navegador y PyWebView).
+- [x] `iniciar_escritorio.bat` (Windows) e `iniciar_escritorio.sh` (Linux).
+- [x] `index.html`, `vite.config.ts`, `src/` y `static/`: eliminados los `<link>` a Google Fonts CDN y URLs externas en bundle, `autoComplete="off"` en todos los `<input>`/`<textarea>`, lectura dinámica de `window.__ADUANA_TOKEN__` en `AduanaApiClient`, cero `innerHTML`/`dangerouslySetInnerHTML`.
+- [x] `tests/test_ca07_desktop_and_frontend.py`: 5 tests pasando (incluyendo arranque real del subproceso Granian, verificación CSP, 401/200 con token, auditoría de `https?://` en `static/` y `autoComplete="off"`).
+
 ## EN CURSO
 - [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
 - [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
@@ -112,18 +119,13 @@ Medido sobre un conjunto INDEPENDIENTE de 288 casos (185 ataques y 103 benignos 
 
 ### Bloqueos detectados en el árbol de trabajo
 - [x] `pipeline/orchestrator.py` importa `explain` de `pipeline/stage5_explica.py` (corregido y validado con tests de integración).
-- [ ] `static/index.html` carga fuentes de `fonts.googleapis.com`/`fonts.gstatic.com`: viola Air-Gapped y la CSP `default-src 'self'`. Empaquetar las fuentes dentro de `static/`.
+- [x] `static/index.html` libre de fuentes externas (`fonts.googleapis.com`/`fonts.gstatic.com`), cumpliendo Air-Gapped y la CSP `default-src 'self'` (validado en `tests/test_ca07_desktop_and_frontend.py`).
 
 ### P0 — Cerrar Gatillo 1
 - [ ] Aplicar hallazgos del red team ronda 2 y añadir su tabla como tests parametrizados en `tests/test_ca01_shield.py`.
 - [x] **Alcance de CA-01 decidido (usuario, opción A):** < 20 ms para textos de hasta 10 000 caracteres; la API sigue aceptando hasta 20 000 (`MAX_RAW_TEXT_CHARS`) sin garantía de 20 ms por encima de 10 000. Documentado en `specs/01_shield.spec.md` y fijado en `tests/test_ca01_shield.py`.
 - [ ] Reescribir `specs/01_shield.spec.md` (firmas reales; **corregir vector `J-00000000-9`: el verificador correcto es 0**; mover "inconsistencias" a "decisiones tomadas").
 - [ ] Límites conocidos sin cubrir (documentados en `core/pii_patterns.py`): nombres sin marcador/minúsculas, base32/ROT13/entidades HTML/`%NN`, números en palabras, clínicos con variantes (`seropositivo`, `d i a b e t e s`), falsos positivos clínicos en texto comercial ("depresión del mercado").
-
-### P3 — Gatillo 7 y frontend
-- [ ] Instalar y **probar de verdad** `granian` y `pywebview` (nunca se han ejecutado): servidor en hilo vs subproceso, puerto efímero, espera de readiness, token a la ventana (`evaluate_js`, no en URL), `private_mode`, `freeze_support` para PyInstaller.
-- [ ] `iniciar_escritorio.bat` e `iniciar_escritorio.sh`.
-- [ ] `static/`: panel funcionario + panel auditoría, **sin CDNs**, render con `textContent` (nunca `innerHTML`), `autocomplete="off"` en inputs con PII, CSP estricta sin inline; test que busque `https?://` en `static/`.
 
 ### P4 — Calidad, seguridad y empaquetado
 - [ ] Instalar y pasar `ruff`, `mypy --strict`, `bandit`, `pip-audit` (hoy no corridos); CI.

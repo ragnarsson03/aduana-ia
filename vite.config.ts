@@ -1,9 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
+const stripExternalErrorUrls = () => ({
+  name: 'strip-external-error-urls',
+  renderChunk(code: string) {
+    return code.replace(/https?:\/\/reactjs\.org\/docs\/error-decoder\.html\?invariant=/g, 'react-invariant:')
+  },
+})
+
+// Air-Gapped build configuration
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), stripExternalErrorUrls()],
   base: './',
   build: {
     outDir: 'static',

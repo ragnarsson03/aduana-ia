@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from core import crypto
 from core.context import (
@@ -66,7 +66,7 @@ class GatewayPipeline:
 
     async def process(self, data: GatewayInput) -> AduanaPacket | BlockedPacket:
         request_id = secrets.token_urlsafe(16)
-        timestamp_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp_utc = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         try:
             # 1. Blind Citizen ID

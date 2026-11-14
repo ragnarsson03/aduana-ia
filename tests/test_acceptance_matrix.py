@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from core.keyring import KeyRing
 
 KEYS = KeyRing(bytes(range(32)))

@@ -19,7 +19,7 @@ from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
 from app.controllers.ledger import DemoLedgerController, LedgerController
 from app.controllers.metrics import MetricsController
-from app.dependencies import build_state
+from app.dependencies import AppState, build_state
 from core.config import (
     MAX_BODY_BYTES,
     Settings,
@@ -108,13 +108,18 @@ def create_app(
     if settings.demo_mode:
         handlers.append(DemoLedgerController)
 
+    allowed_hosts = [
+        candidate
+        for host in settings.allowed_hosts
+        for candidate in (host, f"{host}:{settings.port}")
+    ]
     return Litestar(
         route_handlers=handlers,
         exception_handlers={
             AduanaError: _domain_error_handler,
             Exception: _unhandled_error_handler,
         },
-        allowed_hosts=AllowedHostsConfig(allowed_hosts=list(settings.allowed_hosts)),
+        allowed_hosts=AllowedHostsConfig(allowed_hosts=allowed_hosts),
         response_headers=SECURITY_HEADERS,
         request_max_body_size=MAX_BODY_BYTES,
         state=State({"aduana": state}),
