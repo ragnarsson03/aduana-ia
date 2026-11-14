@@ -202,7 +202,7 @@ class OfflineDeterministicAdapter:
         token_note = ", ".join(tokens[:6]) if tokens else "sin identificadores enmascarados"
         return (
             "[AVISO IA - MODO INSTITUCIONAL OFFLINE] "
-            f"Resumen orientativo determinista (ref={digest}): "
+            f"Resumen orientativo determinista (ref=0x{digest}): "
             f"trámite recibido para revisión funcional ({token_note}). "
             "Este resumen no sustituye la decisión humana ni el motor EXPLICA."
         )
