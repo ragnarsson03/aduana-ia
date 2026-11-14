@@ -39,8 +39,11 @@ def _make_client(tmp_path: Path) -> tuple[TestClient, Path]:
     [
         ("V-14220101", "auditor2026", "auditor", "ledger"),
         ("v-14.220.101", "auditor2026", "auditor", "ledger"),
+        ("auditor@aduana.gob.ve", "auditor2026", "auditor", "ledger"),
         ("Ｖ-18660505", "analista2026", "analista", "pasarela"),
+        ("analista@aduana.gob.ve", "analista2026", "analista", "pasarela"),
         ("V-12110909", "admin2026", "administrador", "pasarela"),
+        ("admin@aduana.gob.ve", "admin2026", "administrador", "pasarela"),
     ],
 )
 def test_login_success_three_roles_and_normalization(

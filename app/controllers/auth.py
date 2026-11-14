@@ -27,6 +27,7 @@ from pipeline.auth import (
     AuthenticatedUser,
     compute_blind_citizen_id,
     dummy_pbkdf2_work,
+    normalize_email,
     verify_pbkdf2_password,
 )
 from pipeline.stage4_ledger import seal_entry
@@ -87,17 +88,34 @@ class AuthController(Controller):
         request: Request,
     ) -> Response[LoginResponse]:
         state: AppState = request.app.state.aduana
-        try:
-            blind_id = compute_blind_citizen_id(state.keys, data.cedula)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="INVALID_CEDULA") from None
+        raw_identifier = data.cedula.strip()
+        found: tuple[AuthenticatedUser, str] | None
+
+        if "@" in raw_identifier:
+            try:
+                clean_email = normalize_email(raw_identifier)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="INVALID_CEDULA") from None
+            email_match = state.auth_repo.find_active_by_email(clean_email)
+            if email_match is None:
+                blind_id = state.keys.hmac_hex("blind-index", clean_email.encode("utf-8"))
+                found = None
+            else:
+                user_obj, pwd_hash, user_blind_id = email_match
+                blind_id = user_blind_id
+                found = (user_obj, pwd_hash)
+        else:
+            try:
+                blind_id = compute_blind_citizen_id(state.keys, raw_identifier)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="INVALID_CEDULA") from None
+            found = state.auth_repo.find_active_by_blind_id(blind_id)
 
         state.auth_rate_guard.check(blind_id)
 
         request_id = uuid.uuid4().hex
         timestamp_utc = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        found = state.auth_repo.find_active_by_blind_id(blind_id)
         if found is None:
             dummy_pbkdf2_work(data.password)
             _seal_auth_event(
