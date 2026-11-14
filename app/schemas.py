@@ -157,3 +157,51 @@ class SessionStatusResponse(msgspec.Struct, frozen=True):
 class LogoutResponse(msgspec.Struct, frozen=True):
     revoked: bool
     jti: str
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_CHAT_PAYLOAD]"
+
+
+class ChatIAUploadRequest(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    prompt: RawText
+    citizen_cedula: Cedula = "V-12345678"
+    purpose_code: PurposeCode = "CHAT_IA_CONSULTA"
+    consent_granted: bool = True
+    file_name: Annotated[str, msgspec.Meta(min_length=1, max_length=120)] | None = None
+    file_mime_type: Annotated[str, msgspec.Meta(min_length=3, max_length=64)] | None = None
+    file_content_b64: Annotated[str, msgspec.Meta(min_length=1, max_length=48_000)] | None = None
+    features: Features | None = None
+    human_decision: RecommendationType | None = None
+    override_justification: Justification | None = None
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_CHAT_PAYLOAD]"
+
+
+class ChatIAResponse(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    request_id: str
+    timestamp_utc: str
+    policy_status: PolicyStatus
+    masked_prompt: str | None
+    sanitized_response: str
+    restored_response: str
+    ai_generated_notice: bool
+    pii_count: int
+    detected_types: tuple[str, ...]
+    rif_mod11_verified: bool | None
+    file_name_sanitized: str | None
+    file_sha256: str | None
+    file_size_bytes: int
+    model_recommendation: RecommendationType
+    human_decision: RecommendationType
+    human_override: bool
+    probability_score: float | None
+    linear_shap_values: dict[str, float] | None
+    citizen_receipt_code: str
+    block_index: int
+    chain_verified: bool
+    latency_ms: float
+
+    def __repr__(self) -> str:  # Zero-Leak
+        return "[REDACTED_CHAT_PAYLOAD]"
+

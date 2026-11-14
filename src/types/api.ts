@@ -157,3 +157,43 @@ export interface SessionStatusResponse {
   expires_at_epoch: number;
   user: LoginUserOut;
 }
+
+export interface ChatIAUploadRequest {
+  prompt: string;
+  citizen_cedula?: string;
+  purpose_code?: string;
+  consent_granted?: boolean;
+  file_name?: string | null;
+  file_mime_type?: string | null;
+  file_content_b64?: string | null;
+  features?: Record<string, number> | null;
+  human_decision?: RecommendationType | null;
+  override_justification?: string | null;
+}
+
+export interface ChatIAResponse {
+  request_id: string;
+  timestamp_utc: string;
+  policy_status: PolicyStatus;
+  masked_prompt: string | null;
+  sanitized_response: string;
+  restored_response: string;
+  ai_generated_notice: boolean;
+  pii_count: number;
+  detected_types: string[];
+  rif_mod11_verified: boolean | null;
+  file_name_sanitized: string | null;
+  file_sha256: string | null;
+  file_size_bytes: number;
+  model_recommendation: RecommendationType;
+  human_decision: RecommendationType;
+  human_override: boolean;
+  probability_score: number | null;
+  linear_shap_values: Record<string, number> | null;
+  citizen_receipt_code: string;
+  block_index: number;
+  chain_verified: boolean;
+  latency_ms: number;
+  is_offline_fallback?: boolean;
+}
+

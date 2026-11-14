@@ -17,6 +17,7 @@ from litestar.middleware import DefineMiddleware
 from litestar.static_files import create_static_files_router
 
 from app.controllers.auth import AuthController
+from app.controllers.chat import ChatController
 from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
 from app.controllers.ledger import DemoLedgerController, LedgerController
@@ -31,6 +32,7 @@ from core.config import (
 )
 from core.errors import (
     AduanaError,
+    AttachmentValidationError,
     ConsentError,
     ImmutableLedgerError,
     InvalidFeaturesError,
@@ -65,6 +67,7 @@ _ERROR_TABLE: Final[dict[type[AduanaError], tuple[int, str]]] = {
     ImmutableLedgerError: (409, "ERR_IMMUTABLE_LEDGER"),
     OverrideJustificationError: (422, "ERR_OVERRIDE_JUSTIFICATION"),
     InvalidFeaturesError: (422, "ERR_INVALID_FEATURES"),
+    AttachmentValidationError: (422, "ERR_INVALID_ATTACHMENT"),
     ShieldResidualPiiError: (422, "ERR_UNSAFE_INPUT"),
     LLMUnavailableError: (503, "ERR_LLM_UNAVAILABLE"),
 }
@@ -107,6 +110,7 @@ def create_app(
     handlers: list = [
         HealthController,
         AuthController,
+        ChatController,
         GatewayController,
         ShieldController,
         LedgerController,
