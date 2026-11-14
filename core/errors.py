@@ -44,7 +44,7 @@ class LLMUnavailableError(AduanaError):
 
 
 class ShieldResidualPiiError(AduanaError):
-    """SHIELD no logró anonimizar el texto por completo (fail-closed); sin contenido en el mensaje."""
+    """SHIELD no logró anonimizar el texto (fail-closed); sin contenido en el mensaje."""
 
 
 class OverrideJustificationError(AduanaError):

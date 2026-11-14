@@ -18,7 +18,7 @@ from core.ephemeral_vault import EphemeralVault
 from core.keyring import KeyRing
 from pipeline.stage4_ledger import SQLiteLedgerRepository, seal_entry
 
-SECRET = "V-12345678"
+SECRET = "V-12345678"  # noqa: S105 (dato sintético de prueba)
 FORBIDDEN_MODULES = {"sqlite3", "pickle", "shelve", "tempfile", "logging", "os", "pathlib", "io"}
 FORBIDDEN_CALLS = {"open", "print"}
 
@@ -54,7 +54,8 @@ def test_vault_module_has_no_io_primitives() -> None:
         if isinstance(node, ast.ImportFrom)
     }
     called = {
-        node.func.id for node in ast.walk(tree)
+        node.func.id
+        for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert imported.isdisjoint(FORBIDDEN_MODULES), imported & FORBIDDEN_MODULES
@@ -79,7 +80,9 @@ def test_ca05_db_and_wal_hold_zero_plaintext_pii_after_20_requests(tmp_path: Pat
     cedulas = [f"V-{10000000 + i}" for i in range(20)]
     rifs = [f"J-{12345670 + i}-4" for i in range(20)]
     phones = [f"0412-00000{i:02d}" for i in range(20)]
-    justifications = [f"Solicitante {c} aprobado con {r}" for c, r in zip(cedulas, rifs, strict=True)]
+    justifications = [
+        f"Solicitante {c} aprobado con {r}" for c, r in zip(cedulas, rifs, strict=True)
+    ]
 
     for i in range(20):
         blind_id = crypto.blind_citizen_id(keys, cedulas[i])
@@ -112,7 +115,7 @@ def test_ca05_db_and_wal_hold_zero_plaintext_pii_after_20_requests(tmp_path: Pat
 
     raw_bytes = bytes(db_bytes)
 
-    # Verificar que NINGUNA cédula, número de cédula, RIF, teléfono ni texto de justificación aparece
+    # Verificar que NINGUNA cédula, RIF, teléfono ni texto de justificación aparece en disco
     for c in cedulas:
         assert c.encode() not in raw_bytes, f"Cédula {c} encontrada en disco"
         digits = c.replace("V-", "")
@@ -125,5 +128,4 @@ def test_ca05_db_and_wal_hold_zero_plaintext_pii_after_20_requests(tmp_path: Pat
         assert p.encode() not in raw_bytes, f"Teléfono {p} encontrado en disco"
 
     for j in justifications:
-        assert j.encode() not in raw_bytes, f"Texto de justificación encontrado en disco"
-
+        assert j.encode() not in raw_bytes, "Texto de justificación encontrado en disco"

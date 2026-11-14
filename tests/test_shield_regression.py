@@ -2,7 +2,7 @@
 
 ``MUST_MASK``: la cadena ``needle`` no puede aparecer en la salida enmascarada.
 ``REDOS``: entradas patológicas; deben resolverse en < 1 s (con 20 000 caracteres).
-``KNOWN_LIMITS``: límites conocidos de baja prioridad; ``xfail`` no estricto (si se corrigen, mejor).
+``KNOWN_LIMITS``: límites conocidos de baja prioridad; ``xfail`` no estricto.
 """
 
 from __future__ import annotations

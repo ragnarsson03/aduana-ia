@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-13. Estado: 404 tests pasan, 66 xfail (benchmark independiente de guardián), 7 xpass. Gatillos 0, 1, 2, 3, 4, 5 y 6 completos y certificados.
+> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 6 completos y certificados.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -74,11 +74,10 @@
 - [x] `tests/test_ca04_explica.py`: 9 pruebas unitarias pasando (descomposición exacta del oráculo de prueba, vector cero, medias poblacionales, grid determinista de 243 puntos, comprobación anti-random, validación de justificaciones y dataset sintético institucional).
 - [x] Removido xfail de CA-04 en `tests/test_acceptance_matrix.py`.
 
-### Gatillo 5 — LLM y Circuit Breaker (CA-06, completo y verificado)
-- [x] `pipeline/llm_adapter.py`: `OfflineDeterministicAdapter` (generador determinista institucional 100% offline, zero-random), `OllamaAdapter` y `OpenAICompatAdapter` (httpx agnóstico).
-- [x] `CircuitBreaker`: máquina de estados CLOSED/OPEN/HALF_OPEN con reloj inyectable, umbral de fallos, cooldown de 15s y failover en < 100 ms.
-- [x] `tests/test_ca06_resilience.py`: 4 pruebas unitarias pasando (éxito en primario, failover en < 100 ms con circuito abierto, recuperación en half-open, determinismo estricto).
-- [x] Removido xfail estricto de CA-06 en `tests/test_acceptance_matrix.py` (CA-01 a CA-06 todos certificados en verde).
+### Gatillo 5 — Adaptadores LLM y Circuit Breaker (CA-06, completo y verificado)
+- [x] `pipeline/llm_adapter.py`: `OfflineDeterministicAdapter` (sin red ni `random()`, no hace eco del canary), `OllamaAdapter` (loopback allowlist, sin redirects, respuesta acotada ≤ 32 KiB) y `OpenAICompatAdapter` (opt-in estricto `enabled=False` por defecto, TLS obligatorio remoto, `repr` redactado).
+- [x] `CircuitBreaker`: máquina de estados `CLOSED`/`OPEN`/`HALF_OPEN` con `failure_threshold=3`, `cooldown_s=30.0`, `timeout_s=3.5` y `clock` inyectable.
+- [x] `tests/test_ca06_resilience.py`: 12 tests pasando (primario, fallo inmediato < 100 ms, timeout, propagación 3.5 s, `OPEN`/`HALF_OPEN`, repetibilidad offline sin sockets, anti-canary, GUARD-OUT tras fallback, Ollama/OpenAI-compat con `MockTransport`). Removido xfail de CA-06 en `tests/test_acceptance_matrix.py`.
 
 ### Gatillo 6 — Orquestador y API completa (CA-05 transversal, completo y verificado)
 - [x] `pipeline/orchestrator.py`: `GatewayPipeline.process` orquestando el flujo completo (stage0 blind id/rate-guard/consentimiento → shield → guard_in → LLM → guard_out → explica → ledger; sellado en ledger de aprobados y `BlockedPacket`; `secrets.token_urlsafe(16)` en servidor; `vault.zeroize` incondicional en bloque `finally`).
@@ -135,7 +134,7 @@ Medido sobre un conjunto INDEPENDIENTE de 288 casos (185 ataques y 103 benignos 
 
 ## Decisiones abiertas para el humano (`[?]`)
 1. ~~Alcance de CA-01~~ — resuelto: ≤ 10 000 caracteres (opción A).
-2. Redefinición de CA-06 (failover con circuito abierto vs timeout en frío).
+2. ~~Redefinición de CA-06~~ — resuelto: timeout primario (3.5 s) y transición/fallback (< 100 ms) se miden por separado; circuito `OPEN` responde < 100 ms totales. Umbrales por defecto: 3 fallos / 30 s.
 3. Letra **C = 3** del RIF (comunales) sin fuente oficial accesible; RIF abreviado no se rellena con ceros.
 4. `consent_hash`: SHA-256 de JSON canónico (actual) vs HMAC dominio `consent` (infalsificable).
 5. Autenticación de producción y política de llaves persistentes (`ADUANA_MASTER_KEY` protegida por DPAPI/TPM/vault).

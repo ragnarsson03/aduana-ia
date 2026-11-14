@@ -65,8 +65,7 @@ def test_detects_structured_pii(text: str, expected: list[tuple[str, str]]) -> N
         ("Solicitante: JUAN PEREZ", [("NAME", "JUAN PEREZ")]),
         ("Titular: María-José Pérez", [("NAME", "María-José Pérez")]),
         ("paciente: O'Brien Smith", [("NAME", "O'Brien Smith")]),
-        ("ciudadano Pedro Gomez y Sr. Luis Mora",
-         [("NAME", "Pedro Gomez"), ("NAME", "Luis Mora")]),
+        ("ciudadano Pedro Gomez y Sr. Luis Mora", [("NAME", "Pedro Gomez"), ("NAME", "Luis Mora")]),
         # base64 corto y url-safe
         ("Vi0xMjM0NTY3OA==", [("ENCODED", "Vi0xMjM0NTY3OA==")]),
         # clínico: derivados
@@ -98,7 +97,9 @@ def test_matches_are_sorted_and_non_overlapping() -> None:
     assert all(a.end <= b.start for a, b in zip(matches, matches[1:], strict=False))
 
 
-@pytest.mark.parametrize("text", ["", "Solicito una beca para mi hijo", "monto 1500 bolívares", "12345"])
+@pytest.mark.parametrize(
+    "text", ["", "Solicito una beca para mi hijo", "monto 1500 bolívares", "12345"]
+)
 def test_clean_text_has_no_matches(text: str) -> None:
     assert find_pii(normalize_text(text)) == ()
 

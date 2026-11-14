@@ -35,12 +35,38 @@ _ASCII_CONTROLS: Final = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 # After NFKC/invisible removal, Latin-1 characters need no further folding.
 _NON_ASCII: Final = re.compile(r"[^\x00-\xff]")
 _CONFUSABLE: Final[dict[str, str]] = {
-    "В": "V", "Е": "E", "Ј": "J", "Р": "P", "С": "C",  # cirílico mayúsculas
-    "Ε": "E", "Ρ": "P",  # griego
-    "ο": "o", "ν": "V", "Ν": "N", "Ѵ": "V", "ѕ": "V", "Ϲ": "C",
-    "Σ": "C", "υ": "u", "Н": "N", "Т": "T", "І": "I", "Ғ": "F",
-    "ᴠ": "V", "ᴇ": "E", "ᴊ": "J", "ᴘ": "P", "ᴄ": "C", "ɢ": "G",  # small caps
-    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "і": "i", "ј": "j",  # cirílico minúsculas
+    "В": "V",
+    "Е": "E",
+    "Ј": "J",
+    "Р": "P",
+    "С": "C",  # cirílico mayúsculas
+    "Ε": "E",
+    "Ρ": "P",  # griego
+    "ο": "o",
+    "ν": "V",
+    "Ν": "N",
+    "Ѵ": "V",
+    "ѕ": "V",
+    "Ϲ": "C",
+    "Σ": "C",
+    "υ": "u",
+    "Н": "N",
+    "Т": "T",
+    "І": "I",
+    "Ғ": "F",
+    "ᴠ": "V",
+    "ᴇ": "E",
+    "ᴊ": "J",
+    "ᴘ": "P",
+    "ᴄ": "C",
+    "ɢ": "G",  # small caps
+    "а": "a",
+    "е": "e",
+    "о": "o",
+    "р": "p",
+    "с": "c",
+    "і": "i",
+    "ј": "j",  # cirílico minúsculas
 }
 _MAX_PASSES: Final[int] = 4
 _EXPANSION_FACTOR: Final[int] = 2

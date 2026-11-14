@@ -33,7 +33,14 @@ from typing import Final
 from core.text_normalizer import normalize_text
 
 KINDS: Final[tuple[str, ...]] = (
-    "ENCODED", "EMAIL", "BANK", "RIF", "PHONE", "CEDULA", "NAME", "CLINICAL",
+    "ENCODED",
+    "EMAIL",
+    "BANK",
+    "RIF",
+    "PHONE",
+    "CEDULA",
+    "NAME",
+    "CLINICAL",
 )
 _MAX_DECODE_DEPTH: Final[int] = 2
 
@@ -60,16 +67,12 @@ _RIF = re.compile(
     rf"(?<![A-Za-z0-9])(?:[JPGCjpgc]{_SEP}{{0,3}}{_number(9, 10)}"
     rf"|[VEve]{_SEP}{{0,3}}{_RIF_BODY}{_SEP}{{1,3}}[0-9])(?![0-9])"
 )
-_RIF_CONTEXT = re.compile(
-    rf"(?<![A-Za-z])(?i:rif){_FILLER}(?P<v>{_number(9, 10)})(?![0-9])"
-)
+_RIF_CONTEXT = re.compile(rf"(?<![A-Za-z])(?i:rif){_FILLER}(?P<v>{_number(9, 10)})(?![0-9])")
 _PHONE = re.compile(
     r"(?<![0-9A-Za-z])(?:(?:\+|00)?58[\s.\-/]{0,3}\(?0?|\(?0)(?:4(?:12|14|16|22|24|26)|2[0-9]{2})\)?"
     r"(?:[\s.\-/_,]{0,3}[0-9]){7}(?![0-9])"
 )
-_CEDULA_LETTER = re.compile(
-    rf"(?<![A-Za-z0-9])[VEve]{_SEP}{{0,4}}{_number(5, 9)}(?![0-9])"
-)
+_CEDULA_LETTER = re.compile(rf"(?<![A-Za-z0-9])[VEve]{_SEP}{{0,4}}{_number(5, 9)}(?![0-9])")
 _CEDULA_CONTEXT = re.compile(
     r"(?<![A-Za-z])(?i:c[ée]dula(?: de identidad)?|documento[o]? de identidad|identificaci[oó]n|"
     r"c\.?i\.?|ced\.?|dni|pasaporte)"
@@ -81,16 +84,38 @@ _NAME = re.compile(
     rf"(?P<v>{_NAME_WORD}(?:\s{{1,20}}(?:(?:de|del|la|las|los)\s{{1,20}}){{0,3}}{_NAME_WORD}){{0,3}})"
 )
 # Cargos y términos comerciales que siguen a un marcador sin ser nombres de persona.
-_NAME_STOPWORDS = frozenset({
-    "comercial", "final", "presidente", "presidenta", "director", "directora", "general",
-    "aduana", "del", "de", "producto", "legal", "fiscal", "jurídico", "juridico",
-})
+_NAME_STOPWORDS = frozenset(
+    {
+        "comercial",
+        "final",
+        "presidente",
+        "presidenta",
+        "director",
+        "directora",
+        "general",
+        "aduana",
+        "del",
+        "de",
+        "producto",
+        "legal",
+        "fiscal",
+        "jurídico",
+        "juridico",
+    }
+)
 _B64 = re.compile(r"(?<![A-Za-z0-9+/\-_=])[A-Za-z0-9+/\-_]{12,4096}+={0,3}(?![A-Za-z0-9+/=\-_])")
 # Runs bound both encoded searches without changing their original boundaries.
 _ENCODED_RUN = re.compile(r"[A-Za-z0-9+/=_\-]{12,}")
 _NAME_MARKERS = (
-    "solicitante", "ciudadan", "beneficiari", "paciente", "titular",
-    "nombre", "se\u00f1or", "senor", "sr",
+    "solicitante",
+    "ciudadan",
+    "beneficiari",
+    "paciente",
+    "titular",
+    "nombre",
+    "se\u00f1or",
+    "senor",
+    "sr",
 )
 
 _HEX = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}){8,}(?![0-9A-Fa-f])")
@@ -103,14 +128,54 @@ _B64_SPLIT = re.compile(
 )
 
 CLINICAL_TERMS: Final[tuple[str, ...]] = (
-    "diabetes", "diabético", "diabética", "diabetico", "diabetica", "hipertensión",
-    "hipertension", "hipertenso", "hipertensa", "cáncer", "cancer", "vih", "hiv", "sida",
-    "tuberculosis", "epilepsia", "epiléptico", "asma", "depresión", "depresion", "esquizofrenia",
-    "trastorno bipolar", "ansiedad", "hepatitis", "leucemia", "insuficiencia renal",
-    "insuficiencia cardíaca", "insuficiencia cardiaca", "cardiopatía", "cardiopatia",
-    "cardiópata", "cardiopata", "discapacidad", "embarazo", "covid", "dengue", "malaria",
-    "paludismo", "parkinson", "alzheimer", "lupus", "esclerosis múltiple", "esclerosis multiple",
-    "trasplante", "quimioterapia", "diálisis", "dialisis", "anemia falciforme",
+    "diabetes",
+    "diabético",
+    "diabética",
+    "diabetico",
+    "diabetica",
+    "hipertensión",
+    "hipertension",
+    "hipertenso",
+    "hipertensa",
+    "cáncer",
+    "cancer",
+    "vih",
+    "hiv",
+    "sida",
+    "tuberculosis",
+    "epilepsia",
+    "epiléptico",
+    "asma",
+    "depresión",
+    "depresion",
+    "esquizofrenia",
+    "trastorno bipolar",
+    "ansiedad",
+    "hepatitis",
+    "leucemia",
+    "insuficiencia renal",
+    "insuficiencia cardíaca",
+    "insuficiencia cardiaca",
+    "cardiopatía",
+    "cardiopatia",
+    "cardiópata",
+    "cardiopata",
+    "discapacidad",
+    "embarazo",
+    "covid",
+    "dengue",
+    "malaria",
+    "paludismo",
+    "parkinson",
+    "alzheimer",
+    "lupus",
+    "esclerosis múltiple",
+    "esclerosis multiple",
+    "trasplante",
+    "quimioterapia",
+    "diálisis",
+    "dialisis",
+    "anemia falciforme",
 )
 _CLINICAL_BODY = "|".join(re.escape(t) for t in sorted(CLINICAL_TERMS, key=len, reverse=True))
 _LETTERS = "A-Za-zÁÉÍÓÚÑáéíóúñ"
@@ -155,8 +220,12 @@ def _extend_digit_bounds(text: str, lo: int, hi: int) -> Region:
 
 _DIGIT_CLUSTER = re.compile(r"[0-9](?:[^0-9]{0,40}[0-9])*")
 _DIGIT_PATTERNS: Final = (  # (prioridad, regex, grupo)
-    (2, _BANK, 0), (3, _RIF, 0), (3, _RIF_CONTEXT, "v"), (4, _PHONE, 0),
-    (5, _CEDULA_LETTER, 0), (5, _CEDULA_CONTEXT, "v"),
+    (2, _BANK, 0),
+    (3, _RIF, 0),
+    (3, _RIF_CONTEXT, "v"),
+    (4, _PHONE, 0),
+    (5, _CEDULA_LETTER, 0),
+    (5, _CEDULA_CONTEXT, "v"),
 )
 _LEFT_PAD: Final[int] = 160
 _RIGHT_PAD: Final[int] = 16
@@ -176,7 +245,9 @@ def _digit_regions(text: str, lo: int, hi: int) -> list[Region]:
     """Vecindarios de dígitos: los patrones numéricos solo se evalúan donde hay dígitos."""
     return _merge(
         [
-            _extend_digit_bounds(text, max(lo, m.start() - _LEFT_PAD), min(hi, m.end() + _RIGHT_PAD))
+            _extend_digit_bounds(
+                text, max(lo, m.start() - _LEFT_PAD), min(hi, m.end() + _RIGHT_PAD)
+            )
             for m in _DIGIT_CLUSTER.finditer(text, lo, hi)
         ]
     )
@@ -225,15 +296,13 @@ def _is_bank_run(value: str) -> bool:
         return True
     cursor = 0
     for phone in phones:
-        if any(ch.isdigit() for ch in value[cursor:phone.start()]):
+        if any(ch.isdigit() for ch in value[cursor : phone.start()]):
             return True
         cursor = phone.end()
     return any(ch.isdigit() for ch in value[cursor:])
 
 
-def _scan(
-    text: str, depth: int, regions: list[Region] | None = None
-) -> list[tuple[str, int, int]]:
+def _scan(text: str, depth: int, regions: list[Region] | None = None) -> list[tuple[str, int, int]]:
     """Candidatos (tipo, inicio, fin) filtrados por prioridad y sin solapes.
 
     ``regions=None`` escanea todo el texto; con regiones solo esos tramos (p. ej. el entorno de
@@ -252,7 +321,8 @@ def _scan(
         for d_lo, d_hi in _digit_regions(text, lo, hi):
             for priority, pattern, group in _DIGIT_PATTERNS:
                 candidates += [
-                    (priority, *m.span(group)) for m in pattern.finditer(text, d_lo, d_hi)
+                    (priority, *m.span(group))
+                    for m in pattern.finditer(text, d_lo, d_hi)
                     if pattern is not _BANK or _is_bank_run(m.group())
                 ]
         # Match regex handling of negative region bounds.
@@ -276,9 +346,7 @@ def _scan(
     return sorted(accepted, key=lambda item: item[1])
 
 
-def find_pii(
-    normalized_text: str, *, regions: list[Region] | None = None
-) -> tuple[PiiMatch, ...]:
+def find_pii(normalized_text: str, *, regions: list[Region] | None = None) -> tuple[PiiMatch, ...]:
     """Coincidencias ordenadas por posición y sin solapes. Recibe texto ya normalizado.
 
     ``regions`` limita el escaneo a tramos ``(inicio, fin)``; el llamador debe dejar margen

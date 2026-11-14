@@ -11,7 +11,7 @@ from app.schemas import ConsentIn, GatewayProcessRequest, ShieldInspectRequest
 from pipeline.orchestrator import GatewayInput
 from tests.conftest import API_TOKEN, TOKEN_HEADERS
 
-SECRET = "V-12345678"
+SECRET = "V-12345678"  # noqa: S105 (dato sintético de prueba)
 
 
 def test_api_requires_token(client: TestClient) -> None:
@@ -93,16 +93,16 @@ def test_shield_inspect_masks_and_leaves_no_vault_session(client: TestClient) ->
     assert client.app.state.aduana.vault.active_sessions == 0
 
 
-def test_shield_inspect_never_logs_input(client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+def test_shield_inspect_never_logs_input(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
     with caplog.at_level(logging.DEBUG):
         client.post("/api/v1/shield/inspect", json={"raw_text": SECRET}, headers=TOKEN_HEADERS)
     assert SECRET not in caplog.text
 
 
 def test_oversized_body_rejected(client: TestClient) -> None:
-    response = client.post(
-        "/api/v1/shield/inspect", content="x" * 70_000, headers=TOKEN_HEADERS
-    )
+    response = client.post("/api/v1/shield/inspect", content="x" * 70_000, headers=TOKEN_HEADERS)
     assert response.status_code == 413
 
 

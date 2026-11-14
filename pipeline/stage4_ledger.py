@@ -118,7 +118,8 @@ class SQLiteLedgerRepository:
             try:
                 cur.execute("BEGIN IMMEDIATE")
                 cur.execute(
-                    "SELECT block_index, block_hash FROM ledger_blocks ORDER BY block_index DESC LIMIT 1"
+                    "SELECT block_index, block_hash FROM ledger_blocks "
+                    "ORDER BY block_index DESC LIMIT 1"
                 )
                 row = cur.fetchone()
                 if row is None:
@@ -185,9 +186,7 @@ class SQLiteLedgerRepository:
         with self._lock:
             cur = self._conn.cursor()
             try:
-                cur.execute(
-                    "SELECT * FROM ledger_blocks ORDER BY block_index DESC LIMIT 1"
-                )
+                cur.execute("SELECT * FROM ledger_blocks ORDER BY block_index DESC LIMIT 1")
                 row = cur.fetchone()
                 return _row_to_block(row) if row else None
             finally:
@@ -199,12 +198,14 @@ class SQLiteLedgerRepository:
             try:
                 if end is None:
                     cur.execute(
-                        "SELECT * FROM ledger_blocks WHERE block_index >= ? ORDER BY block_index ASC",
+                        "SELECT * FROM ledger_blocks WHERE block_index >= ? "
+                        "ORDER BY block_index ASC",
                         (start,),
                     )
                 else:
                     cur.execute(
-                        "SELECT * FROM ledger_blocks WHERE block_index >= ? AND block_index <= ? ORDER BY block_index ASC",
+                        "SELECT * FROM ledger_blocks WHERE block_index >= ? "
+                        "AND block_index <= ? ORDER BY block_index ASC",
                         (start, end),
                     )
                 rows = cur.fetchall()

@@ -61,7 +61,9 @@ def main() -> None:
     _wait_ready(port)
 
     window = webview.create_window("Aduana IA — Perímetro Soberano", f"http://127.0.0.1:{port}")
-    window.events.loaded += lambda: window.evaluate_js(f"window.__ADUANA_TOKEN__={json.dumps(token)}")
+    window.events.loaded += lambda: window.evaluate_js(
+        f"window.__ADUANA_TOKEN__={json.dumps(token)}"
+    )
     with tempfile.TemporaryDirectory(prefix="aduana-wv-") as storage:
         webview.start(private_mode=True, storage_path=storage, debug=False)
 
