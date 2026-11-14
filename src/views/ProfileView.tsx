@@ -102,7 +102,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     } else if (prov === 'openai') {
       setAiModel('gpt-4o-mini');
     } else if (prov === 'gemini') {
-      setAiModel('gemini-1.5-flash');
+      setAiModel('gemini-3.5-flash');
     } else if (prov === 'cloudflare') {
       setAiModel('@cf/meta/llama-3.2-3b-instruct');
     } else if (prov === 'ollama') {
@@ -566,7 +566,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     >
                       <option value="groq">Groq Cloud (Llama 3.3 70B / 3.1 8B — Ultra-rápido y Gratuito)</option>
                       <option value="openai">OpenAI / OpenRouter / Compatible OpenAI (GPT-4o mini, DeepSeek)</option>
-                      <option value="gemini">Google Gemini (Gemini 1.5 Flash)</option>
+                      <option value="gemini">Google Gemini (Gemini 3.5 Flash / Flash Lite)</option>
                       <option value="cloudflare">Cloudflare Workers AI (REST API Token o Nativo)</option>
                       <option value="ollama">Ollama / Servidor Local Air-Gapped</option>
                       <option value="custom">Endpoint Compatible Personalizado</option>
@@ -581,7 +581,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       </label>
                       <span className="text-[10px] text-neutral-400">
                         {aiProvider === 'groq' && 'Consola Groq Cloud (Gratis)'}
-                        {aiProvider === 'gemini' && 'Google AI Studio'}
+                        {aiProvider === 'gemini' && 'Google AI Studio (clave AIza... o AQ...)'}
                         {aiProvider === 'openai' && 'Plataforma OpenAI'}
                       </span>
                     </div>
@@ -595,7 +595,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                           aiProvider === 'groq'
                             ? 'gsk_...'
                             : aiProvider === 'gemini'
-                            ? 'AIzaSy...'
+                            ? 'AIzaSy... o AQ....'
                             : aiProvider === 'openai'
                             ? 'sk-...'
                             : 'Token o Clave secreta'
@@ -624,9 +624,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         autoComplete="off"
                         value={aiModel}
                         onChange={(e) => setAiModel(e.target.value)}
-                        placeholder="ej. llama-3.3-70b-versatile"
+                        placeholder={
+                          aiProvider === 'gemini'
+                            ? 'gemini-3.5-flash'
+                            : aiProvider === 'groq'
+                            ? 'llama-3.3-70b-versatile'
+                            : 'ej. nombre-del-modelo'
+                        }
                         className="w-full px-3.5 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#111827] text-neutral-800 dark:text-neutral-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
+                      {aiProvider === 'gemini' && (
+                        <p className="mt-1 text-[11px] text-neutral-400">
+                          Modelo: <span className="font-mono text-indigo-500 font-semibold">gemini-3.5-flash</span> (no coloque la clave aquí).
+                        </p>
+                      )}
                     </div>
 
                     {/* Endpoint / Base URL */}
@@ -639,9 +650,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         autoComplete="off"
                         value={aiEndpoint}
                         onChange={(e) => setAiEndpoint(e.target.value)}
-                        placeholder="Predeterminado del proveedor o URL propia"
+                        placeholder={
+                          aiProvider === 'gemini'
+                            ? 'Dejar en blanco (se usa API oficial de Gemini)'
+                            : 'Predeterminado del proveedor o URL propia'
+                        }
                         className="w-full px-3.5 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#111827] text-neutral-800 dark:text-neutral-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
+                      {aiProvider === 'gemini' && (
+                        <p className="mt-1 text-[11px] text-neutral-400">
+                          Deje este campo vacío; el sistema conecta automáticamente a Gemini.
+                        </p>
+                      )}
                     </div>
                   </div>
 
