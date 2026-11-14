@@ -19,7 +19,7 @@ CHAT_CODES = ("chat.analista.01", "chat.analista.02")
 CHAT_ROLE = "ANALISTA_VALORACION_ADUANERA"
 HEADERS = {"X-Aduana-Token": API_TOKEN, "Content-Type": "application/json"}
 # Contraseñas de prueba locales (no son las del seeder real, que las genera al sembrar).
-TEST_PASSWORD = "Prueba-local-2026-{n}"
+TEST_PASSWORD = "Prueba-local-2026-{n}"  # noqa: S105
 
 
 def _passwords() -> dict[str, str]:
@@ -74,7 +74,9 @@ def test_chat_user_logs_in_and_has_both_chat_permissions(api: TestClient, codigo
 def test_chat_user_can_use_the_ai_chat_endpoint(api: TestClient, codigo: str) -> None:
     headers = _login(api, codigo)
     response = api.post(
-        "/api/v1/shield/inspect", json={"raw_text": "Consulta sobre mi expediente."}, headers=headers
+        "/api/v1/shield/inspect",
+        json={"raw_text": "Consulta sobre mi expediente."},
+        headers=headers,
     )
     assert response.status_code == 201, response.text
 
@@ -89,7 +91,9 @@ def test_chat_user_can_use_the_ai_chat_endpoint(api: TestClient, codigo: str) ->
         ("get", "/api/v1/metrics/benchmark"),
     ],
 )
-def test_chat_users_gain_no_other_access(api: TestClient, codigo: str, method: str, path: str) -> None:
+def test_chat_users_gain_no_other_access(
+    api: TestClient, codigo: str, method: str, path: str
+) -> None:
     headers = _login(api, codigo)
     kwargs = {"json": {"identificador": "V-12345678"}} if method == "post" else {}
     response = getattr(api, method)(path, headers=headers, **kwargs)

@@ -216,7 +216,7 @@ def test_generated_password_always_meets_policy_even_if_csprng_yields_no_digit(
     )
     monkeypatch.setattr(cli.secrets, "token_urlsafe", lambda _n: next(candidates))
     password = cli.generate_password()
-    assert password == "abcdefghijk-Z_1234567890"  # descartó los dos sin dígito y reintentó
+    assert password == "abcdefghijk-Z_1234567890"  # noqa: S105  # descartó los dos sin dígito y reintentó
 
 
 def test_generated_passwords_are_policy_compliant_and_unique(cli: ModuleType) -> None:
