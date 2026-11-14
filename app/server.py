@@ -16,6 +16,7 @@ from litestar.exceptions import HTTPException
 from litestar.middleware import DefineMiddleware
 from litestar.static_files import create_static_files_router
 
+from app.controllers.auth import AuthController
 from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
 from app.controllers.ledger import DemoLedgerController, LedgerController
@@ -86,6 +87,8 @@ def _unhandled_error_handler(_: Request, exc: Exception) -> Response[dict[str, s
 def _shutdown_handler(app: Litestar) -> None:
     state: AppState = app.state.aduana
     state.vault.zeroize_all()
+    state.session_store.zeroize_all()
+    state.auth_repo.close()
     state.repo.close()
 
 
@@ -103,6 +106,7 @@ def create_app(
 
     handlers: list = [
         HealthController,
+        AuthController,
         GatewayController,
         ShieldController,
         LedgerController,

@@ -1,4 +1,4 @@
-export type UserRole = 'auditor' | 'analista' | 'admin';
+export type UserRole = 'analista' | 'administrador' | 'auditor';
 
 export interface UserCredentials {
   clearanceLevel: string;
