@@ -16,12 +16,28 @@ from pipeline.stage4_ledger import SQLiteLedgerRepository
 from tests.conftest import TOKEN_HEADERS
 
 MODULES = [
-    "core.context", "core.config", "core.errors", "core.crypto", "core.keyring",
-    "core.ephemeral_vault", "core.protocols", "core.text_normalizer", "core.pii_patterns",
-    "pipeline.stage0_consent", "pipeline.stage1_shield", "pipeline.stage2_guard_in",
-    "pipeline.stage3_guard_out", "pipeline.stage4_ledger", "pipeline.stage5_explica",
-    "pipeline.llm_adapter", "pipeline.orchestrator",
-    "app.server", "app.schemas", "app.dependencies", "app.desktop", "app.security",
+    "core.context",
+    "core.config",
+    "core.errors",
+    "core.crypto",
+    "core.keyring",
+    "core.ephemeral_vault",
+    "core.protocols",
+    "core.text_normalizer",
+    "core.pii_patterns",
+    "pipeline.stage0_consent",
+    "pipeline.stage1_shield",
+    "pipeline.stage2_guard_in",
+    "pipeline.stage3_guard_out",
+    "pipeline.stage4_ledger",
+    "pipeline.stage5_explica",
+    "pipeline.llm_adapter",
+    "pipeline.orchestrator",
+    "app.server",
+    "app.schemas",
+    "app.dependencies",
+    "app.desktop",
+    "app.security",
 ]
 
 GATEWAY_BODY = {
@@ -51,7 +67,16 @@ def test_context_dataclasses_are_frozen() -> None:
 def test_explica_mappings_are_deeply_immutable() -> None:
     source = {"a": 1.0}
     result = ExplicaResult(
-        "m", 0.0, 0.5, 0.0, source, source, source, 0.0, "REVISION_ESTANDAR", "REVISION_ESTANDAR",
+        "m",
+        0.0,
+        0.5,
+        0.0,
+        source,
+        source,
+        source,
+        0.0,
+        "REVISION_ESTANDAR",
+        "REVISION_ESTANDAR",
         False,
     )
     source["a"] = 99.0

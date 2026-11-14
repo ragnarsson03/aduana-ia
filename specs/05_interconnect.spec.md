@@ -1,6 +1,6 @@
 # 05 — Interconexión LLM, Circuit Breaker y orquestación
 
-**Estado:** especificación viva de Gatillo 5 y contratos de integración con Gatillos 6/7. Adaptadores, intercambio y `GatewayPipeline.process` son stubs. No acredita disponibilidad real de modelos ni aceptación servidor/escritorio.
+**Estado:** Gatillo 5 (`pipeline/llm_adapter.py`, CA-06) implementado y verificado en `tests/test_ca06_resilience.py`. `GatewayPipeline.process` (Gatillo 6) y lanzador de escritorio (Gatillo 7) siguen pendientes.
 
 ## Alcance y trazabilidad
 
@@ -114,7 +114,13 @@ Archivo principal: `tests/test_ca06_resilience.py`; integración: `tests/test_ga
 
 Relojes y fakes deben permitir observar instante del fallo y comienzo/fin de transición. Hasta definir el alcance de `latency_ms`, registrar también tiempo externo total y de fallback; no presentar solo ese campo como prueba. La prueba PyWebView requiere entorno de GUI: si no se ejecuta, registrar aceptación desktop pendiente, no inferirla de mocks.
 
-## Inconsistencias y decisiones pendientes
+## Decisiones tomadas (Gatillo 5)
+
+1. **Medición de CA-06 (`< 100 ms` vs `3.5 s`):** El timeout primario (`timeout_s = 3.5` por defecto) y el tiempo de transición + generación offline (`< 100 ms` tras el fallo) se miden por separado; cuando el circuito está `OPEN` o el fallo es inmediato, la respuesta completa del intercambio toma `< 100 ms`.
+2. **Máquina de estados de `CircuitBreaker`:** `CLOSED` -> `OPEN` tras `failure_threshold = 3` fallos consecutivos; permanece `OPEN` durante `cooldown_s = 30.0` (medido con `clock` inyectable, `time.monotonic` por defecto) respondiendo directo vía `fallback`; luego pasa a `HALF_OPEN` para una petición de prueba (éxito cierra a `CLOSED`, fallo reabre a `OPEN`).
+3. **Endurecimiento de adaptadores HTTP:** `OllamaAdapter` (loopback por defecto) y `OpenAICompatAdapter` (opt-in estricto `enabled=False` por defecto, TLS obligatorio en hosts no loopback, `repr` redactado) validan host contra `allowed_hosts`, deshabilitan redirects (`follow_redirects=False`) y acotan respuestas a `32 KiB`.
+
+## Inconsistencias y decisiones pendientes (Gatillos 6/7)
 
 1. **3.5 s** de espera y **<100 ms** de conmutación son presupuestos diferentes; interpretar CA-06 como tiempo total desde solicitud entraría en conflicto con timeout configurado. Falta definición formal del intervalo de transición (incluye o no generación fallback).
 2. No están definidos endpoints/credenciales de proveedores, plantillas offline, reintentos, contador de fallos, estados abierto/semicerrado, enfriamiento ni recuperación. El nombre `CircuitBreaker` no autoriza inventar esos umbrales.

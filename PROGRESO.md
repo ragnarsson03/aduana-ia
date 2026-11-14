@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-13. Estado: 265 tests pasan, 2 CA en `xfail(strict=True)`. Gatillo 2 y Gatillo 3 completos y certificados.
+> Última actualización: 2026-11-14. Estado: 383 tests pasan, 2 xfailed, 3 xpassed. Gatillo 2, Gatillo 3 y Gatillo 5 completos y verificados.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -67,6 +67,11 @@
 - [x] `tests/test_ca05_restrictive_storage.py`: convertido en test real `test_ca05_db_and_wal_hold_zero_plaintext_pii_after_20_requests` (20 trámites simulados, auditoría binaria de `.db`, `-wal`, `-shm` con 0 bytes de PII).
 - [x] Removido xfail de CA-03 en `tests/test_acceptance_matrix.py`.
 
+### Gatillo 5 — Adaptadores LLM y Circuit Breaker (CA-06, completo y verificado)
+- [x] `pipeline/llm_adapter.py`: `OfflineDeterministicAdapter` (sin red ni `random()`, no hace eco del canary), `OllamaAdapter` (loopback allowlist, sin redirects, respuesta acotada ≤ 32 KiB) y `OpenAICompatAdapter` (opt-in estricto `enabled=False` por defecto, TLS obligatorio remoto, `repr` redactado).
+- [x] `CircuitBreaker`: máquina de estados `CLOSED`/`OPEN`/`HALF_OPEN` con `failure_threshold=3`, `cooldown_s=30.0`, `timeout_s=3.5` y `clock` inyectable.
+- [x] `tests/test_ca06_resilience.py`: 12 tests pasando (primario, fallo inmediato < 100 ms, timeout, propagación 3.5 s, `OPEN`/`HALF_OPEN`, repetibilidad offline sin sockets, anti-canary, GUARD-OUT tras fallback, Ollama/OpenAI-compat con `MockTransport`). Removido xfail de CA-06 en `tests/test_acceptance_matrix.py`.
+
 ## EN CURSO
 - [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
 - [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
@@ -83,11 +88,6 @@
 - [ ] `data/synthetic_tramites.csv` (sintético, determinista) y coeficientes β/μ fijos (5 variables); `explain(features, human_decision, override_justification)`.
 - [ ] Sigmoide **numéricamente estable** (rama por signo de z); validar que `features` tenga exactamente las claves esperadas y valores finitos; error de reconstrucción del logit < 1e-9; sin `random`/numpy/scikit-learn.
 - [ ] Override humano: justificación ≥ 20 y ≤ 500 caracteres, pasada por SHIELD antes de aceptarse; valor por defecto de `human_decision` cuando es `None` (definir). Spec: `specs/04_explica.spec.md`.
-
-### P2 — Gatillo 5: LLM y Circuit Breaker (CA-06)
-- [ ] `OfflineDeterministicAdapter` (resumen determinista sin red), `OllamaAdapter` y `OpenAICompatAdapter` (httpx; allowlist de hosts, sin redirects, respuesta acotada; **híbrido opt-in**).
-- [ ] `CircuitBreaker` como máquina de estados CLOSED/OPEN/HALF_OPEN con umbral, enfriamiento y reloj inyectable.
-- [?] **Redefinir CA-06**: con circuito abierto el failover responde < 100 ms; con timeout en frío tarda hasta 3.5 s. Documentar qué se mide. Spec: `specs/05_interconnect.spec.md`.
 
 ### P3 — Gatillo 6: Orquestador y API completa
 - [ ] `GatewayPipeline.process`: stage0 (blind id, rate-guard, consentimiento) → shield → guard_in → LLM → guard_out → explica → ledger; `vault.zeroize` en `finally`; `BlockedPacket` para rechazos (también se sellan); `request_id` con `secrets.token_urlsafe(16)` generado en servidor.
@@ -109,7 +109,7 @@
 
 ## Decisiones abiertas para el humano (`[?]`)
 1. ~~Alcance de CA-01~~ — resuelto: ≤ 10 000 caracteres (opción A).
-2. Redefinición de CA-06 (failover con circuito abierto vs timeout en frío).
+2. ~~Redefinición de CA-06~~ — resuelto: timeout primario (3.5 s) y transición/fallback (< 100 ms) se miden por separado; circuito `OPEN` responde < 100 ms totales. Umbrales por defecto: 3 fallos / 30 s.
 3. Letra **C = 3** del RIF (comunales) sin fuente oficial accesible; RIF abreviado no se rellena con ceros.
 4. `consent_hash`: SHA-256 de JSON canónico (actual) vs HMAC dominio `consent` (infalsificable).
 5. Autenticación de producción y política de llaves persistentes (`ADUANA_MASTER_KEY` protegida por DPAPI/TPM/vault).

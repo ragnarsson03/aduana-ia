@@ -36,7 +36,9 @@ class KeyRing:
             raise RuntimeError("KeyRing destruido: llave sobrescrita.")
         if domain not in DOMAINS:
             raise ValueError("Dominio de llave desconocido.")
-        return hmac.new(bytes(self._master), _DOMAIN_PREFIX + domain.encode(), hashlib.sha256).digest()
+        return hmac.new(
+            bytes(self._master), _DOMAIN_PREFIX + domain.encode(), hashlib.sha256
+        ).digest()
 
     def hmac_hex(self, domain: str, data: bytes) -> str:
         """HMAC-SHA256 con la subllave del dominio."""

@@ -1,7 +1,7 @@
 """GET /api/v1/ledger/verify y (solo con ADUANA_DEMO_MODE=1) POST /api/v1/ledger/tamper-sim.
 
-``tamper-sim`` opera sobre una COPIA en RAM de los bloques (``iter_blocks`` + ``dataclasses.replace``
-+ ``verify_chain``); jamás muta el archivo del ledger ni sus triggers.
+``tamper-sim`` opera sobre una COPIA en RAM de los bloques (``iter_blocks`` +
+``dataclasses.replace`` + ``verify_chain``); jamás muta el archivo del ledger ni sus triggers.
 """
 
 from __future__ import annotations

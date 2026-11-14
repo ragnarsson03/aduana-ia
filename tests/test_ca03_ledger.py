@@ -1,7 +1,7 @@
 """CA-03 — LEDGER Criptográfico (RF-15..RF-17, CA-03).
 
-Verifica inmutabilidad SQLite (triggers BEFORE UPDATE/DELETE), encadenamiento canónico SHA-256 + HMAC,
-detección de alteración de bit en < 50 ms y simulación de sabotaje en memoria (specs/03_ledger.spec.md).
+Verifica inmutabilidad SQLite (triggers BEFORE UPDATE/DELETE), encadenamiento SHA-256 + HMAC,
+detección de alteración de bit en < 50 ms y simulación en memoria (specs/03_ledger.spec.md).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from litestar.testing import TestClient
 from core.config import GENESIS_PREV_HASH
 from core.context import ChainAnchor, LedgerEntry
 from core.crypto import block_hash, canonical_block_payload
-from core.errors import ImmutableLedgerError
+from core.errors import ImmutableLedgerError, StorageError
 from core.keyring import KeyRing
 from pipeline.stage4_ledger import SQLiteLedgerRepository, seal_entry, verify_chain
 
@@ -72,12 +72,16 @@ def test_sqlite_hardening(tmp_path: Path) -> None:
     cur = conn.cursor()
 
     # Intentar UPDATE directo debe ser abortado por el trigger
-    with pytest.raises((sqlite3.IntegrityError, sqlite3.OperationalError, ImmutableLedgerError)) as exc_info:
+    with pytest.raises(
+        (sqlite3.IntegrityError, sqlite3.OperationalError, ImmutableLedgerError)
+    ) as exc_info:
         cur.execute("UPDATE ledger_blocks SET security_verdict = 'ALTERED' WHERE block_index = 0")
     assert "ERR_IMMUTABLE_LEDGER" in str(exc_info.value)
 
     # Intentar DELETE directo debe ser abortado por el trigger
-    with pytest.raises((sqlite3.IntegrityError, sqlite3.OperationalError, ImmutableLedgerError)) as exc_info:
+    with pytest.raises(
+        (sqlite3.IntegrityError, sqlite3.OperationalError, ImmutableLedgerError)
+    ) as exc_info:
         cur.execute("DELETE FROM ledger_blocks WHERE block_index = 0")
     assert "ERR_IMMUTABLE_LEDGER" in str(exc_info.value)
 
@@ -93,7 +97,7 @@ def test_schema_uniqueness(tmp_path: Path) -> None:
     seal_entry(entry1, repo, keys=KEYS)
 
     # Mismo request_id
-    with pytest.raises(Exception):
+    with pytest.raises((StorageError, sqlite3.IntegrityError)):
         seal_entry(entry1, repo, keys=KEYS)
 
     repo.close()
@@ -182,7 +186,7 @@ def test_genesis_link_broken(tmp_path: Path) -> None:
 
 
 def test_rehashed_without_hmac(tmp_path: Path) -> None:
-    """Un atacante que recalcula SHA-256 sin la clave HMAC es detectado con HMAC_SIGNATURE_FORGED."""
+    """Recalcular SHA-256 sin la clave HMAC debe detectarse como HMAC_SIGNATURE_FORGED."""
     repo = SQLiteLedgerRepository(str(tmp_path / "rehash.db"))
     seal_entry(_make_entry("r0", 0), repo, keys=KEYS)
     seal_entry(_make_entry("r1", 1), repo, keys=KEYS)
@@ -193,7 +197,10 @@ def test_rehashed_without_hmac(tmp_path: Path) -> None:
     temp_block = replace(b1, payload_hash=new_payload_h)
     new_b_hash = block_hash(
         canonical_block_payload(
-            temp_block, index=temp_block.block_index, prev_hash=temp_block.prev_hash, key_id=temp_block.key_id
+            temp_block,
+            index=temp_block.block_index,
+            prev_hash=temp_block.prev_hash,
+            key_id=temp_block.key_id,
         )
     )
     # Conserva la firma antigua

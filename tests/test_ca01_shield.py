@@ -15,8 +15,14 @@ TEXT = (
     "Correo fixture@example.invalid. Paciente con diabetes."
 )
 ORIGINALS = [
-    "V-00000001", "E-00000002", "J-12345678-4", "0412-0000001", "0212-0000002",
-    "00000000000000000001", "fixture@example.invalid", "diabetes",
+    "V-00000001",
+    "E-00000002",
+    "J-12345678-4",
+    "0412-0000001",
+    "0212-0000002",
+    "00000000000000000001",
+    "fixture@example.invalid",
+    "diabetes",
 ]
 
 
@@ -33,8 +39,16 @@ def test_masks_every_structured_identifier(vault: EphemeralVault) -> None:
     masked, meta = run(vault)
     for original in ORIGINALS:
         assert original not in masked
-    for token in ("[CEDULA_1]", "[CEDULA_2]", "[RIF_1]", "[PHONE_1]", "[PHONE_2]", "[BANK_1]",
-                  "[EMAIL_1]", "[CLINICAL_1]"):
+    for token in (
+        "[CEDULA_1]",
+        "[CEDULA_2]",
+        "[RIF_1]",
+        "[PHONE_1]",
+        "[PHONE_2]",
+        "[BANK_1]",
+        "[EMAIL_1]",
+        "[CLINICAL_1]",
+    ):
         assert token in masked
     assert set(meta.detected_types) == {"CEDULA", "RIF", "PHONE", "BANK", "EMAIL", "CLINICAL"}
     assert meta.detected_types == tuple(sorted(meta.detected_types))
