@@ -6,9 +6,12 @@ import secrets
 
 from litestar import Controller, Request, post
 from litestar.params import JSONBody
+from litestar.status_codes import HTTP_200_OK
 
+from app.controllers.chat import MAX_CHAT_REQUEST_BYTES, _execute_chat_pipeline, chat_api_guard
 from app.dependencies import AppState
 from app.schemas import (
+    ChatIAResponse,
     GatewayProcessRequest,
     GatewayProcessResponse,
     ShieldInspectRequest,
@@ -80,6 +83,15 @@ class GatewayController(Controller):
             probability_score=packet.explica.probability_score,
             linear_shap_values=dict(packet.explica.linear_shap_values),
         )
+
+    @post(
+        "/chat",
+        status_code=HTTP_200_OK,
+        guards=[chat_api_guard],
+        request_max_body_size=MAX_CHAT_REQUEST_BYTES,
+    )
+    async def chat_multimodal(self, request: Request) -> ChatIAResponse:
+        return await _execute_chat_pipeline(request)
 
 
 class ShieldController(Controller):

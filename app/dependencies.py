@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.config import LLM_TIMEOUT_SECONDS, Settings
+from core.config import LLM_TIMEOUT_SECONDS, Settings, load_gemini_from_env
 from core.ephemeral_vault import EphemeralVault
 from core.keyring import KeyRing
-from core.protocols import StorageRepositoryProtocol
+from core.protocols import LLMAdapterProtocol, StorageRepositoryProtocol
 from pipeline.auth import SessionStore, SQLiteAuthRepository
-from pipeline.llm_adapter import CircuitBreaker, OfflineDeterministicAdapter
+from pipeline.llm_adapter import (
+    CircuitBreaker,
+    GeminiAdapter,
+    OfflineDeterministicAdapter,
+)
 from pipeline.orchestrator import GatewayPipeline
 from pipeline.stage0_consent import RateGuard
 from pipeline.stage4_ledger import SQLiteLedgerRepository
@@ -46,7 +50,19 @@ def build_state(
     auth_repo = SQLiteAuthRepository(str(settings.db_path), keys=keys)
     if pipeline is None:
         fallback = OfflineDeterministicAdapter()
-        breaker = CircuitBreaker(fallback, fallback, timeout_s=LLM_TIMEOUT_SECONDS)
+        gemini_key, gemini_model = load_gemini_from_env()
+        primary: LLMAdapterProtocol
+        timeout_s = LLM_TIMEOUT_SECONDS
+        if gemini_key:
+            primary = GeminiAdapter(
+                api_key=gemini_key,
+                model=gemini_model,
+                enabled=True,
+            )
+            timeout_s = 10.0
+        else:
+            primary = fallback
+        breaker = CircuitBreaker(primary, fallback, timeout_s=timeout_s)
         pipeline = GatewayPipeline(
             keys=keys,
             vault=vault,

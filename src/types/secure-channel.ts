@@ -32,6 +32,33 @@ export interface InstitutionalChannel {
   description: string;
 }
 
+export interface FileAttachment {
+  name: string;
+  sizeBytes: number;
+  formattedSize: string;
+  mimeType: string;
+  dataUrl: string;
+  sha256Hex: string;
+  isClassified?: boolean;
+  isEncrypted?: boolean;
+  algorithm?: string;
+  ivHex?: string;
+  ciphertextPreview?: string;
+  authTagValid?: boolean;
+}
+
+export interface CryptoProcessVerification {
+  algorithm: string;
+  handshakeStatus: string;
+  ed25519Key: string;
+  ivHex: string;
+  ciphertextPreview: string;
+  authTagValid: boolean;
+  sha256Short: string;
+  piiShieldStatus: string;
+  sessionTokenId: string;
+}
+
 export interface ChatMessage {
   id: string;
   senderName: string;
@@ -49,6 +76,8 @@ export interface ChatMessage {
   tokenExampleLabel?: string;
   secondTimestamp?: string;
   sentReceiptLabel?: string;
+  fileAttachment?: FileAttachment;
+  cryptoVerification?: CryptoProcessVerification;
   attachment?: {
     title: string;
     description: string;

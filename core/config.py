@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import sys
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,7 @@ from typing import Final
 from core.keyring import MIN_KEY_BYTES, KeyRing
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
+DEFAULT_GEMINI_MODEL: Final[str] = "gemini-3.5-flash-lite"
 
 VAULT_TTL_SECONDS: Final[int] = 180
 VAULT_MAX_SESSIONS: Final[int] = 1000
@@ -93,3 +95,68 @@ def load_api_token_from_env(env: MutableMapping[str, str] | None = None) -> str:
     env = os.environ if env is None else env
     token = env.pop("ADUANA_API_TOKEN", None)
     return token if token and len(token) >= 32 else secrets.token_urlsafe(32)
+
+
+def _parse_dotenv_file(dotenv_path: Path) -> dict[str, str]:
+    """Lee un archivo .env local soportando tanto KEY=VALUE como una clave cruda en una línea."""
+    if not dotenv_path.is_file():
+        return {}
+    parsed: dict[str, str] = {}
+    try:
+        content = dotenv_path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            k, v = line.split("=", 1)
+            key_name = k.strip()
+            val = v.strip().strip("'").strip('"')
+            if key_name and val:
+                parsed[key_name] = val
+        elif (line.startswith("AQ.") or line.startswith("AIza")) and "GEMINI_API_KEY" not in parsed:
+            parsed["GEMINI_API_KEY"] = line
+    return parsed
+
+
+def load_gemini_from_env(
+    env: MutableMapping[str, str] | None = None,
+    *,
+    dotenv_path: Path | None = None,
+) -> tuple[str, str]:
+    """Obtiene ``(api_key, model)`` para Gemini y purga ``GEMINI_API_KEY`` del entorno."""
+    active_env = os.environ if env is None else env
+    api_key = (
+        active_env.pop("GEMINI_API_KEY", None)
+        or active_env.pop("GOOGLE_API_KEY", None)
+        or active_env.pop("ADUANA_GEMINI_API_KEY", None)
+        or ""
+    ).strip()
+    model = (
+        active_env.get("GEMINI_MODEL")
+        or active_env.get("ADUANA_GEMINI_MODEL")
+        or ""
+    ).strip()
+
+    # Si no estamos en pytest (o si se pasó dotenv_path explícito), leer .env del proyecto
+    in_pytest = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+    if not api_key and (dotenv_path is not None or (env is None and not in_pytest)):
+        target_dotenv = dotenv_path if dotenv_path is not None else (PROJECT_ROOT / ".env")
+        file_vars = _parse_dotenv_file(target_dotenv)
+        api_key = (
+            file_vars.get("GEMINI_API_KEY")
+            or file_vars.get("GOOGLE_API_KEY")
+            or file_vars.get("ADUANA_GEMINI_API_KEY")
+            or ""
+        ).strip()
+        if not model:
+            model = (
+                file_vars.get("GEMINI_MODEL")
+                or file_vars.get("ADUANA_GEMINI_MODEL")
+                or ""
+            ).strip()
+
+    return api_key, (model or DEFAULT_GEMINI_MODEL)
+

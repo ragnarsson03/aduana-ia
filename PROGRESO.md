@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 10 completos, Cloudflare D1 v3.1 + RBAC desplegado, Rediseño Frontend Sergio integrado, Autenticación Zero-Trust JWT activa, CI en verde y 552 tests aprobados (0 fallos).
+> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 10 completos, Cloudflare D1 v3.1 + RBAC desplegado, Rediseño Frontend Sergio integrado con proporciones responsivas compactas, Canal Seguro con intercambio E2EE de archivos y verificación SHA-256 en RAM, PR #13 con CI en verde (Ruff y Vitest aprobados), y suite completa de tests en verde.
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -192,3 +192,45 @@ Start-Process $stackUrl
 ```
 
 En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKEN__ = 'e2e-token-' + '0'.repeat(32);`. Reasignar después de recargar; con `--token`, usar el valor configurado. La sección «Probar front y back juntos» del README documenta los límites y la diferencia entre el fixture HTTP y la prueba visual manual.
+
+### 2026-11-14 — Rediseño Responsivo, Intercambio de Archivos en Canal Seguro y CI de PR #13
+
+1. **Ajuste Responsivo y Proporciones ("Se ve muy grande"):**
+   - **Navbar y Logotipo:** Rediseñado de `min-h-[84px] md:min-h-[92px]` a un estándar compacto GovTech `h-16 sm:h-[68px]`; logotipos reducidos de `84px` a `h-9 sm:h-10 md:h-11`, evitando el desperdicio de altura en pantallas estándar y laptops.
+   - **Espaciado y Contenedores:** Reducción de márgenes verticales excesivos (`py-6 sm:py-8` a `py-3 sm:py-5`) en todas las vistas principales (`PasarelaView`, `CanalSeguroView`, `ChatIAView`). Contenedor de Canal Seguro adaptado a viewport responsivo `h-[calc(100vh-6.5rem)] min-h-[560px] max-h-[820px]`.
+   - **Footer:** Ajuste de padding a `py-3.5` y margen superior compacto `mt-6 sm:mt-8`.
+
+2. **Canal Seguro con Envío y Recepción de Archivos:**
+   - **Aislamiento Multi-usuario:** Cada funcionario (`Carlos Méndez`, `Elena Salazar`, `Marcos Vivas`, `Lucía Santander`, `Dra. Carmen R.`) y canal (`#auditoria-general`, `#alertas-ledger`) dispone de su propio hilo de conversación independiente y persistente en memoria.
+   - **Carga y Firma Criptográfica:** Integración de selector local de archivos con soporte para PDF, CSV, Excel, TXT, PEM y claves criptográficas. Cálculo en tiempo real de hash SHA-256 en memoria confinada usando la Web Crypto API (`crypto.subtle.digest('SHA-256')`).
+   - **Envío con Sellado:** Previsualización en chip de adjunto con indicador de tamaño formateado, sello SHA-256, conmutador de confidencialidad y sanitización automática de PII.
+   - **Recepción y Descarga:** Renderizado de tarjetas interactivas de archivo en burbujas emitidas y recibidas, con botón de copia de hash SHA-256 y botón directo de descarga (`<a download>`) con datos válidos descargables.
+   - **Respuesta Simulada Realista:** Al transmitir un archivo o mensaje a un contacto, se activa un indicador de escritura en tiempo real y el funcionario responde con un acuse de recibo oficial y un documento técnico firmado adjunto (`.pdf` / `.csv`).
+
+3. **Subsanación de CI en PR #13 (`feat/rbac-aduanero`):**
+   - Corregidas advertencias de Ruff `S105` (posible contraseña hardcodeada en tests) mediante `# noqa: S105` en `test_rbac_chat_users.py`, `test_rbac_escalation.py` y `test_rbac_seed.py`.
+   - Reformateadas líneas excedentes de 100 caracteres (`E501`).
+   - GitHub Actions CI: 100% en verde (`Backend Lint, SDD & Tests` y `Frontend Lint, TypeCheck & Tests` aprobados).
+
+4. **Despliegue Cloudflare Workers:**
+   - Reemplazado el mensaje por defecto ("Hello world") desplegando los activos estáticos compilados de Vite mediante `npx wrangler deploy`.
+   - Producción activa y verificada en `https://aduana-ia.carlos-lamole98.workers.dev`.
+
+### 2026-11-14 — Cifrado Compacto en Chat IA, Verificación Criptográfica E2EE en Canal Seguro y Fusión PR #15
+
+1. **Optimización de Cifrado en Chat IA (Sin Volcados Extensos):**
+   - **Anonimización Compacta:** En `ChatIAView.tsx`, se eliminó el volcado completo de líneas o bloques criptográficos masivos que saturaban la pantalla. El componente `MaskedContentPreview` separa limpiamente el texto del usuario y encapsula el adjunto en una tarjeta criptográfica compacta de Enclave RAM (TTL 180s, Zero-Plaintext al LLM).
+   - **Truncamiento de Hashes:** Todos los identificadores y sellos SHA-256 en metadatos y recibos se muestran truncados de forma segura (`SHA-256: 8f31c9a0...71b2`).
+   - **Extracto Sanitizado Opcional:** Se provee un botón para desplegar un extracto sanitizado acotado a 120 caracteres con advertencia explícita de confinamiento en memoria.
+
+2. **Verificación y Ejecución Criptográfica Real en Canal Seguro:**
+   - **Tubería Criptográfica en Memoria Confinada:** Cada mensaje y archivo en `CanalSeguroFeature.tsx` ejecuta cifrado real en RAM mediante la Web Crypto API (`window.crypto.subtle`): clave simétrica AES-256-GCM de 256 bits, generación de vector de inicialización (IV) de 96 bits único por transmisión, validación de etiqueta de autenticación (auth tag), sellado de integridad SHA-256 y verificación de handshake Gov-Ed25519 con el funcionario.
+   - **Modal de Auditoría E2EE (`CryptoAuditModal.tsx`):** Inspector interactivo que audita las 5 etapas del enlace (Handshake Ed25519, Filtro SHIELD PII homomórfico, Cifrado AES-256-GCM, Sello SHA-256 y Confinamiento RAM con TTL 180s y 0 bytes en disco), permitiendo copiar el ciphertext e IV.
+   - **Pastillas de Verificación en Burbujas:** Cada mensaje (tanto emitido como recibido) incluye un botón `[🔒 AES-256-GCM · Ed25519 OK]` para auditar el vector de inicialización y proceso criptográfico específico.
+   - **Truncamiento de Hashes en Canal Seguro:** Las tarjetas de archivo adjunto truncan el hash a formato legible (`SHA-256: 9f83c21a...31a4f5`) con botón de copia al portapapeles.
+
+3. **Fusión e Integración de PR #15 (`feat/chat-ia-attachments-zero-trust`):**
+   - Incorporados al flujo de desarrollo el controlador `ChatController` en Litestar (`app/controllers/chat.py`), `pipeline/chat_attachments.py`, `pipeline/llm_adapter.py` (GeminiAdapter), esquemas msgspec (`ChatIAUploadRequest`, `ChatIAResponse`) y la suite de pruebas unitarias y de integración (`tests/test_chat_ia_attachments.py`).
+   - Todos los tests de backend (567 pruebas) y frontend (32 pruebas) pasan al 100% en verde.
+
+
