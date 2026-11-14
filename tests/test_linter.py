@@ -137,6 +137,8 @@ def test_ruff_linter_if_installed() -> None:
             text=True,
         )
         if res.returncode != 0:
+            if "No module named ruff" in (res.stderr or ""):
+                return
             # Si ruff reporta errores, se señalan
             pytest.fail(f"Ruff detectó violaciones de estilo/lint:\n{res.stdout or res.stderr}")
     except FileNotFoundError:
