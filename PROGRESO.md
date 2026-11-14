@@ -1,7 +1,7 @@
 # PROGRESO — Aduana IA (backend)
 
 > Archivo de coordinación para varios modelos/agentes. **Antes de tomar una tarea:** léela entera, marca `[~]` con tu nombre/fecha, y no toques los archivos que otra tarea `[~]` esté usando. **Al terminar:** marca `[x]` y corre la suite.
-> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 7 completos, endurecimiento de Guardián (P0) certificado (486 tests en verde).
+> Última actualización: 2026-11-14. Estado: Gatillo 0 al Gatillo 10 completos, Cloudflare D1 v3.1 + RBAC desplegado, Rediseño Frontend Sergio integrado, Autenticación Zero-Trust JWT activa, CI en verde y 552 tests aprobados (0 fallos).
 
 ## Leyenda
 `[x]` hecho · `[~]` en curso (quién) · `[ ]` pendiente · `[?]` requiere decisión humana
@@ -93,9 +93,28 @@
 - [x] `index.html`, `vite.config.ts`, `src/` y `static/`: eliminados los `<link>` a Google Fonts CDN y URLs externas en bundle, `autoComplete="off"` en todos los `<input>`/`<textarea>`, lectura dinámica de `window.__ADUANA_TOKEN__` en `AduanaApiClient`, cero `innerHTML`/`dangerouslySetInnerHTML`.
 - [x] `tests/test_ca07_desktop_and_frontend.py`: 5 tests pasando (incluyendo arranque real del subproceso Granian, verificación CSP, 401/200 con token, auditoría de `https?://` en `static/` y `autoComplete="off"`).
 
+### Gatillo 8 — Base de Datos Cloudflare D1 v3.1, RBAC y Despliegue Edge (PR #8, completo y desplegado)
+- [x] `schema.sql`: 6 tablas formalizadas (`roles_aduana`, `usuarios_aduana`, `ledger_blocks`, `consent_records`, `tramite_evaluations`, `canal_seguro_channels`, `canal_seguro_messages`) con triggers de inmutabilidad y `PRAGMA foreign_keys = ON`.
+- [x] `seed_d1.sql` / `scripts/generate_d1_seed.py`: 3 roles oficiales (`analista`, `administrador`, `auditor`), 10 funcionarios con `blind_citizen_id` HMAC-SHA256 y PBKDF2 (310.000 iteraciones), 2 canales E2EE.
+- [x] `wrangler.jsonc`: configurado con bindings `DB` (`aduana-db` UUID `21eb0bb7-3d0f-4695-b450-3af441ab4d5b`), `KV` (`aduana-kv` ID `3885a09654fa42eea23241b0948b8df7`), `AI` y soporte de Workers Static Assets (`assets: { directory: "./static" }`).
+- [x] Despliegue en producción Cloudflare Workers activo en `https://aduana-ia.carlos-lamole98.workers.dev`.
+- [x] Configuración de CI/CD en Cloudflare Pages / Workers compilando desde rama `develop` con `npm run build`.
+
+### Gatillo 9 — Rediseño Frontend Sergio y Experiencia de Usuario (PR #10, completo y desplegado)
+- [x] `src/views/LoginView.tsx` e `src/index.css`: tarjeta de acceso con inclinación 3D parallax interactiva (seguimiento del cursor con momentum lerp), reflejo especular dinámico (`--mouse-x`, `--mouse-y`), cyber scanline sweep, botón de acceso con destello `shimmer-btn`.
+- [x] Identidad Visual: sustitución de ícono genérico por el emblema oficial de Aduana IA (`Logo-white.png`) con sombras y contrastes adaptados a fondo oscuro.
+- [x] Navegación: pestaña "Chat IA" renombrada visualmente a "Nexus IA" preservando contratos internos (`id: 'chat'`).
+- [x] Auditoría en UI: alerta de manipulación de bloque (`DESAJUSTE SHA-256`) en `LedgerView.tsx` rediseñada con mayor sobriedad e integración estética.
+- [x] Accesibilidad: soporte estricto de `@media (prefers-reduced-motion: reduce)` desactivando animaciones y transformaciones CSS ante preferencias del sistema.
+
+### Gatillo 10 — Autenticación Zero-Trust, JWT Sessions y Auditoría en Ledger (PR #11, completo)
+- [x] `pipeline/auth.py` y `app/controllers/auth.py`: autenticación soberana mediante PBKDF2-HMAC-SHA256 (310.000 iteraciones) + `blind_citizen_id` (HMAC-SHA256 de cédula), emisión de tokens JWT HS256 firmados con subllave dedicada del `KeyRing`, endpoints `/api/v1/auth/login`, `/api/v1/auth/verify`, `/api/v1/auth/me`.
+- [x] Registro inmutable en `ledger_blocks` de todos los eventos de autenticación (éxitos y rechazos por credencial incorrecta).
+- [x] `tests/test_auth_login.py`: 12 pruebas unitarias pasando (total suite: 552 tests en verde).
+
 ## EN CURSO
-- [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
-- [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
+- [x] **Codex** — optimización de rendimiento y benchmarks en `core/pii_patterns.py` y `core/text_normalizer.py`.
+- [x] **Penetration Tester** — suite de regresión del red team de SHIELD rondas 1-2 (`tests/test_shield_regression.py`: 106 tests pasando).
 
 ## PENDIENTE
 
@@ -119,17 +138,18 @@ Medido sobre la regresión del red team (`tests/test_guardian_regression.py`) y 
 - [x] `static/index.html` libre de fuentes externas (`fonts.googleapis.com`/`fonts.gstatic.com`), cumpliendo Air-Gapped y la CSP `default-src 'self'` (validado en `tests/test_ca07_desktop_and_frontend.py`).
 
 ### P0 — Cerrar Gatillo 1
-- [ ] Aplicar hallazgos del red team ronda 2 y añadir su tabla como tests parametrizados en `tests/test_ca01_shield.py`.
+- [x] Aplicar hallazgos del red team ronda 2 y añadir su tabla como tests parametrizados (implementado en `tests/test_shield_regression.py`: 106 tests pasando, cubriendo `MUST_MASK`, `REDOS` y `KNOWN_LIMITS`).
 - [x] **Alcance de CA-01 decidido (usuario, opción A):** < 20 ms para textos de hasta 10 000 caracteres; la API sigue aceptando hasta 20 000 (`MAX_RAW_TEXT_CHARS`) sin garantía de 20 ms por encima de 10 000. Documentado en `specs/01_shield.spec.md` y fijado en `tests/test_ca01_shield.py`.
-- [ ] Reescribir `specs/01_shield.spec.md` (firmas reales; **corregir vector `J-00000000-9`: el verificador correcto es 0**; mover "inconsistencias" a "decisiones tomadas").
+- [x] Reescribir `specs/01_shield.spec.md` (firmas reales; **corregir vector `J-00000000-9`: el verificador correcto es 0**; mover "inconsistencias" a "decisiones tomadas").
 - [ ] Límites conocidos sin cubrir (documentados en `core/pii_patterns.py`): nombres sin marcador/minúsculas, base32/ROT13/entidades HTML/`%NN`, números en palabras, clínicos con variantes (`seropositivo`, `d i a b e t e s`), falsos positivos clínicos en texto comercial ("depresión del mercado").
 
 ### P4 — Calidad, seguridad y empaquetado
-- [ ] Instalar y pasar `ruff`, `mypy --strict`, `bandit`, `pip-audit` (hoy no corridos); CI.
-- [ ] Autenticación institucional (OIDC/LDAP) y `actor_id` pseudonimizado en el bloque (hoy solo token por proceso).
-- [ ] Pasaporte/otros identificadores, política de `purpose_code` autorizados, formato UTC del `timestamp`.
-- [ ] README: sección de despliegue remoto (TLS + auth), recordar `workers=1`; documentar riesgo residual de `zeroize` en CPython (`pagefile.sys`, `hiberfil.sys`, volcados WER) y mitigaciones (BitLocker, sin hibernación).
-- [ ] Commit(s) con mensajes convencionales (`feat:`, `test:`…); nada está commiteado todavía. Revisar `.gitignore` (ya cubre `.db`, WAL/SHM, `.venv`, `.env`).
+- [x] Instalar y pasar `ruff` (cero violaciones), `bandit` (auditoría estática), `pip-audit` (cero vulnerabilidades conocidas en dependencias); Pipeline CI activo en `.github/workflows/ci.yml`.
+- [x] Commit(s) con mensajes convencionales (`feat:`, `test:`, `merge:`, `fix:`); todos los PRs (#6, #7, #8, #9, #10) fusionados y ramas sincronizadas en `origin/develop`.
+- [ ] `mypy --strict`: tipado estricto exhaustivo en módulos que interactúan con DTOs de Litestar.
+- [ ] Autenticación institucional (OIDC/LDAP) y `actor_id` pseudonimizado en el bloque (para entornos conectados fuera del alcance Air-Gapped/offline).
+- [ ] Pasaporte/otros identificadores internacionales, política de `purpose_code` autorizados, formato UTC del `timestamp`.
+- [ ] Documentar en manual de operaciones el riesgo residual de `zeroize` en CPython (`pagefile.sys`, `hiberfil.sys`, volcados WER) y mitigaciones recomendadas (BitLocker, deshabilitar hibernación).
 
 ## Decisiones abiertas para el humano (`[?]`)
 1. ~~Alcance de CA-01~~ — resuelto: ≤ 10 000 caracteres (opción A).
@@ -147,7 +167,7 @@ Medido sobre la regresión del red team (`tests/test_guardian_regression.py`) y 
 | Pipeline | `pipeline/stage0_consent.py`, `stage1_shield.py`, `stage2_guard_in.py`, `stage3_guard_out.py`, `stage4_ledger.py`, `stage5_explica.py`, `llm_adapter.py`, `orchestrator.py` (completos y certificados) |
 | API | `app/server.py`, `security.py`, `schemas.py`, `dependencies.py`, `controllers/*`, `desktop.py` (completos y probados con Granian + PyWebView) |
 | Tests | `tests/` (conftest con `client`, `demo_client`, `keys`; token `API_TOKEN`/`TOKEN_HEADERS`) |
-| Specs | `specs/00_architecture.spec.md`, `00_kernel`, `01_shield` (desactualizada), `02_guardian`, `03_ledger`, `04_explica`, `05_interconnect`, `06_files_and_chat_frontend` |
+| Specs | `specs/00_architecture.spec.md`, `00_kernel`, `01_shield` (actualizada con firmas y decisiones), `02_guardian`, `03_ledger`, `04_explica`, `05_interconnect`, `06_files_and_chat_frontend` |
 
 ### 2026-11-14 — Harness de front y back reales
 
