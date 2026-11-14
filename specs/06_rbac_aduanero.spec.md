@@ -61,6 +61,16 @@ Toda ruta (salvo `GET /health/system`) exige además la cabecera `X-Aduana-Token
 
 Errores (cuerpo `{"error": "<CODIGO>"}`, sin contenido ciudadano): `401 ERR_AUTH_INVALID` (credencial o token inválido/expirado, mensaje uniforme), `403 ERR_FORBIDDEN` (rol sin permiso), `423 ERR_ACCOUNT_LOCKED`, `409 ERR_USER_EXISTS`, `422 ERR_WEAK_PASSWORD`.
 
+### 4.1 Formas de petición y respuesta (fijadas por `tests/test_ca07_rbac_aduana.py`)
+
+- `POST /auth/login` → `200` con `{"token": "v1....", "codigo_usuario", "rol", "expires_at"}`; sin hash ni sal. Usuario inexistente, contraseña errónea y usuario suspendido dan el mismo `401 ERR_AUTH_INVALID`. Los 4 primeros fallos dan 401; con el bloqueo activo, `423 ERR_ACCOUNT_LOCKED` también con la contraseña correcta.
+- `GET /auth/me` → `200` con `{"codigo_usuario", "rol", "permisos": [...]}`; sin secretos.
+- `POST /explica/evaluate` → cuerpo `{"features": {...5 variables...}}`; respuesta `200` con `probability_score`, `linear_shap_values`, `model_recommendation` en el nivel superior. No crea bloques.
+- `POST /audit/fiscal` → cuerpo `{"identificador": "V-12345678"}`; respuesta `{"blocks": [{"block_index", "citizen_receipt_code", "security_verdict", "timestamp_utc", "block_hash"}]}`; solo los bloques cuyo `blind_citizen_id` coincide con el índice ciego del identificador; nunca devuelve el identificador ni `blind_citizen_id`.
+- `GET /ledger/receipt/{codigo}` → `{"codigo", "block_index", "block_hash", "cadena_valida", "liberacion_autorizada"}`; `404 ERR_NOT_FOUND` sin eco si no existe.
+- `POST /usuarios` → cuerpo `{"codigo_usuario", "identificador", "rol", "password"}`; respuesta `201` con el `UsuarioAduana` público (sin sal, hash ni `blind_identifier`). `POST /usuarios/{codigo}/suspender` sin cuerpo → `200`.
+- Con RBAC apagado las rutas nuevas no existen (`404`; `405` aceptable en POST por el router estático).
+
 ## 5. Invariantes criptográficas
 
 1. **Contraseñas:** nunca en claro. `hashlib.pbkdf2_hmac('sha256', password.encode(), salt, iterations, dklen=32)` con `salt = secrets.token_bytes(32)` único por usuario. Iteraciones por defecto `600_000` (OWASP 2023), guardadas por usuario para poder migrar. Comparación con `hmac.compare_digest`.
