@@ -57,3 +57,28 @@ class InvalidFeaturesError(AduanaError, ValueError):
 
 class OverrideJustificationError(AduanaError):
     """Override humano sin justificación de al menos 20 caracteres (RF-20)."""
+
+
+class AuthenticationError(AduanaError):
+    """Credencial o token inválido/expirado (HTTP 401 ERR_AUTH_INVALID). Mensaje uniforme:
+    nunca revela si el identificador existe."""
+
+
+class InvalidTokenError(AuthenticationError):
+    """Token de sesión malformado, manipulado o vencido."""
+
+
+class AuthorizationError(AduanaError):
+    """El rol del usuario no tiene el permiso requerido (HTTP 403 ERR_FORBIDDEN)."""
+
+
+class AccountLockedError(AduanaError):
+    """Cuenta bloqueada temporalmente por intentos fallidos (HTTP 423 ERR_ACCOUNT_LOCKED)."""
+
+
+class WeakPasswordError(AduanaError):
+    """La contraseña no cumple la política mínima (HTTP 422 ERR_WEAK_PASSWORD). Sin eco."""
+
+
+class DuplicateUserError(AduanaError):
+    """Ya existe un usuario con ese código o identificador (HTTP 409 ERR_USER_EXISTS)."""

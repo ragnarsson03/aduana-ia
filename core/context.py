@@ -14,7 +14,7 @@ Desviaciones documentadas respecto a PROMPT_MAESTRO.md §2.1:
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal
 
@@ -219,3 +219,46 @@ class ChainVerification:
     blocks_checked: int
     corrupted_block_index: int | None = None
     failure_reason: ChainFailureReason | None = None
+
+
+# --- Identidad y RBAC aduanero (specs/06_rbac_aduanero.spec.md) -------------------------------
+
+AduanaRoleType = Literal[
+    "INSPECTOR_TRIBUTARIO_SENIAT",
+    "AGENTE_ADUANAL_CERTIFICADO",
+    "FISCAL_ANTI_CONTRABANDO",
+    "OPERADOR_LOGISTICO_ALMACEN",
+    "SUPERVISOR_PUERTO_ADUANERO",
+    "ANALISTA_VALORACION_ADUANERA",
+]
+
+UserStatus = Literal["ACTIVO", "SUSPENDIDO"]
+
+
+@dataclass(frozen=True, slots=True)
+class UsuarioAduana:
+    """Usuario del sistema. NO contiene sal ni hash de contraseña ni identificador en claro:
+    ``blind_identifier`` es el HMAC (Anillo 2) de la cédula o el RIF."""
+
+    user_id: str
+    codigo_usuario: str  # alias no personal (p. ej. "insp.senat.01")
+    blind_identifier: str
+    rol: AduanaRoleType
+    estado: UserStatus
+    created_utc: str
+    last_login_utc: str | None = None
+    failed_attempts: int = 0
+    locked_until_utc: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AuthToken:
+    """Token de sesión firmado (``v1.<payload>.<hmac>``). El valor no aparece en ``repr``."""
+
+    token: str = field(repr=False)
+    user_id: str
+    codigo_usuario: str
+    rol: AduanaRoleType
+    issued_at: int
+    expires_at: int
+    token_id: str
