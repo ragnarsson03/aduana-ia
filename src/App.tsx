@@ -220,7 +220,7 @@ export const App: React.FC = () => {
         ))}
 
         {activeTab === 'explicabilidad' && (connection === 'online' ? (
-          <LiveExplicabilidadView onNavigateToPasarela={() => handleNavigate('pasarela')} />
+          <LiveExplicabilidadView onNavigateToPasarela={() => handleNavigate('pasarela')} onNotify={showNotification} />
         ) : (
           <ExplicabilidadView onNotify={showNotification} />
         ))}

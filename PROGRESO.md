@@ -281,10 +281,18 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
 
 8. **Sincronización del Repositorio de Destino de Cloudflare (`carloss856/aduana-ia`):**
    - **Diagnóstico del Registro de Cloudflare:** En los logs de compilación de Cloudflare se identificó que el proyecto estaba vinculado al repositorio clonado `https://github.com/carloss856/aduana-ia.git`, el cual había quedado varado en el commit inicial `bedbfe1` mientras el equipo commiteaba en `ragnarsson03/aduana-ia`.
-   - **Acción:** Se agregó el remote `fork` y se empujaron las ramas `main` y `develop` con todos los PRs (1 al 16), el Edge Router `functions/worker.ts`, `wrangler.toml` y los activos de Vite precompilados.
-
-
-
-
-
+   - **Acción:** Se agregó el remote `fork` y se empujaron las ramas `main` y `develop` con todos los PRs (1 al 16), el Edge Router `functions/worker.ts`, `wrangler.toml` y los activos de Vite precompilados.### Gatillo 11 — Módulo de Gráficos Auditor & Configuración Dinámica de IA en Producción (Completado)
+- [x] **Auditoría & Gráficos:** Pestaña «Gráficos & Explicabilidad» accesible para el perfil Auditor y sincronización de `allowed_tabs` con `core/ui_profile.py`.
+- [x] **Gráficos Integrados en Live:** `LiveExplicabilidadView.tsx` ahora presenta el panel completo de trazabilidad, circular gauge (SVG), desglose SHAP interactivo y monitor de equidad regional bajo cualquier estado de conexión.
+- [x] **Panel de Configuración de IA (Administrador de TI):** Interfaz en `ProfileView.tsx` para configurar credenciales y proveedor LLM (Groq, OpenAI/OpenRouter, Gemini, Cloudflare REST, Ollama).
+- [x] **Diagnóstico en Vivo:** Endpoint `POST /api/v1/admin/ai-test` para verificar conectividad y medir latencia en milisegundos directamente contra el proveedor.
+- [x] **Persistencia en Edge:** Endpoint `POST /api/v1/admin/ai-config` con almacenamiento en KV y memoria de enclave, con transmisión de cabeceras seguras para el Chat IA.
+- [x] **Cumplimiento de Seguridad y Air-Gap:** Validación estricta de `autoComplete="off"`, ausencia de URLs externas literales en bundles compilados (`test_ca07_desktop_and_frontend.py` en verde).
+### Gatillo 11 — Módulo de Gráficos Auditor & Configuración Dinámica de IA en Producción (Completado)
+- [x] **Auditoría & Gráficos:** Pestaña «Gráficos & Explicabilidad» accesible para el perfil Auditor y sincronización de `allowed_tabs` con `core/ui_profile.py`.
+- [x] **Gráficos Integrados en Live:** `LiveExplicabilidadView.tsx` ahora presenta el panel completo de trazabilidad, circular gauge (SVG), desglose SHAP interactivo y monitor de equidad regional bajo cualquier estado de conexión.
+- [x] **Panel de Configuración de IA (Administrador de TI):** Interfaz en `ProfileView.tsx` para configurar credenciales y proveedor LLM (Groq, OpenAI/OpenRouter, Gemini, Cloudflare REST, Ollama).
+- [x] **Diagnóstico en Vivo:** Endpoint `POST /api/v1/admin/ai-test` para verificar conectividad y medir latencia en milisegundos directamente contra el proveedor.
+- [x] **Persistencia en Edge:** Endpoint `POST /api/v1/admin/ai-config` con almacenamiento en KV y memoria de enclave, con transmisión de cabeceras seguras para el Chat IA.
+- [x] **Cumplimiento de Seguridad y Air-Gap:** Validación estricta de `autoComplete="off"`, ausencia de URLs externas literales en bundles compilados (`test_ca07_desktop_and_frontend.py` en verde).
 

@@ -55,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'pasarela', label: 'Pasarela' },
     { id: 'chat', label: 'Nexus IA', hasDot: true, dotColor: 'bg-indigo-500' },
     { id: 'ledger', label: 'Ledger' },
-    { id: 'explicabilidad', label: 'Explicabilidad' },
+    { id: 'explicabilidad', label: 'Gráficos & Explicabilidad' },
     { id: 'canal', label: 'Canal Seguro', hasDot: true, dotColor: 'bg-emerald-500' },
   ];
 

@@ -115,6 +115,25 @@ export interface ApiClientConfig {
   timeoutMs?: number;
 }
 
+export interface AIConfigData {
+  provider: 'groq' | 'openai' | 'gemini' | 'cloudflare' | 'ollama' | 'custom';
+  apiKey?: string;
+  model?: string;
+  endpoint?: string;
+  accountId?: string;
+  has_key?: boolean;
+  masked_key?: string;
+}
+
+export interface AITestResponse {
+  success: boolean;
+  provider: string;
+  model: string;
+  latency_ms: number;
+  sample_reply?: string;
+  error?: string;
+}
+
 /** El pipeline puede esperar al LLM local: tiempo máximo mayor que el del resto de endpoints. */
 const GATEWAY_TIMEOUT_MS = 60000;
 
@@ -153,6 +172,66 @@ export class AduanaApiClient {
     this.sessionExpiredHandler = handler;
   }
 
+  public getStoredAIConfig(): AIConfigData | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('aduana_ai_config');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  public setStoredAIConfig(config: AIConfigData): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('aduana_ai_config', JSON.stringify(config));
+    } catch {}
+  }
+
+  public async fetchAIConfig(): Promise<AIConfigData> {
+    try {
+      return await this.request<AIConfigData>('/admin/ai-config', { method: 'GET' });
+    } catch {
+      return this.getStoredAIConfig() || { provider: 'groq', model: 'llama-3.3-70b-versatile' };
+    }
+  }
+
+  public async saveAIConfig(
+    config: AIConfigData
+  ): Promise<{ ok: boolean; message: string; provider?: string; model?: string }> {
+    this.setStoredAIConfig(config);
+    try {
+      return await this.request<{ ok: boolean; message: string; provider?: string; model?: string }>(
+        '/admin/ai-config',
+        {
+          method: 'POST',
+          body: JSON.stringify(config),
+        }
+      );
+    } catch {
+      return { ok: true, message: 'Configuración guardada en caché local del navegador.' };
+    }
+  }
+
+  public async testAIConfig(config: AIConfigData): Promise<AITestResponse> {
+    try {
+      return await this.request<AITestResponse>(
+        '/admin/ai-test',
+        { method: 'POST', body: JSON.stringify(config) },
+        28000
+      );
+    } catch (err: any) {
+      return {
+        success: false,
+        provider: config.provider,
+        model: config.model || '',
+        latency_ms: 0,
+        error: err.message || 'Error de conexión con el proveedor',
+      };
+    }
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -166,6 +245,16 @@ export class AduanaApiClient {
       (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) ||
       this.apiToken;
 
+    const aiCfg = this.getStoredAIConfig();
+    const aiHeaders: Record<string, string> = {};
+    if (aiCfg?.apiKey) {
+      aiHeaders['X-AI-Provider'] = aiCfg.provider;
+      aiHeaders['X-AI-Key'] = aiCfg.apiKey;
+      if (aiCfg.model) aiHeaders['X-AI-Model'] = aiCfg.model;
+      if (aiCfg.endpoint) aiHeaders['X-AI-Endpoint'] = aiCfg.endpoint;
+      if (aiCfg.accountId) aiHeaders['X-AI-Account-ID'] = aiCfg.accountId;
+    }
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -176,6 +265,7 @@ export class AduanaApiClient {
           'Content-Type': 'application/json',
           'X-Aduana-Token': activeToken,
           ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
+          ...aiHeaders,
           ...(options.headers || {}),
         },
       });
@@ -335,6 +425,16 @@ export class AduanaApiClient {
       (params.prompt || '').trim() ||
       'Analiza exhaustivamente el documento adjunto, resume sus hallazgos clave, verifica su cumplimiento normativo y emite un dictamen técnico.';
 
+    const aiCfg = this.getStoredAIConfig();
+    const aiHeaders: Record<string, string> = {};
+    if (aiCfg?.apiKey) {
+      aiHeaders['X-AI-Provider'] = aiCfg.provider;
+      aiHeaders['X-AI-Key'] = aiCfg.apiKey;
+      if (aiCfg.model) aiHeaders['X-AI-Model'] = aiCfg.model;
+      if (aiCfg.endpoint) aiHeaders['X-AI-Endpoint'] = aiCfg.endpoint;
+      if (aiCfg.accountId) aiHeaders['X-AI-Account-ID'] = aiCfg.accountId;
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/octet-stream',
       'X-Aduana-Token': activeToken,
@@ -350,6 +450,7 @@ export class AduanaApiClient {
         : {}),
       ...(params.client_file_sha256 ? { 'X-Client-File-Sha256': params.client_file_sha256 } : {}),
       ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
+      ...aiHeaders,
     };
 
     try {
@@ -573,13 +674,16 @@ export class AduanaApiClient {
           entity: 'Superintendencia Nacional Aduanera / Contraloría GovTech',
           department: 'Dirección de Auditoría Algorítmica y Cumplimiento',
           permissions: [
+            'tramite:override',
+            'shield:inspect',
             'Desencriptación de PII autorizada',
             'Auditoría de Ledger SHA-256',
             'Inspección de Inferencia GovEval',
             'Canal E2EE Enclave Seguro',
+            'metrics:read',
           ],
           default_tab: 'ledger',
-          allowed_tabs: ['ledger', 'explicabilidad'],
+          allowed_tabs: ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'],
         },
       },
       {

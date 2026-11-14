@@ -6,7 +6,15 @@
  * 2. Cualquier otra ruta -> `env.ASSETS.fetch(request)` (Frontend React SPA en `./static`).
  */
 
-import { onRequestPost as handleChatMessage } from './api/v1/chat/message';
+import { onRequestPost as handleChatMessage, callLLM } from './api/v1/chat/message';
+
+let inMemoryAiConfig: {
+  provider: string;
+  apiKey: string;
+  model: string;
+  endpoint: string;
+  accountId: string;
+} | null = null;
 
 export interface Env {
   ASSETS: {
@@ -97,14 +105,18 @@ const USER_PROFILES: Record<string, UserProfile> = {
     entity: 'SENIAT / Intendencia de Aduanas',
     department: 'Fiscalización y Auditoría Tributaria',
     permissions: [
+      'tramite:override',
+      'shield:inspect',
       'ledger:audit',
       'ledger:receipt',
       'explica:read',
+      'audit:fiscal',
+      'metrics:read',
       'chat:ia',
       'chat:canal',
     ],
     default_tab: 'ledger',
-    allowed_tabs: ['ledger', 'explicabilidad', 'chat', 'canal'],
+    allowed_tabs: ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'],
   },
 };
 
@@ -310,6 +322,104 @@ export default {
         return jsonResponse({ success: true, message: 'SESION_CERRADA' }, 200, {
           'Set-Cookie': clearCookie,
         });
+      }
+
+      // 6.1. Configuración de IA por Administrador de TI (GET /admin/ai-config)
+      if (subpath === '/admin/ai-config' && request.method === 'GET') {
+        let cfg: any = inMemoryAiConfig;
+        if (!cfg && env.KV) {
+          try {
+            const raw = await env.KV.get('aduana_ai_config');
+            if (raw) cfg = JSON.parse(raw);
+          } catch {}
+        }
+        return jsonResponse({
+          provider: cfg?.provider || 'groq',
+          model: cfg?.model || 'llama-3.3-70b-versatile',
+          endpoint: cfg?.endpoint || '',
+          accountId: cfg?.accountId || '',
+          has_key: Boolean(cfg?.apiKey),
+          masked_key: cfg?.apiKey ? `${cfg.apiKey.slice(0, 4)}••••••••${cfg.apiKey.slice(-4)}` : '',
+        });
+      }
+
+      // 6.2. Guardar Configuración de IA (POST /admin/ai-config)
+      if (subpath === '/admin/ai-config' && request.method === 'POST') {
+        try {
+          const body = (await request.json()) as any;
+          inMemoryAiConfig = {
+            provider: body.provider || 'groq',
+            apiKey: (body.apiKey || '').trim(),
+            model: (body.model || '').trim(),
+            endpoint: (body.endpoint || '').trim(),
+            accountId: (body.accountId || '').trim(),
+          };
+          if (env.KV) {
+            await env.KV.put('aduana_ai_config', JSON.stringify(inMemoryAiConfig));
+          }
+          return jsonResponse({
+            ok: true,
+            message: 'Configuración del motor de IA actualizada en el Enclave Edge.',
+            provider: inMemoryAiConfig.provider,
+            model: inMemoryAiConfig.model,
+          });
+        } catch (err: any) {
+          return jsonResponse({ error: 'FAILED_TO_SAVE_CONFIG', detail: err.message }, 500);
+        }
+      }
+
+      // 6.3. Test de Diagnóstico de IA en Tiempo Real (POST /admin/ai-test)
+      if (subpath === '/admin/ai-test' && request.method === 'POST') {
+        try {
+          const body = (await request.json()) as any;
+          const provider = body.provider || inMemoryAiConfig?.provider || 'groq';
+          const apiKey = (body.apiKey || inMemoryAiConfig?.apiKey || '').trim();
+          const model = (body.model || inMemoryAiConfig?.model || '').trim();
+          const endpoint = (body.endpoint || inMemoryAiConfig?.endpoint || '').trim();
+          const accountId = (body.accountId || inMemoryAiConfig?.accountId || '').trim();
+
+          const t0 = Date.now();
+          const reply = await callLLM({
+            provider,
+            apiKey,
+            model,
+            endpoint,
+            accountId,
+            systemPrompt:
+              'Usted es el Asistente de Verificación de Diagnóstico de Aduana IA. ' +
+              'Responda en español en exactamente 1 o 2 oraciones concisas confirmando que el canal de inferencia ' +
+              'y el modelo están 100% operativos bajo gobernanza algorítmica.',
+            userInput: 'Verificación de conectividad, latencia y respuesta del motor de IA en producción.',
+            env,
+          });
+          const latency = Date.now() - t0;
+
+          if (!reply) {
+            return jsonResponse(
+              {
+                success: false,
+                error: 'El modelo no devolvió texto. Verifique la API Key, el nombre del modelo o la cuota del proveedor.',
+              },
+              400
+            );
+          }
+
+          return jsonResponse({
+            success: true,
+            provider,
+            model: model || 'predeterminado',
+            latency_ms: latency,
+            sample_reply: reply,
+          });
+        } catch (testErr: any) {
+          return jsonResponse(
+            {
+              success: false,
+              error: testErr.message || 'Error desconocido al conectar con el proveedor de IA',
+            },
+            400
+          );
+        }
       }
 
       // 7. Inspección SHIELD PII
