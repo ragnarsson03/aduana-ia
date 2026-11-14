@@ -87,19 +87,23 @@ const STATUS_FALLBACK_CODES: Record<number, string> = {
 };
 
 export function describeErrorCode(code: string): string {
-  return ERROR_MESSAGES[code] ?? 'Error inesperado del servidor.';
+  if (ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
+  if (typeof code === 'string' && code.includes(' ')) return code;
+  return 'Error inesperado del servidor.';
 }
 
 /** Error tipado de la API. `message` es apto para la UI y nunca incluye texto ciudadano. */
 export class ApiError extends Error {
   public readonly code: string;
   public readonly status: number;
+  public readonly rawDetail?: string;
 
-  constructor(code: string, status: number) {
+  constructor(code: string, status: number, rawDetail?: string) {
     super(describeErrorCode(code));
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
+    this.rawDetail = rawDetail;
   }
 }
 
@@ -113,6 +117,25 @@ export interface ApiClientConfig {
   baseUrl?: string;
   apiToken?: string;
   timeoutMs?: number;
+}
+
+export interface AIConfigData {
+  provider: 'groq' | 'openai' | 'gemini' | 'cloudflare' | 'ollama' | 'custom';
+  apiKey?: string;
+  model?: string;
+  endpoint?: string;
+  accountId?: string;
+  has_key?: boolean;
+  masked_key?: string;
+}
+
+export interface AITestResponse {
+  success: boolean;
+  provider: string;
+  model: string;
+  latency_ms: number;
+  sample_reply?: string;
+  error?: string;
 }
 
 /** El pipeline puede esperar al LLM local: tiempo máximo mayor que el del resto de endpoints. */
@@ -153,6 +176,71 @@ export class AduanaApiClient {
     this.sessionExpiredHandler = handler;
   }
 
+  public getStoredAIConfig(): AIConfigData | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('aduana_ai_config');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  public setStoredAIConfig(config: AIConfigData): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('aduana_ai_config', JSON.stringify(config));
+    } catch {}
+  }
+
+  public async fetchAIConfig(): Promise<AIConfigData> {
+    try {
+      return await this.request<AIConfigData>('/admin/ai-config', { method: 'GET' });
+    } catch {
+      return this.getStoredAIConfig() || { provider: 'groq', model: 'llama-3.3-70b-versatile' };
+    }
+  }
+
+  public async saveAIConfig(
+    config: AIConfigData
+  ): Promise<{ ok: boolean; message: string; provider?: string; model?: string }> {
+    this.setStoredAIConfig(config);
+    try {
+      return await this.request<{ ok: boolean; message: string; provider?: string; model?: string }>(
+        '/admin/ai-config',
+        {
+          method: 'POST',
+          body: JSON.stringify(config),
+        }
+      );
+    } catch {
+      return { ok: true, message: 'Configuración guardada en caché local del navegador.' };
+    }
+  }
+
+  public async testAIConfig(config: AIConfigData): Promise<AITestResponse> {
+    try {
+      return await this.request<AITestResponse>(
+        '/admin/ai-test',
+        { method: 'POST', body: JSON.stringify(config) },
+        28000
+      );
+    } catch (err: any) {
+      const errorMsg =
+        err?.rawDetail ||
+        (err?.code && !ERROR_MESSAGES[err.code] && err.code.length > 5 ? err.code : null) ||
+        err?.message ||
+        'Error de conexión con el proveedor';
+      return {
+        success: false,
+        provider: config.provider,
+        model: config.model || '',
+        latency_ms: 0,
+        error: errorMsg,
+      };
+    }
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -166,6 +254,16 @@ export class AduanaApiClient {
       (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) ||
       this.apiToken;
 
+    const aiCfg = this.getStoredAIConfig();
+    const aiHeaders: Record<string, string> = {};
+    if (aiCfg?.apiKey) {
+      aiHeaders['X-AI-Provider'] = aiCfg.provider;
+      aiHeaders['X-AI-Key'] = aiCfg.apiKey;
+      if (aiCfg.model) aiHeaders['X-AI-Model'] = aiCfg.model;
+      if (aiCfg.endpoint) aiHeaders['X-AI-Endpoint'] = aiCfg.endpoint;
+      if (aiCfg.accountId) aiHeaders['X-AI-Account-ID'] = aiCfg.accountId;
+    }
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -176,6 +274,7 @@ export class AduanaApiClient {
           'Content-Type': 'application/json',
           'X-Aduana-Token': activeToken,
           ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
+          ...aiHeaders,
           ...(options.headers || {}),
         },
       });
@@ -189,9 +288,17 @@ export class AduanaApiClient {
     if (!response.ok) {
       // Solo se lee el campo `error` (código estable); el cuerpo nunca se registra.
       let code = STATUS_FALLBACK_CODES[response.status] ?? `HTTP_${response.status}`;
+      let rawDetail: string | undefined = undefined;
       try {
-        const body = (await response.json()) as { error?: unknown };
-        if (typeof body?.error === 'string' && body.error) code = body.error;
+        const body = (await response.json()) as { error?: unknown; detail?: unknown; message?: unknown };
+        if (typeof body?.error === 'string' && body.error) {
+          code = body.error;
+          rawDetail = body.error;
+        } else if (typeof body?.detail === 'string' && body.detail) {
+          rawDetail = body.detail;
+        } else if (typeof body?.message === 'string' && body.message) {
+          rawDetail = body.message;
+        }
       } catch {
         // cuerpo no JSON: se conserva el código derivado del estado HTTP
       }
@@ -200,7 +307,7 @@ export class AduanaApiClient {
         this.sessionJwt = null;
         this.sessionExpiredHandler?.();
       }
-      throw new ApiError(code, response.status);
+      throw new ApiError(code, response.status, rawDetail);
     }
 
     try {
@@ -335,6 +442,16 @@ export class AduanaApiClient {
       (params.prompt || '').trim() ||
       'Analiza exhaustivamente el documento adjunto, resume sus hallazgos clave, verifica su cumplimiento normativo y emite un dictamen técnico.';
 
+    const aiCfg = this.getStoredAIConfig();
+    const aiHeaders: Record<string, string> = {};
+    if (aiCfg?.apiKey) {
+      aiHeaders['X-AI-Provider'] = aiCfg.provider;
+      aiHeaders['X-AI-Key'] = aiCfg.apiKey;
+      if (aiCfg.model) aiHeaders['X-AI-Model'] = aiCfg.model;
+      if (aiCfg.endpoint) aiHeaders['X-AI-Endpoint'] = aiCfg.endpoint;
+      if (aiCfg.accountId) aiHeaders['X-AI-Account-ID'] = aiCfg.accountId;
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/octet-stream',
       'X-Aduana-Token': activeToken,
@@ -350,6 +467,7 @@ export class AduanaApiClient {
         : {}),
       ...(params.client_file_sha256 ? { 'X-Client-File-Sha256': params.client_file_sha256 } : {}),
       ...(this.sessionJwt ? { Authorization: `Bearer ${this.sessionJwt}` } : {}),
+      ...aiHeaders,
     };
 
     try {
@@ -573,13 +691,16 @@ export class AduanaApiClient {
           entity: 'Superintendencia Nacional Aduanera / Contraloría GovTech',
           department: 'Dirección de Auditoría Algorítmica y Cumplimiento',
           permissions: [
+            'tramite:override',
+            'shield:inspect',
             'Desencriptación de PII autorizada',
             'Auditoría de Ledger SHA-256',
             'Inspección de Inferencia GovEval',
             'Canal E2EE Enclave Seguro',
+            'metrics:read',
           ],
           default_tab: 'ledger',
-          allowed_tabs: ['ledger', 'explicabilidad'],
+          allowed_tabs: ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'],
         },
       },
       {

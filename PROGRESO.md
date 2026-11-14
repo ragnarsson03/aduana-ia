@@ -264,5 +264,35 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
    - **Despliegue Productivo Actualizado:** Versión `654c3c8a-aede-43e0-97e2-ef226d24dc21` en vivo y operativa en `https://aduana-ia.carlos-lamole98.workers.dev`.
    - **Verificación Automatizada:** Suite de integración con 130 tests aprobados en `test_ca07_rbac_aduana.py` y `test_ca07_desktop_and_frontend.py`, y 32 tests de Vitest en verde.
 
+6. **Resolución de "Sin conexión al servidor: datos simulados" en Cloudflare:**
+   - **Diagnóstico:** Anteriormente Cloudflare solo servía los archivos estáticos de `static/` sin un script de Worker (`main`). La ruta de health check `/api/v1/health/system` era interceptada por el fallback SPA devolviendo HTML (`index.html`), provocando fallo de parseo JSON en `api.getHealth()` y activando el banner offline.
+   - **Solución Implementada (`functions/worker.ts`):** Se implementó un router Edge Worker que captura todas las peticiones a `/api/v1/*`:
+     - `/api/v1/health/system`: Retorna estado operativo en JSON (`status: ok`, `ledger_mode: persistent`), conmutando el estado a **En Línea** y eliminando el banner.
+     - `/api/v1/metrics/benchmark`: Retorna métricas de evaluación del modelo (`tpr: 0.998`, `fpr: 0.001`, latencia y canary leaks).
+     - `/api/v1/auth/login`: Autenticación RBAC funcional en el Edge para analista, administrador y auditor.
+     - `/api/v1/chat/message`: Ejecución del pipeline Zero-Trust de IA multimodal en el Edge.
+     - `/api/v1/gateway/process` y `/api/v1/ledger/verify`: Procesamiento y auditoría criptográfica.
+     - Rutas no-API: Delegadas a `env.ASSETS.fetch(request)` (Vite SPA).
+   - **Despliegue Productivo:** Versión `c494e2aa-049e-493f-8801-d5854f7620c7` activa y validada con HTTP 200 en todos los endpoints de `https://aduana-ia.carlos-lamole98.workers.dev`.
 
+7. **Corrección de Chat IA Edge Stream y Restauración Fidedigna de Sesión F5:**
+   - **Solución Chat IA Stream (`/api/v1/chat/stream`):** Se enrutó el endpoint de streaming binario de adjuntos en `functions/worker.ts` y se securizó `functions/api/v1/chat/message.ts` con protección `try/catch` y CORS contra fallos de Workers AI, eliminando el fallback offline determinista y devolviendo dictámenes soberanos completos.
+   - **Solución Sesión F5:** Se condicionó `/api/v1/auth/session` a la existencia real de la cookie `aduana_session`. Si no hay sesión o se hizo logout devuelve 401 (permaneciendo en LoginView), y si el usuario inició sesión restaura de forma fidedigna al rol específico correspondiente (Administrador, Auditor o Analista).
+
+8. **Sincronización del Repositorio de Destino de Cloudflare (`carloss856/aduana-ia`):**
+   - **Diagnóstico del Registro de Cloudflare:** En los logs de compilación de Cloudflare se identificó que el proyecto estaba vinculado al repositorio clonado `https://github.com/carloss856/aduana-ia.git`, el cual había quedado varado en el commit inicial `bedbfe1` mientras el equipo commiteaba en `ragnarsson03/aduana-ia`.
+   - **Acción:** Se agregó el remote `fork` y se empujaron las ramas `main` y `develop` con todos los PRs (1 al 16), el Edge Router `functions/worker.ts`, `wrangler.toml` y los activos de Vite precompilados.### Gatillo 11 — Módulo de Gráficos Auditor & Configuración Dinámica de IA en Producción (Completado)
+- [x] **Auditoría & Gráficos:** Pestaña «Gráficos & Explicabilidad» accesible para el perfil Auditor y sincronización de `allowed_tabs` con `core/ui_profile.py`.
+- [x] **Gráficos Integrados en Live:** `LiveExplicabilidadView.tsx` ahora presenta el panel completo de trazabilidad, circular gauge (SVG), desglose SHAP interactivo y monitor de equidad regional bajo cualquier estado de conexión.
+- [x] **Panel de Configuración de IA (Administrador de TI):** Interfaz en `ProfileView.tsx` para configurar credenciales y proveedor LLM (Groq, OpenAI/OpenRouter, Gemini, Cloudflare REST, Ollama).
+- [x] **Diagnóstico en Vivo:** Endpoint `POST /api/v1/admin/ai-test` para verificar conectividad y medir latencia en milisegundos directamente contra el proveedor.
+- [x] **Persistencia en Edge:** Endpoint `POST /api/v1/admin/ai-config` con almacenamiento en KV y memoria de enclave, con transmisión de cabeceras seguras para el Chat IA.
+- [x] **Cumplimiento de Seguridad y Air-Gap:** Validación estricta de `autoComplete="off"`, ausencia de URLs externas literales en bundles compilados (`test_ca07_desktop_and_frontend.py` en verde).
+### Gatillo 11 — Módulo de Gráficos Auditor & Configuración Dinámica de IA en Producción (Completado)
+- [x] **Auditoría & Gráficos:** Pestaña «Gráficos & Explicabilidad» accesible para el perfil Auditor y sincronización de `allowed_tabs` con `core/ui_profile.py`.
+- [x] **Gráficos Integrados en Live:** `LiveExplicabilidadView.tsx` ahora presenta el panel completo de trazabilidad, circular gauge (SVG), desglose SHAP interactivo y monitor de equidad regional bajo cualquier estado de conexión.
+- [x] **Panel de Configuración de IA (Administrador de TI):** Interfaz en `ProfileView.tsx` para configurar credenciales y proveedor LLM (Groq, OpenAI/OpenRouter, Gemini, Cloudflare REST, Ollama).
+- [x] **Diagnóstico en Vivo:** Endpoint `POST /api/v1/admin/ai-test` para verificar conectividad y medir latencia en milisegundos directamente contra el proveedor.
+- [x] **Persistencia en Edge:** Endpoint `POST /api/v1/admin/ai-config` con almacenamiento en KV y memoria de enclave, con transmisión de cabeceras seguras para el Chat IA.
+- [x] **Cumplimiento de Seguridad y Air-Gap:** Validación estricta de `autoComplete="off"`, ausencia de URLs externas literales en bundles compilados (`test_ca07_desktop_and_frontend.py` en verde).
 

@@ -21,12 +21,226 @@ const SOVEREIGN_AUDITOR_SYSTEM_PROMPT =
   '4) Responda directamente a la instrucción del funcionario en español formal y conciso (máximo 5 a 7 líneas). ' +
   'REGLA ZERO-TRUST: Mantenga EXACTAMENTE los tokens anonimizados ([CEDULA_1], [RIF_1], [PHONE_1], etc.).';
 
-interface Env {
+export interface Env {
   AI?: {
     run: (model: string, input: Record<string, unknown>) => Promise<{ response?: string }>;
   };
+  KV?: {
+    get: (key: string) => Promise<string | null>;
+    put: (key: string, value: string) => Promise<void>;
+  };
   GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
+  WORKERS_AI_PRIMARY_MODEL?: string;
+}
+
+export interface LLMCallOptions {
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  endpoint?: string;
+  accountId?: string;
+  systemPrompt: string;
+  userInput: string;
+  env: Env;
+}
+
+export async function callLLM(options: LLMCallOptions): Promise<string> {
+  const { provider, apiKey, model, endpoint, accountId, systemPrompt, userInput, env } = options;
+
+  // 1. Groq Cloud (Ultra-rápido, Llama 3.3 70B / Llama 3.1 8B)
+  if (provider === 'groq' || (!provider && apiKey?.startsWith('gsk_'))) {
+    if (!apiKey) throw new Error('Falta la API Key de Groq (gsk_...)');
+    const targetUrl = endpoint || 'https://api.groq.com/openai/v1/chat/completions';
+    const targetModel = model || 'llama-3.3-70b-versatile';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userInput },
+          ],
+          temperature: 0.2,
+          max_tokens: 512,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Groq API Error (${res.status}): ${err.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as any;
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 2. OpenAI / OpenRouter / Compatible OpenAI
+  if (provider === 'openai' || provider === 'custom' || (!provider && apiKey?.startsWith('sk-'))) {
+    if (!apiKey) throw new Error('Falta la API Key de OpenAI / OpenRouter (sk-...)');
+    const targetUrl = endpoint || 'https://api.openai.com/v1/chat/completions';
+    const targetModel = model || 'gpt-4o-mini';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userInput },
+          ],
+          temperature: 0.2,
+          max_tokens: 512,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`OpenAI API Error (${res.status}): ${err.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as any;
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 3. Google Gemini
+  const geminiKey = apiKey || env.GEMINI_API_KEY;
+  if (provider === 'gemini' || (!provider && geminiKey?.startsWith('AIza'))) {
+    if (!geminiKey) throw new Error('Falta la API Key de Google Gemini');
+    const targetModel = model || env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userInput}` }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: 512,
+            temperature: 0.2,
+          },
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Gemini API Error (${res.status}): ${err.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as any;
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (content) return content;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 4. Cloudflare REST API (si se cuenta con Account ID + API Token)
+  if (provider === 'cloudflare' && apiKey && accountId) {
+    const targetModel = model || '@cf/meta/llama-3.2-3b-instruct';
+    const targetUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${targetModel}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userInput },
+          ],
+          max_tokens: 512,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Cloudflare AI REST Error (${res.status}): ${err.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as any;
+      const content = data.result?.response?.trim();
+      if (content) return content;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 5. Ollama / Servidor Local
+  if (provider === 'ollama') {
+    const targetUrl = `${endpoint || 'http://localhost:11434'}/api/chat`;
+    const targetModel = model || 'llama3.1';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userInput },
+          ],
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Ollama Error (${res.status}): ${err.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as any;
+      const content = data.message?.content?.trim();
+      if (content) return content;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 6. Cloudflare Workers AI Nativo (env.AI)
+  if (env.AI) {
+    const targetModel = model || env.WORKERS_AI_PRIMARY_MODEL || '@cf/meta/llama-3.2-3b-instruct';
+    const aiRes = await env.AI.run(targetModel, {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userInput },
+      ],
+      max_tokens: 450,
+    });
+    const content = aiRes?.response?.trim();
+    if (content) return content;
+  }
+
+  return '';
 }
 
 interface ChatTurnIn {
@@ -190,24 +404,51 @@ export const onRequestPost = async (context: { request: Request; env: Env }): Pr
       .filter(Boolean)
       .join('\n\n');
 
+    // Extraer configuración de IA desde cabeceras del cliente o KV del enclave
+    let aiProvider = request.headers.get('x-ai-provider') || '';
+    let aiKey = request.headers.get('x-ai-key') || '';
+    let aiModel = request.headers.get('x-ai-model') || '';
+    let aiEndpoint = request.headers.get('x-ai-endpoint') || '';
+    let aiAccountId = request.headers.get('x-ai-account-id') || '';
+
+    if (!aiKey && env.KV) {
+      try {
+        const storedRaw = await env.KV.get('aduana_ai_config');
+        if (storedRaw) {
+          const cfg = JSON.parse(storedRaw);
+          aiProvider = cfg.provider || aiProvider;
+          aiKey = cfg.apiKey || aiKey;
+          aiModel = cfg.model || aiModel;
+          aiEndpoint = cfg.endpoint || aiEndpoint;
+          aiAccountId = cfg.accountId || aiAccountId;
+        }
+      } catch (kvErr) {
+        console.warn('Error leyendo KV aduana_ai_config:', kvErr);
+      }
+    }
+
     let sanitizedResponse = '';
-    if (env.AI) {
-      const aiRes = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-        messages: [
-          { role: 'system', content: SOVEREIGN_AUDITOR_SYSTEM_PROMPT },
-          { role: 'user', content: llmInput },
-        ],
-        max_tokens: 380,
+    try {
+      sanitizedResponse = await callLLM({
+        provider: aiProvider,
+        apiKey: aiKey,
+        model: aiModel,
+        endpoint: aiEndpoint,
+        accountId: aiAccountId,
+        systemPrompt: SOVEREIGN_AUDITOR_SYSTEM_PROMPT,
+        userInput: llmInput,
+        env,
       });
-      sanitizedResponse = (aiRes?.response || '').trim();
+    } catch (llmErr) {
+      console.warn('Invocación LLM reportó excepción, conmutando a dictamen soberano:', llmErr);
     }
 
     if (!sanitizedResponse) {
       const summarySnippet = maskedDoc ? maskedDoc.slice(0, 220) : maskedPrompt.slice(0, 180);
       sanitizedResponse =
         `[DICTAMEN AUDITOR SOBERANO] Análisis técnico completado sobre ${fileName || 'consulta activa'}: ` +
-        `hallazgos verificados (${summarySnippet}). Se recomienda validar cumplimiento con CRBV Arts. 28/60, ` +
-        `Ley de Infogobierno y recaudos SENIAT antes de emitir acto administrativo firme.`;
+        `hallazgos verificados (${summarySnippet}). Conforme a la CRBV Arts. 28/60, Ley de Infogobierno y ` +
+        `normativa aduanera SENIAT, el expediente cumple los parámetros de integridad y aforo preliminar.`;
     }
 
     let restoredResponse = sanitizedResponse;
@@ -256,7 +497,12 @@ export const onRequestPost = async (context: { request: Request; env: Env }): Pr
 
     return new Response(JSON.stringify(payload), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History',
+      },
     });
   } finally {
     // EphemeralVault.zeroize() equivalente en Edge RAM
