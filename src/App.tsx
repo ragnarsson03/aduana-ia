@@ -6,11 +6,29 @@ import { ChatIAView } from './views/ChatIAView';
 import { LedgerView } from './views/LedgerView';
 import { ExplicabilidadView } from './views/ExplicabilidadView';
 import { CanalSeguroView } from './views/CanalSeguroView';
+import { ProfileView } from './views/ProfileView';
+import { LoginView } from './views/LoginView';
 import { NavTabId } from './types';
+import { AuthUser } from './types/auth';
+import { MOCK_AUTH_USERS, ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from './constants/mockAuth';
 import { CheckCircle2 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTabId>('pasarela');
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    if (typeof window !== 'undefined') {
+      const savedRole = localStorage.getItem('aduana_auth_role');
+      if (savedRole && MOCK_AUTH_USERS[savedRole]) {
+        return MOCK_AUTH_USERS[savedRole];
+      }
+    }
+    return MOCK_AUTH_USERS.auditor; // Default session: Auditora Principal (Deykary González)
+  });
+
+  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
+    const role = currentUser ? currentUser.role : 'auditor';
+    return ROLE_DEFAULT_TAB[role] || 'ledger';
+  });
+  const [profileSection, setProfileSection] = useState<'profile' | 'settings'>('profile');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('aduana_dark_mode');
@@ -33,6 +51,16 @@ export const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Guard active tab based on role permissions
+  useEffect(() => {
+    if (currentUser && activeTab !== 'perfil') {
+      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab(ROLE_DEFAULT_TAB[currentUser.role] || 'ledger');
+      }
+    }
+  }, [currentUser, activeTab]);
+
   const showNotification = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -41,19 +69,63 @@ export const App: React.FC = () => {
   };
 
   const handleNavigate = (tab: NavTabId) => {
+    // If user attempts to navigate to unauthorized tab, redirect to default
+    if (currentUser && tab !== 'perfil') {
+      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      if (!allowed.includes(tab)) {
+        const fallback = ROLE_DEFAULT_TAB[currentUser.role] || 'ledger';
+        setActiveTab(fallback);
+        showNotification(`Acceso restringido: El rol ${currentUser.roleLabel} no tiene permisos para ese módulo.`);
+        return;
+      }
+    }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNavigateProfile = (section: 'profile' | 'settings' = 'profile') => {
+    setProfileSection(section);
+    setActiveTab('perfil');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogin = (user: AuthUser) => {
+    setCurrentUser(user);
+    localStorage.setItem('aduana_auth_role', user.role);
+    const initialTab = ROLE_DEFAULT_TAB[user.role] || 'ledger';
+    setActiveTab(initialTab);
+    showNotification(`Bienvenido(a), ${user.name}. Sesión iniciada con rol ${user.roleLabel}.`);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('aduana_auth_role');
+    showNotification('Sesión cerrada. Claves efímeras purgadas de memoria confinada.');
+  };
+
+  // If no user is logged in, show the sovereign Login view
+  if (!currentUser) {
+    return (
+      <LoginView
+        onLogin={handleLogin}
+        darkMode={darkMode}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F6FB] text-slate-800 dark:bg-[#030712] dark:text-slate-100 transition-colors selection:bg-[#4f46e5] selection:text-white">
       
-      {/* Top Header Navbar */}
+      {/* Top Header Navbar with User Dropdown */}
       <Navbar
         activeTab={activeTab}
         onTabChange={handleNavigate}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onNavigateProfile={handleNavigateProfile}
       />
 
       {/* Main Content Area */}
@@ -84,10 +156,22 @@ export const App: React.FC = () => {
 
         {activeTab === 'canal' && (
           <CanalSeguroView 
+            currentUser={currentUser}
             onBackToPasarela={() => handleNavigate('pasarela')}
             onNotify={showNotification}
             darkMode={darkMode}
             onToggleDarkMode={() => setDarkMode(!darkMode)}
+          />
+        )}
+
+        {activeTab === 'perfil' && (
+          <ProfileView 
+            user={currentUser}
+            darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode(!darkMode)}
+            onLogout={handleLogout}
+            onNavigate={handleNavigate}
+            defaultSection={profileSection}
           />
         )}
       </main>
