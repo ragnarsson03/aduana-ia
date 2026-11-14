@@ -144,7 +144,6 @@ def keys() -> KeyRing:
     return KEYS
 
 
-@pytest.mark.xfail(strict=False, reason="cobertura medida 22,7 %: guardián de frases fijas")
 @pytest.mark.parametrize(
     ("text", "case"), BLOCK, ids=[f"{c}-{i}" for i, (_, c) in enumerate(BLOCK)]
 )
@@ -153,7 +152,6 @@ def test_guard_in_blocks(text: str, case: str, keys: KeyRing) -> None:
     assert not result.allowed, case
 
 
-@pytest.mark.xfail(strict=False, reason="falsos positivos por palabras clave fuera de contexto")
 @pytest.mark.parametrize(("text", "case"), ALLOW, ids=[c for _, c in ALLOW])
 def test_guard_in_allows_legitimate_text(text: str, case: str, keys: KeyRing) -> None:
     _, result = guard_in("t", text, keys=keys)
@@ -195,14 +193,12 @@ def test_nfkc_bomb_fails_closed_in_guard_out(size: int) -> None:
     assert not result.allowed
 
 
-@pytest.mark.xfail(strict=False, reason="guard_out solo detecta el canary contiguo (M4)")
 @pytest.mark.parametrize(("text", "case"), OUT_LEAKS, ids=[c for _, c in OUT_LEAKS])
 def test_guard_out_detects_fragmented_or_encoded_canary(text: str, case: str) -> None:
     result = guard_out(f"Respuesta: {text}", canary_token=CANARY)
     assert result.canary_leaked or not result.allowed, case
 
 
-@pytest.mark.xfail(strict=False, reason="enlaces/handlers peligrosos sin bandera (M5)")
 @pytest.mark.parametrize(("text", "case"), OUT_LINKS, ids=[c for _, c in OUT_LINKS])
 def test_guard_out_flags_dangerous_links_and_handlers(text: str, case: str) -> None:
     result = guard_out(f"Ver {text}", canary_token=CANARY)

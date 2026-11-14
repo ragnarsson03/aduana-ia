@@ -157,3 +157,48 @@ aduana-ia/
 - **Kernel para Agentes IA:** [PROMPT_MAESTRO.md](PROMPT_MAESTRO.md)
 - **Ingeniería y Negocio GovTech:** [docs/Ingenieria Y Negocio Aduana IA.md](docs/Ingenieria%20Y%20Negocio%20Aduana%20IA.md)
 - **Licencia:** [GNU General Public License v3.0](LICENSE)
+
+## Probar front y back juntos
+
+Desde este worktree y su rama `integration/front-back`, use el Python del venv compartido. El harness usa Granian si está instalado (confirmado en este entorno); como alternativa admite uvicorn. No instala dependencias ni usa red externa.
+
+Iniciar el backend real y servir el front compilado existente:
+
+```powershell
+Set-Location 'E:\proyectos\hackatonUNETI\aduana-ia-integration'
+$env:PYTHONPATH = (Get-Location).Path
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& 'E:\proyectos\hackatonUNETI\aduana-ia\.venv\Scripts\python' scripts/run_e2e_stack.py
+```
+
+La única línea JSON de stdout contiene `url`, `token`, `db_path` y `pid`, después de comprobar `GET /api/v1/health/system`. El servidor escucha solo en `127.0.0.1` y el puerto es libre. El token predeterminado es fijo: `e2e-token-` seguido de 32 ceros; puede cambiarse con `--token` (mínimo 32 caracteres). `--duration 60` cierra el stack a los 60 segundos desde readiness; Ctrl+C también lo cierra. La clave maestra hexadecimal de prueba representa los bytes 0..31. Son credenciales públicas de prueba, solo para este harness local.
+
+El proceso fuerza `ADUANA_DEMO_MODE=1`, `ADUANA_DB_PATH` a un directorio temporal bajo `tests/e2e_harness/`, y `ADUANA_STATIC_DIR` a `static/` del worktree. Nunca usa `data/ledger.db`; elimina el temporal al cerrar. `--static-dir` permite otra carpeta dentro de este worktree. El harness consume el build disponible: no ejecuta npm ni modifica React o sus assets.
+
+Abrir el front en otra terminal PowerShell, pegando el campo `url` del JSON:
+
+```powershell
+$stackUrl = Read-Host 'Pegue el campo url del JSON de arranque'
+Start-Process $stackUrl
+```
+
+La aplicación web necesita `window.__ADUANA_TOKEN__`. En la consola del navegador, antes de usar las acciones de API, configure el token predeterminado así:
+
+```javascript
+window.__ADUANA_TOKEN__ = 'e2e-token-' + '0'.repeat(32);
+```
+
+Si pasó `--token`, asigne ese valor. No lo ponga en la URL; vuelva a asignarlo después de recargar la página. El fixture `live_stack` configura automáticamente `X-Aduana-Token` para las pruebas HTTP mediante `live_http`; no inyecta JavaScript en el navegador.
+
+Ejecutar las pruebas del harness y las pruebas rápidas de estáticos (crean su propio stack, no requieren dejar abierto el manual):
+
+```powershell
+Set-Location 'E:\proyectos\hackatonUNETI\aduana-ia-integration'
+$env:PYTHONPATH = (Get-Location).Path
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& 'E:\proyectos\hackatonUNETI\aduana-ia\.venv\Scripts\python' -m pytest tests/e2e_harness tests/test_static_serving.py -q --tb=short -o cache_dir=tests/e2e_harness/.pytest_cache --basetemp=tests/e2e_harness/.pytest_tmp
+```
+
+Las pruebas comprueban HTML, assets y MIME, ausencia de hosts externos en el índice, CSP/nosniff/no-store, 401 sin token, 415 con text/plain, las cinco variables institucionales, ledger verificable y los cuatro escenarios de tamper. Se procesan dos trámites sintéticos porque el ledger empieza en 0, mientras `tamper-sim` exige `block_index >= 1`. Se buscan las tres variantes de la cédula sintética en respuestas y archivos SQLite/WAL/SHM, con mensajes de error redactados.
+
+Los hallazgos quedan como fallos reales, sin xfail: en la verificación inicial faltan CSP y nosniff en `/`, los enlaces profundos SPA devuelven 404 (no 500), y los DTO de entrada de Shield/Gateway requieren la cédula sintética en claro. Por eso no se puede afirmar que los cuerpos originales estén libres de ella; la prueba de privacidad de ingreso lo señala explícitamente. Las respuestas y la persistencia sí deben estar libres de ella. El índice servido y el CSS actual no referencian Google Fonts. Una prueba HTTP no ejecuta React ni demuestra toda la interacción visual del navegador.

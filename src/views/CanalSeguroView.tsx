@@ -1,7 +1,9 @@
 import React from 'react';
 import { CanalSeguroFeature } from '../features/canal-seguro/CanalSeguroFeature';
+import { AuthUser } from '../types/auth';
 
 interface CanalSeguroViewProps {
+  currentUser?: AuthUser;
   onBackToPasarela: () => void;
   onNotify: (msg: string) => void;
   darkMode: boolean;
@@ -9,6 +11,7 @@ interface CanalSeguroViewProps {
 }
 
 export const CanalSeguroView: React.FC<CanalSeguroViewProps> = ({
+  currentUser,
   onBackToPasarela,
   onNotify,
   darkMode,
@@ -17,6 +20,7 @@ export const CanalSeguroView: React.FC<CanalSeguroViewProps> = ({
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 transition-colors">
       <CanalSeguroFeature
+        currentUser={currentUser}
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
         onNavigateHome={onBackToPasarela}

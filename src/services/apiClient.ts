@@ -1,60 +1,85 @@
 /**
  * Cliente de Conexión a la Pasarela Soberana Aduana IA.
  * Compatible con:
- * - Servidor Local Litestar (Python 3.11+ / Granian)
- * - Cloudflare Pages Functions / Workers AI
+ * - Servidor Local Litestar (Python 3.11+ / Granian), mismo origen (/api/v1)
  * - Despliegue Remoto en Hosting / VPS Institucional
+ *
+ * Zero-Leak: este módulo nunca registra (console), persiste (storage) ni incluye en mensajes
+ * de error el texto ciudadano ni los cuerpos de respuesta.
  */
 
-export type RecommendationType =
-  | 'PRIORIDAD_ALTA'
-  | 'REVISION_ESTANDAR'
-  | 'RECAUDOS_INCOMPLETOS'
-  | 'BLOQUEADO_SEGURIDAD';
+import type {
+  BenchmarkResponse,
+  GatewayProcessRequest,
+  GatewayProcessResponse,
+  HealthResponse,
+  LedgerVerifyResponse,
+  ShieldInspectResponse,
+  TamperScenario,
+  TamperSimResponse,
+} from '../types/api';
 
-export interface ShieldInspectResponse {
-  masked_text: string;
-  pii_count: number;
-  detected_types: string[];
-  rif_mod11_verified: boolean | null;
-  latency_ms: number;
-  is_offline_fallback?: boolean;
+export type {
+  BenchmarkResponse,
+  GatewayProcessRequest,
+  GatewayProcessResponse,
+  HealthResponse,
+  LedgerVerifyResponse,
+  RecommendationType,
+  ShieldInspectResponse,
+  TamperScenario,
+  TamperSimResponse,
+} from '../types/api';
+
+/** Mensajes en español por código de error del backend (cuerpo {"error": "<CODIGO>"}). */
+export const ERROR_MESSAGES: Record<string, string> = {
+  ERR_CONSENT_REQUIRED: 'Se requiere el consentimiento expreso del ciudadano para procesar la solicitud.',
+  ERR_RATE_LIMIT: 'Demasiadas solicitudes. Espere un momento antes de intentarlo de nuevo.',
+  ERR_UNSAFE_INPUT: 'El texto contiene datos personales que no pudieron anonimizarse de forma segura. Revíselo.',
+  ERR_IMMUTABLE_LEDGER: 'El registro de auditoría es inalterable: la operación fue rechazada.',
+  ERR_LLM_UNAVAILABLE: 'El modelo de IA local no está disponible en este momento.',
+  ERR_OVERRIDE_JUSTIFICATION:
+    'La decisión humana difiere de la recomendación: se requiere una justificación escrita válida.',
+  UNAUTHORIZED: 'No autorizado: falta o es inválido el token de acceso de la aplicación.',
+  UNSUPPORTED_MEDIA_TYPE: 'Tipo de contenido no soportado: la solicitud debe ser application/json.',
+  PAYLOAD_TOO_LARGE: 'El texto supera el tamaño máximo permitido.',
+  BAD_REQUEST: 'Solicitud inválida: revise los campos del formulario.',
+  NOT_FOUND: 'Recurso no disponible en este servidor.',
+  INTERNAL_ERROR: 'Error interno del servidor.',
+  ERR_INTERNAL: 'Error interno del servidor.',
+  NETWORK: 'Sin conexión al servidor.',
+  TIMEOUT: 'El servidor tardó demasiado en responder.',
+};
+
+const STATUS_FALLBACK_CODES: Record<number, string> = {
+  400: 'BAD_REQUEST',
+  401: 'UNAUTHORIZED',
+  404: 'NOT_FOUND',
+  413: 'PAYLOAD_TOO_LARGE',
+  415: 'UNSUPPORTED_MEDIA_TYPE',
+};
+
+export function describeErrorCode(code: string): string {
+  return ERROR_MESSAGES[code] ?? 'Error inesperado del servidor.';
 }
 
-export interface LedgerVerifyResponse {
-  is_valid: boolean;
-  blocks_checked: number;
-  corrupted_block_index: number | null;
-  failure_reason: string | null;
-  head_hash: string | null;
-  latency_ms: number;
-  is_offline_fallback?: boolean;
+/** Error tipado de la API. `message` es apto para la UI y nunca incluye texto ciudadano. */
+export class ApiError extends Error {
+  public readonly code: string;
+  public readonly status: number;
+
+  constructor(code: string, status: number) {
+    super(describeErrorCode(code));
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+  }
 }
 
-export type TamperScenario =
-  | 'flip_payload_bit'
-  | 'recompute_sha_without_key'
-  | 'break_prev_link'
-  | 'flip_override';
-
-export interface TamperSimResponse {
-  simulated: boolean;
-  scenario: TamperScenario;
-  tampered_block_index: number;
-  detection: LedgerVerifyResponse;
-  is_offline_fallback?: boolean;
-}
-
-export interface GatewayProcessRequest {
-  raw_text: string;
-  citizen_cedula: string;
-  consent: {
-    granted: boolean;
-    purpose_code: string;
-  };
-  features: Record<string, number>;
-  human_decision?: RecommendationType | null;
-  override_justification?: string | null;
+/** Convierte cualquier error capturado en un mensaje seguro para la UI. */
+export function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) return err.message;
+  return 'Error inesperado al comunicarse con el servidor.';
 }
 
 export interface ApiClientConfig {
@@ -63,18 +88,21 @@ export interface ApiClientConfig {
   timeoutMs?: number;
 }
 
+/** El pipeline puede esperar al LLM local: tiempo máximo mayor que el del resto de endpoints. */
+const GATEWAY_TIMEOUT_MS = 60000;
+
 export class AduanaApiClient {
   private baseUrl: string;
   private apiToken: string;
   private timeoutMs: number;
 
   constructor(config: ApiClientConfig = {}) {
-    // Si no se especifica, usa /api/v1 relativo (para Cloudflare / Nginx / Litestar servido local)
+    // Si no se especifica, usa /api/v1 relativo (mismo origen que sirve Litestar)
     this.baseUrl = config.baseUrl || (typeof window !== 'undefined' && (window as any).__ADUANA_API_URL__) || '/api/v1';
     this.apiToken =
       config.apiToken ||
       (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) ||
-      'aduana-dev-token-secret-2026';
+      '';
     this.timeoutMs = config.timeoutMs ?? 4000;
   }
 
@@ -86,15 +114,21 @@ export class AduanaApiClient {
     this.apiToken = token;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    timeoutMs: number = this.timeoutMs
+  ): Promise<T> {
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    // El token puede inyectarse tras la carga (evaluate_js de la app de escritorio): se lee en cada llamada.
     const activeToken =
       (typeof window !== 'undefined' && (window as any).__ADUANA_TOKEN__) || this.apiToken;
 
+    let response: Response;
     try {
-      const response = await fetch(url, {
+      response = await fetch(url, {
         ...options,
         signal: controller.signal,
         headers: {
@@ -103,15 +137,29 @@ export class AduanaApiClient {
           ...(options.headers || {}),
         },
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error API (${response.status}): ${errorText || response.statusText}`);
-      }
-
-      return (await response.json()) as T;
+    } catch (err) {
+      const aborted = err instanceof Error && err.name === 'AbortError';
+      throw new ApiError(aborted ? 'TIMEOUT' : 'NETWORK', 0);
     } finally {
       clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      // Solo se lee el campo `error` (código estable); el cuerpo nunca se registra.
+      let code = STATUS_FALLBACK_CODES[response.status] ?? `HTTP_${response.status}`;
+      try {
+        const body = (await response.json()) as { error?: unknown };
+        if (typeof body?.error === 'string' && body.error) code = body.error;
+      } catch {
+        // cuerpo no JSON: se conserva el código derivado del estado HTTP
+      }
+      throw new ApiError(code, response.status);
+    }
+
+    try {
+      return (await response.json()) as T;
+    } catch {
+      throw new ApiError('INTERNAL_ERROR', response.status);
     }
   }
 
@@ -125,7 +173,7 @@ export class AduanaApiClient {
         method: 'POST',
         body: JSON.stringify({ raw_text: rawText }),
       });
-    } catch (err) {
+    } catch {
       // Fallback determinista en cliente (Air-Gapped / offline)
       return this.fallbackShieldInspect(rawText);
     }
@@ -133,54 +181,62 @@ export class AduanaApiClient {
 
   /**
    * Verificación integral de la cadena criptográfica SHA-256 + HMAC.
+   * Lanza ApiError si el servidor no responde: nunca devuelve datos inventados.
    */
   public async verifyLedger(): Promise<LedgerVerifyResponse> {
-    try {
-      return await this.request<LedgerVerifyResponse>('/ledger/verify', {
-        method: 'GET',
-      });
-    } catch (err) {
-      return {
-        is_valid: true,
-        blocks_checked: 4,
-        corrupted_block_index: null,
-        failure_reason: null,
-        head_hash: '0x3c99f18a2bc4e578...soberano',
-        latency_ms: 12.4,
-        is_offline_fallback: true,
-      };
-    }
+    return this.request<LedgerVerifyResponse>('/ledger/verify', { method: 'GET' });
   }
 
   /**
-   * Simulación de sabotaje criptográfico de 1 bit para auditoría de jurado.
+   * Simulación de sabotaje sobre una copia en RAM (solo con ADUANA_DEMO_MODE=1).
+   * Lanza ApiError con status 404 si el modo demo está desactivado.
    */
   public async simulateTamper(
     blockIndex: number,
     scenario: TamperScenario = 'flip_payload_bit'
   ): Promise<TamperSimResponse> {
+    return this.request<TamperSimResponse>('/ledger/tamper-sim', {
+      method: 'POST',
+      body: JSON.stringify({ scenario, block_index: blockIndex }),
+    });
+  }
+
+  /**
+   * Detecta si /ledger/tamper-sim existe sin alterar nada: un block_index inválido (0) recibe
+   * 400 de validación si la ruta existe y 404 si el modo demo está desactivado.
+   */
+  public async isTamperSimAvailable(): Promise<boolean> {
     try {
-      return await this.request<TamperSimResponse>('/ledger/tamper-sim', {
+      await this.request<TamperSimResponse>('/ledger/tamper-sim', {
         method: 'POST',
-        body: JSON.stringify({ scenario, block_index: blockIndex }),
+        body: JSON.stringify({ scenario: 'flip_payload_bit', block_index: 0 }),
       });
+      return true;
     } catch (err) {
-      return {
-        simulated: true,
-        scenario,
-        tampered_block_index: blockIndex,
-        detection: {
-          is_valid: false,
-          blocks_checked: 4,
-          corrupted_block_index: blockIndex,
-          failure_reason: 'HMAC_SIGNATURE_FORGED',
-          head_hash: '0xBAD_BLOCK_CORRUPTED',
-          latency_ms: 18.2,
-          is_offline_fallback: true,
-        },
-        is_offline_fallback: true,
-      };
+      return err instanceof ApiError && err.status !== 0 && err.status !== 404;
     }
+  }
+
+  /** Pipeline completo SHIELD -> GUARD -> IA -> EXPLICA -> LEDGER. */
+  public async processGateway(
+    payload: GatewayProcessRequest,
+    timeoutMs: number = GATEWAY_TIMEOUT_MS
+  ): Promise<GatewayProcessResponse> {
+    return this.request<GatewayProcessResponse>(
+      '/gateway/process',
+      { method: 'POST', body: JSON.stringify(payload) },
+      timeoutMs
+    );
+  }
+
+  /** Estado mínimo del servidor (único endpoint sin token). */
+  public async getHealth(): Promise<HealthResponse> {
+    return this.request<HealthResponse>('/health/system', { method: 'GET' });
+  }
+
+  /** Benchmark de ataques (TPR/FPR, latencia, canary). */
+  public async getBenchmark(): Promise<BenchmarkResponse> {
+    return this.request<BenchmarkResponse>('/metrics/benchmark', { method: 'GET' });
   }
 
   /**
