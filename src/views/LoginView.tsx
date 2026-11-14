@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Shield, 
   Lock, 
   Unlock, 
   User, 
@@ -12,6 +11,7 @@ import {
 import { AuthUser, UserRole } from '../types/auth';
 import { MOCK_AUTH_USERS } from '../constants/mockAuth';
 import loginBgImg from '../assets/login-bg.jpg';
+import systemLogoImg from '../assets/Logo-white.png';
 
 interface LoginViewProps {
   onLogin: (user: AuthUser) => void;
@@ -119,9 +119,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
           {/* Card Header */}
           <div className="text-center mb-6">
-            {/* Elevated Shield Icon */}
-            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#171b26] border border-indigo-500/40 mb-3 shadow-[0_0_22px_rgba(79,70,229,0.35)] text-indigo-400">
-              <Shield className="w-8 h-8 fill-indigo-400/20 stroke-indigo-400" />
+            {/* Official System Emblem Logo */}
+            <div className="inline-flex items-center justify-center mb-3">
+              <img 
+                src={systemLogoImg} 
+                alt="Aduana IA" 
+                className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] drop-shadow-[0_0_24px_rgba(79,70,229,0.35)] transition-transform duration-300 hover:scale-105"
+              />
             </div>
 
             <h1 className="text-2xl sm:text-[28px] font-bold text-white tracking-tight">
