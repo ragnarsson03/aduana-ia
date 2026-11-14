@@ -23,7 +23,7 @@ export const CanalHeader: React.FC<CanalHeaderProps> = ({
         <img 
           src={logoImg} 
           alt="Aduana IA" 
-          className="h-10 sm:h-12 w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
+          className="h-12 sm:h-14 md:h-16 w-auto object-contain rounded-xl shadow-xs hover:opacity-95 transition-all"
         />
         <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           <span className="text-slate-400 dark:text-slate-500 font-normal">—</span> Canal Seguro
