@@ -2,6 +2,7 @@
 # Aduana IA — Configuración Cloudflare (Workers con Activos Estáticos + D1 + Workers AI + KV)
 # ===========================================================================
 name = "aduana-ia"
+main = "functions/worker.ts"
 compatibility_date = "2026-02-01"
 
 [build]

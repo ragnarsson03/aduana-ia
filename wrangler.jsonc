@@ -5,6 +5,7 @@
 	// ===========================================================================
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "aduana-ia",
+	"main": "functions/worker.ts",
 	"compatibility_date": "2026-02-01",
 	"build": {
 		"command": "npm run build"

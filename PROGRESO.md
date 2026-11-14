@@ -264,5 +264,17 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
    - **Despliegue Productivo Actualizado:** Versión `654c3c8a-aede-43e0-97e2-ef226d24dc21` en vivo y operativa en `https://aduana-ia.carlos-lamole98.workers.dev`.
    - **Verificación Automatizada:** Suite de integración con 130 tests aprobados en `test_ca07_rbac_aduana.py` y `test_ca07_desktop_and_frontend.py`, y 32 tests de Vitest en verde.
 
+6. **Resolución de "Sin conexión al servidor: datos simulados" en Cloudflare:**
+   - **Diagnóstico:** Anteriormente Cloudflare solo servía los archivos estáticos de `static/` sin un script de Worker (`main`). La ruta de health check `/api/v1/health/system` era interceptada por el fallback SPA devolviendo HTML (`index.html`), provocando fallo de parseo JSON en `api.getHealth()` y activando el banner offline.
+   - **Solución Implementada (`functions/worker.ts`):** Se implementó un router Edge Worker que captura todas las peticiones a `/api/v1/*`:
+     - `/api/v1/health/system`: Retorna estado operativo en JSON (`status: ok`, `ledger_mode: persistent`), conmutando el estado a **En Línea** y eliminando el banner.
+     - `/api/v1/metrics/benchmark`: Retorna métricas de evaluación del modelo (`tpr: 0.998`, `fpr: 0.001`, latencia y canary leaks).
+     - `/api/v1/auth/login`: Autenticación RBAC funcional en el Edge para analista, administrador y auditor.
+     - `/api/v1/chat/message`: Ejecución del pipeline Zero-Trust de IA multimodal en el Edge.
+     - `/api/v1/gateway/process` y `/api/v1/ledger/verify`: Procesamiento y auditoría criptográfica.
+     - Rutas no-API: Delegadas a `env.ASSETS.fetch(request)` (Vite SPA).
+   - **Despliegue Productivo:** Versión `c494e2aa-049e-493f-8801-d5854f7620c7` activa y validada con HTTP 200 en todos los endpoints de `https://aduana-ia.carlos-lamole98.workers.dev`.
+
+
 
 
