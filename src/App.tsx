@@ -12,6 +12,10 @@ import { NavTabId } from './types';
 import { AuthUser } from './types/auth';
 import { MOCK_AUTH_USERS, ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from './constants/mockAuth';
 import { CheckCircle2 } from 'lucide-react';
+import { OfflineBanner } from './components/OfflineBanner';
+import { useBackendStatus } from './state/BackendStatus';
+import { LiveLedgerView } from './views/live/LiveLedgerView';
+import { LiveExplicabilidadView } from './views/live/LiveExplicabilidadView';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
@@ -38,6 +42,7 @@ export const App: React.FC = () => {
     return false;
   });
 
+  const { connection } = useBackendStatus();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync dark class on documentElement
@@ -128,6 +133,8 @@ export const App: React.FC = () => {
         onNavigateProfile={handleNavigateProfile}
       />
 
+      <OfflineBanner />
+
       {/* Main Content Area */}
       <main className="flex-1 w-full animate-in fade-in duration-200">
         {activeTab === 'pasarela' && (
@@ -146,13 +153,17 @@ export const App: React.FC = () => {
           />
         )}
 
-        {activeTab === 'ledger' && (
+        {activeTab === 'ledger' && (connection === 'online' ? (
+          <LiveLedgerView onNotify={showNotification} />
+        ) : (
           <LedgerView onCopyText={showNotification} />
-        )}
+        ))}
 
-        {activeTab === 'explicabilidad' && (
+        {activeTab === 'explicabilidad' && (connection === 'online' ? (
+          <LiveExplicabilidadView onNavigateToPasarela={() => handleNavigate('pasarela')} />
+        ) : (
           <ExplicabilidadView onNotify={showNotification} />
-        )}
+        ))}
 
         {activeTab === 'canal' && (
           <CanalSeguroView 

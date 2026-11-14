@@ -169,6 +169,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
               <input
                 type="text"
+                autoComplete="off"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="auditor.soberano@enclave.aduana.gob"
@@ -182,6 +183,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <input
                 id="password-input"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="off"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="Passkey o Clave Encriptada"
@@ -204,6 +206,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <label className="inline-flex items-center space-x-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
+                  autoComplete="off"
                   checked={rememberNode}
                   onChange={(e) => setRememberNode(e.target.checked)}
                   className="w-4 h-4 rounded border-white/20 bg-[#0a0e18] text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"

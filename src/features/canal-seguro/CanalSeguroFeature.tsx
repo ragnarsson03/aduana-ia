@@ -185,7 +185,7 @@ export const CanalSeguroFeature: React.FC<CanalSeguroFeatureProps> = ({
           <div className="p-3 border-b border-neutral-200/60 dark:border-neutral-800/60">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" />
-              <input
+              <input autoComplete="off"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -511,7 +511,7 @@ export const CanalSeguroFeature: React.FC<CanalSeguroFeatureProps> = ({
               </button>
 
               {/* Message Input */}
-              <input
+              <input autoComplete="off"
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
