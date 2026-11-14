@@ -66,7 +66,8 @@ _HIGH_RISK_PATTERNS: Final[tuple[tuple[re.Pattern[str], float, str], ...]] = (
     (re.compile(r"<instruccion_institucional_inmutable>", re.IGNORECASE), 0.95, "XML_TAG_INJECTION"),
     (re.compile(r";\s*drop\s+table\b", re.IGNORECASE), 0.90, "SQLI_DROP_TABLE"),
     (re.compile(r"\bunion\s+select\b", re.IGNORECASE), 0.90, "SQLI_UNION_SELECT"),
-    (re.compile(r"\bselect\s+.*\s+from\s+", re.IGNORECASE), 0.85, "SQLI_SELECT_FROM"),
+    # Acotado: el original `\bselect\s+.*\s+from\s+` era cúbico (select + 3000 espacios => 108 s).
+    (re.compile(r"\bselect\b[^;\n]{1,200}?\bfrom\b", re.IGNORECASE), 0.85, "SQLI_SELECT_FROM"),
     (re.compile(r";\s*update\s+\w+\s+set\b", re.IGNORECASE), 0.90, "SQLI_UPDATE"),
     (re.compile(r"<script[\s>]", re.IGNORECASE), 0.90, "CODE_INJECTION_SCRIPT"),
     (re.compile(r"\bjavascript:", re.IGNORECASE), 0.85, "CODE_INJECTION_JS"),

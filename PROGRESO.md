@@ -77,8 +77,31 @@
 ## EN CURSO
 - [~] **Codex** — optimizar `core/pii_patterns.py` y `core/text_normalizer.py` (solo esos dos). Meta: ≤ 8 ms a 5 000 caracteres, ≤ 25 ms a 20 000. **No editar esos archivos hasta que termine.**
 - [~] **Penetration Tester** — red team ronda 2 de SHIELD (solo lectura). Entrega tabla de regresión para convertir en tests.
+- [~] **Antigravity (2026-11-13)** — Gatillo 5 (LLM y Circuit Breaker CA-06) y Gatillo 6 (Orquestador y API completa).
 
 ## PENDIENTE
+
+### P0 — Endurecer Gatillo 2 (resultado del red team, 2026-11-13)
+Medido sobre un conjunto INDEPENDIENTE de 288 casos (185 ataques y 103 benignos duros, escritos aparte): **TPR 22,7 % (IC 17–29 %)**, **FPR 4,9 %** frente a CA-02 (TPR ≥ 88 %, FPR ≤ 4 %). El 98 % del benchmark propio (`data/attack_benchmark.json`) es sobreajuste: 48 de 50 patrones salen de sus propios ataques. Criterio de salida: `tests/test_guardian_regression.py` (hoy 65 `xfail`; al corregir, quitar el xfail correspondiente) y un conjunto ciego que **nadie use para afinar reglas**.
+- [x] **C1 ReDoS cúbico** en `SQLI_SELECT_FROM` (select + 3000 espacios tardaba 108 s): corregido con `\bselect\b[^;\n]{1,200}?\bfrom\b` (ahora 14 ms). Hay tests sin xfail que lo vigilan.
+- [x] `orchestrator.py` llamaba `guard_in(request_id, masked_text, self._keys)` posicional; la firma exige `keys=` → corregido.
+- [ ] **A1 cobertura:** pasar de frases literales a reglas por intención (verbos de anulación × objetos {instrucciones, reglas, normas, directrices, configuración, prompt} en ventana ≤ 6 tokens; verbos de exfiltración × {prompt, contexto inicial, token, canary, clave}; marcadores de autoridad + verbo aprobar/omitir; español e inglés). Opcional: clasificador ligero (n-gramas de caracteres) entrenado con datos independientes, combinado con `max(regla, clasificador)`.
+- [ ] **A2 ofuscación:** escanear varias vistas del texto (normalizado, invisibles→espacio, sin diacríticos, leet-fold, letras sueltas colapsadas, rot13 e invertido). Hoy pasan leet, letras espaciadas, puntos/guiones por letra, rot13, invertido, ZWJ, U+2800 y tags U+E00xx.
+- [ ] **A3 base64/hex:** decodificar TODOS los candidatos (con tope), limpiar espacios/saltos, urlsafe, `\x`, UTF-16, recursión ≤ 2. Hoy un decoy benigno delante evita la detección (`break`).
+- [ ] **A4 falsos positivos (4,9 %):** bajar el peso de `sin restricciones`, `modo desarrollador`, `instrucciones internas`, `evadir controles` y exigir segunda señal dirigida al asistente; detectar negaciones y citas.
+- [ ] **M2** capturar `ValueError` de `normalize_text` en `guard_in` y `guard_out` (fail-closed, estado de política propio) y en `/metrics/benchmark`.
+- [ ] **M3** escapar y envolver el texto NORMALIZADO (hoy se analiza el normalizado pero se envuelve el original: ＜ fullwidth y tags U+E00xx llegan al LLM).
+- [ ] **M4** `guard_out`: canary fragmentado/codificado (subcadenas ≥ 6, separadores, base64 del token y del hex, ventana deslizante); fingerprint del texto del prompt del sistema.
+- [ ] **M5** `guard_out`: neutralizar o marcar enlaces `javascript|data|vbscript|//`, más handlers `onfocus/ontoggle/...`; decidir si `xss_or_code_injected=True` debe bloquear o añadir `SANITIZED_XSS`. El frontend debe renderizar con `textContent`.
+- [ ] **M6** PII ofuscada en guard_out ("arroba/punto", teléfono con espacios): comparte detector con SHIELD.
+- [ ] **B2** `/metrics/benchmark`: candado contra carrera de caché; `canary_leaks_neutralized_pct` es constante (no mide nada); medir p95 y guard_out; reportar IC de Wilson.
+- [ ] Rehacer el benchmark: benignos adversariales (con "ignorar", "olvidar", "clave", "modo", "instrucciones" usados legítimamente), textos largos, autor distinto al de las reglas.
+- [ ] CA-02 (< 25 ms/prompt) solo se cumple por debajo de ~6 000 caracteres; el tope de la API es 20 000 → acotar el alcance o bajar el tope.
+- Conjunto independiente del red team (NO usarlo para afinar): `C:\Users\csubero\AppData\Local\Temp\claude\ac455cc4694fadac\eb26388d-f516-4461-ab6f-bc92c4f41ebf\scratchpad\independent_set.json`.
+
+### Bloqueos detectados en el árbol de trabajo
+- [ ] `pipeline/orchestrator.py` importa `explain_dossier` de `pipeline/stage5_explica.py` y esa función aún no existe: rompe la recolección de tests (`tests/test_api_hardening.py` y cualquiera que importe el orquestador). Quien edita orquestador/EXPLICA debe cerrarlo antes de commitear.
+- [ ] `static/index.html` carga fuentes de `fonts.googleapis.com`/`fonts.gstatic.com`: viola Air-Gapped y la CSP `default-src 'self'`. Empaquetar las fuentes dentro de `static/`.
 
 ### P0 — Cerrar Gatillo 1
 - [ ] Aplicar hallazgos del red team ronda 2 y añadir su tabla como tests parametrizados en `tests/test_ca01_shield.py`.
@@ -87,15 +110,15 @@
 - [ ] Límites conocidos sin cubrir (documentados en `core/pii_patterns.py`): nombres sin marcador/minúsculas, base32/ROT13/entidades HTML/`%NN`, números en palabras, clínicos con variantes (`seropositivo`, `d i a b e t e s`), falsos positivos clínicos en texto comercial ("depresión del mercado").
 
 ### P2 — Gatillo 5: LLM y Circuit Breaker (CA-06)
-- [ ] `OfflineDeterministicAdapter` (resumen determinista sin red), `OllamaAdapter` y `OpenAICompatAdapter` (httpx; allowlist de hosts, sin redirects, respuesta acotada; **híbrido opt-in**).
-- [ ] `CircuitBreaker` como máquina de estados CLOSED/OPEN/HALF_OPEN con umbral, enfriamiento y reloj inyectable.
+- [~] `OfflineDeterministicAdapter` (resumen determinista sin red), `OllamaAdapter` y `OpenAICompatAdapter` (httpx; allowlist de hosts, sin redirects, respuesta acotada; **híbrido opt-in**).
+- [~] `CircuitBreaker` como máquina de estados CLOSED/OPEN/HALF_OPEN con umbral, enfriamiento y reloj inyectable.
 - [?] **Redefinir CA-06**: con circuito abierto el failover responde < 100 ms; con timeout en frío tarda hasta 3.5 s. Documentar qué se mide. Spec: `specs/05_interconnect.spec.md`.
 
 ### P3 — Gatillo 6: Orquestador y API completa
-- [ ] `GatewayPipeline.process`: stage0 (blind id, rate-guard, consentimiento) → shield → guard_in → LLM → guard_out → explica → ledger; `vault.zeroize` en `finally`; `BlockedPacket` para rechazos (también se sellan); `request_id` con `secrets.token_urlsafe(16)` generado en servidor.
-- [ ] DTO de salida propio (usa `sanitized_response`, **omite `raw_response` y el canary**), `POST /gateway/process`, mapeo de errores a 403/429/409/422/503, `RateLimitError` → 429 + `Retry-After`.
-- [ ] Lifespan de Litestar: purga periódica de la bóveda, `zeroize_all` y cierre del repo al apagar.
-- [ ] Test de integración CA-05 completo (caplog/capsys + `.db`/`-wal`/`-shm`).
+- [~] `GatewayPipeline.process`: stage0 (blind id, rate-guard, consentimiento) → shield → guard_in → LLM → guard_out → explica → ledger; `vault.zeroize` en `finally`; `BlockedPacket` para rechazos (también se sellan); `request_id` con `secrets.token_urlsafe(16)` generado en servidor.
+- [~] DTO de salida propio (usa `sanitized_response`, **omite `raw_response` y el canary**), `POST /gateway/process`, mapeo de errores a 403/429/409/422/503, `RateLimitError` → 429 + `Retry-After`.
+- [~] Lifespan de Litestar: purga periódica de la bóveda, `zeroize_all` y cierre del repo al apagar.
+- [~] Test de integración CA-05 completo (caplog/capsys + `.db`/`-wal`/`-shm`).
 
 ### P3 — Gatillo 7 y frontend
 - [ ] Instalar y **probar de verdad** `granian` y `pywebview` (nunca se han ejecutado): servidor en hilo vs subproceso, puerto efímero, espera de readiness, token a la ventana (`evaluate_js`, no en URL), `private_mode`, `freeze_support` para PyInstaller.
