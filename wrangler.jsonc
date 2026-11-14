@@ -1,43 +1,39 @@
 {
-  // ===========================================================================
-  // Aduana IA — Configuración Cloudflare (Pages + D1 SQLite + Workers AI + KV)
-  // Manual de Despliegue del Hackathon UNETI IA 2026
-  // ===========================================================================
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "aduana-ia",
-  "compatibility_date": "2026-02-01",
-  "pages_build_output_dir": "dist",
-
-  // Variables de entorno públicas del entorno Edge
-  "vars": {
-    "ADUANA_EDGE_MODE": "cloudflare-pages",
-    "WORKERS_AI_PRIMARY_MODEL": "@cf/meta/llama-3.1-8b-instruct",
-    "WORKERS_AI_FALLBACK_MODEL": "@cf/zai-org/glm-4.7-flash"
-  },
-
-  // Base de datos SQLite serverless (Ledger + usuarios_aduana RBAC)
-  // Ejecutar:
-  //   wrangler d1 execute aduana-db --remote --file=schema.sql
-  //   wrangler d1 execute aduana-db --remote --file=seed_d1.sql
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "aduana-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
-    }
-  ],
-
-  // Inferencia soberana en el Edge (Workers AI)
-  // Modelos soportados: @cf/zai-org/glm-4.7-flash | @cf/meta/llama-3.1-8b-instruct
-  "ai": {
-    "binding": "AI"
-  },
-
-  // Caché efímera / sesiones / rate-limiting distribuido en el Edge
-  "kv_namespaces": [
-    {
-      "binding": "KV",
-      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
-    }
-  ]
+	// ===========================================================================
+	// Aduana IA — Configuración Cloudflare (Pages + D1 SQLite + Workers AI + KV)
+	// Manual de Despliegue del Hackathon UNETI IA 2026
+	// ===========================================================================
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "aduana-ia",
+	"compatibility_date": "2026-02-01",
+	"pages_build_output_dir": "dist",
+	// Variables de entorno públicas del entorno Edge
+	"vars": {
+		"ADUANA_EDGE_MODE": "cloudflare-pages",
+		"WORKERS_AI_PRIMARY_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+		"WORKERS_AI_FALLBACK_MODEL": "@cf/zai-org/glm-4.7-flash"
+	},
+	// Base de datos SQLite serverless (Ledger + usuarios_aduana RBAC)
+	// Ejecutar:
+	//   wrangler d1 execute aduana-db --remote --file=schema.sql
+	//   wrangler d1 execute aduana-db --remote --file=seed_d1.sql
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "aduana-db",
+			"database_id": "21eb0bb7-3d0f-4695-b450-3af441ab4d5b"
+		}
+	],
+	// Inferencia soberana en el Edge (Workers AI)
+	// Modelos soportados: @cf/zai-org/glm-4.7-flash | @cf/meta/llama-3.1-8b-instruct
+	"ai": {
+		"binding": "AI"
+	},
+	// Caché efímera / sesiones / rate-limiting distribuido en el Edge
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+		}
+	]
 }
