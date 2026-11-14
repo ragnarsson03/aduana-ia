@@ -87,19 +87,23 @@ const STATUS_FALLBACK_CODES: Record<number, string> = {
 };
 
 export function describeErrorCode(code: string): string {
-  return ERROR_MESSAGES[code] ?? 'Error inesperado del servidor.';
+  if (ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
+  if (typeof code === 'string' && code.includes(' ')) return code;
+  return 'Error inesperado del servidor.';
 }
 
 /** Error tipado de la API. `message` es apto para la UI y nunca incluye texto ciudadano. */
 export class ApiError extends Error {
   public readonly code: string;
   public readonly status: number;
+  public readonly rawDetail?: string;
 
-  constructor(code: string, status: number) {
+  constructor(code: string, status: number, rawDetail?: string) {
     super(describeErrorCode(code));
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
+    this.rawDetail = rawDetail;
   }
 }
 
@@ -222,12 +226,17 @@ export class AduanaApiClient {
         28000
       );
     } catch (err: any) {
+      const errorMsg =
+        err?.rawDetail ||
+        (err?.code && !ERROR_MESSAGES[err.code] && err.code.length > 5 ? err.code : null) ||
+        err?.message ||
+        'Error de conexión con el proveedor';
       return {
         success: false,
         provider: config.provider,
         model: config.model || '',
         latency_ms: 0,
-        error: err.message || 'Error de conexión con el proveedor',
+        error: errorMsg,
       };
     }
   }
@@ -279,9 +288,17 @@ export class AduanaApiClient {
     if (!response.ok) {
       // Solo se lee el campo `error` (código estable); el cuerpo nunca se registra.
       let code = STATUS_FALLBACK_CODES[response.status] ?? `HTTP_${response.status}`;
+      let rawDetail: string | undefined = undefined;
       try {
-        const body = (await response.json()) as { error?: unknown };
-        if (typeof body?.error === 'string' && body.error) code = body.error;
+        const body = (await response.json()) as { error?: unknown; detail?: unknown; message?: unknown };
+        if (typeof body?.error === 'string' && body.error) {
+          code = body.error;
+          rawDetail = body.error;
+        } else if (typeof body?.detail === 'string' && body.detail) {
+          rawDetail = body.detail;
+        } else if (typeof body?.message === 'string' && body.message) {
+          rawDetail = body.message;
+        }
       } catch {
         // cuerpo no JSON: se conserva el código derivado del estado HTTP
       }
@@ -290,7 +307,7 @@ export class AduanaApiClient {
         this.sessionJwt = null;
         this.sessionExpiredHandler?.();
       }
-      throw new ApiError(code, response.status);
+      throw new ApiError(code, response.status, rawDetail);
     }
 
     try {

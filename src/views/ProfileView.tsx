@@ -104,7 +104,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     } else if (prov === 'gemini') {
       setAiModel('gemini-1.5-flash');
     } else if (prov === 'cloudflare') {
-      setAiModel('@cf/meta/llama-3.1-8b-instruct');
+      setAiModel('@cf/meta/llama-3.2-3b-instruct');
     } else if (prov === 'ollama') {
       setAiModel('llama3.1');
     } else if (prov === 'custom') {

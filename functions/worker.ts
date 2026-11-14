@@ -137,7 +137,7 @@ function jsonResponse(data: unknown, status = 200, headers: Record<string, strin
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History, X-AI-Provider, X-AI-Key, X-AI-Model, X-AI-Endpoint, X-AI-Account-ID',
       ...headers,
     },
   });
@@ -154,7 +154,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History, X-AI-Provider, X-AI-Key, X-AI-Model, X-AI-Endpoint, X-AI-Account-ID',
           'Access-Control-Allow-Credentials': 'true',
         },
       });
@@ -195,7 +195,7 @@ export default {
           const newHeaders = new Headers(res.headers);
           newHeaders.set('Access-Control-Allow-Origin', '*');
           newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-          newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History');
+          newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Aduana-Token, X-Chat-Prompt, X-File-Name, X-File-Mime, X-Chat-History, X-AI-Provider, X-AI-Key, X-AI-Model, X-AI-Endpoint, X-AI-Account-ID');
           return new Response(res.body, {
             status: res.status,
             statusText: res.statusText,
@@ -400,7 +400,7 @@ export default {
                 success: false,
                 error: 'El modelo no devolvió texto. Verifique la API Key, el nombre del modelo o la cuota del proveedor.',
               },
-              400
+              200
             );
           }
 
@@ -417,7 +417,7 @@ export default {
               success: false,
               error: testErr.message || 'Error desconocido al conectar con el proveedor de IA',
             },
-            400
+            200
           );
         }
       }

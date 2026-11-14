@@ -162,7 +162,7 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
 
   // 4. Cloudflare REST API (si se cuenta con Account ID + API Token)
   if (provider === 'cloudflare' && apiKey && accountId) {
-    const targetModel = model || '@cf/meta/llama-3.1-8b-instruct';
+    const targetModel = model || '@cf/meta/llama-3.2-3b-instruct';
     const targetUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${targetModel}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 18000);
@@ -228,7 +228,7 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
 
   // 6. Cloudflare Workers AI Nativo (env.AI)
   if (env.AI) {
-    const targetModel = model || env.WORKERS_AI_PRIMARY_MODEL || '@cf/meta/llama-3.1-8b-instruct';
+    const targetModel = model || env.WORKERS_AI_PRIMARY_MODEL || '@cf/meta/llama-3.2-3b-instruct';
     const aiRes = await env.AI.run(targetModel, {
       messages: [
         { role: 'system', content: systemPrompt },
