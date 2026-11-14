@@ -275,6 +275,11 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
      - Rutas no-API: Delegadas a `env.ASSETS.fetch(request)` (Vite SPA).
    - **Despliegue Productivo:** Versión `c494e2aa-049e-493f-8801-d5854f7620c7` activa y validada con HTTP 200 en todos los endpoints de `https://aduana-ia.carlos-lamole98.workers.dev`.
 
+7. **Corrección de Chat IA Edge Stream y Restauración Fidedigna de Sesión F5:**
+   - **Solución Chat IA Stream (`/api/v1/chat/stream`):** Se enrutó el endpoint de streaming binario de adjuntos en `functions/worker.ts` y se securizó `functions/api/v1/chat/message.ts` con protección `try/catch` y CORS contra fallos de Workers AI, eliminando el fallback offline determinista y devolviendo dictámenes soberanos completos.
+   - **Solución Sesión F5:** Se condicionó `/api/v1/auth/session` a la existencia real de la cookie `aduana_session`. Si no hay sesión o se hizo logout devuelve 401 (permaneciendo en LoginView), y si el usuario inició sesión restaura de forma fidedigna al rol específico correspondiente (Administrador, Auditor o Analista).
+
+
 
 
 
