@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const allNavItems: NavTabItem[] = [
     { id: 'pasarela', label: 'Pasarela' },
-    { id: 'chat', label: 'Chat IA', hasDot: true, dotColor: 'bg-indigo-500' },
+    { id: 'chat', label: 'Nexus IA', hasDot: true, dotColor: 'bg-indigo-500' },
     { id: 'ledger', label: 'Ledger' },
     { id: 'explicabilidad', label: 'Explicabilidad' },
     { id: 'canal', label: 'Canal Seguro', hasDot: true, dotColor: 'bg-emerald-500' },
