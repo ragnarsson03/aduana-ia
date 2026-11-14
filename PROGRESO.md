@@ -216,3 +216,21 @@ En la consola del navegador, antes de las acciones de API: `window.__ADUANA_TOKE
    - Reemplazado el mensaje por defecto ("Hello world") desplegando los activos estáticos compilados de Vite mediante `npx wrangler deploy`.
    - Producción activa y verificada en `https://aduana-ia.carlos-lamole98.workers.dev`.
 
+### 2026-11-14 — Cifrado Compacto en Chat IA, Verificación Criptográfica E2EE en Canal Seguro y Fusión PR #15
+
+1. **Optimización de Cifrado en Chat IA (Sin Volcados Extensos):**
+   - **Anonimización Compacta:** En `ChatIAView.tsx`, se eliminó el volcado completo de líneas o bloques criptográficos masivos que saturaban la pantalla. El componente `MaskedContentPreview` separa limpiamente el texto del usuario y encapsula el adjunto en una tarjeta criptográfica compacta de Enclave RAM (TTL 180s, Zero-Plaintext al LLM).
+   - **Truncamiento de Hashes:** Todos los identificadores y sellos SHA-256 en metadatos y recibos se muestran truncados de forma segura (`SHA-256: 8f31c9a0...71b2`).
+   - **Extracto Sanitizado Opcional:** Se provee un botón para desplegar un extracto sanitizado acotado a 120 caracteres con advertencia explícita de confinamiento en memoria.
+
+2. **Verificación y Ejecución Criptográfica Real en Canal Seguro:**
+   - **Tubería Criptográfica en Memoria Confinada:** Cada mensaje y archivo en `CanalSeguroFeature.tsx` ejecuta cifrado real en RAM mediante la Web Crypto API (`window.crypto.subtle`): clave simétrica AES-256-GCM de 256 bits, generación de vector de inicialización (IV) de 96 bits único por transmisión, validación de etiqueta de autenticación (auth tag), sellado de integridad SHA-256 y verificación de handshake Gov-Ed25519 con el funcionario.
+   - **Modal de Auditoría E2EE (`CryptoAuditModal.tsx`):** Inspector interactivo que audita las 5 etapas del enlace (Handshake Ed25519, Filtro SHIELD PII homomórfico, Cifrado AES-256-GCM, Sello SHA-256 y Confinamiento RAM con TTL 180s y 0 bytes en disco), permitiendo copiar el ciphertext e IV.
+   - **Pastillas de Verificación en Burbujas:** Cada mensaje (tanto emitido como recibido) incluye un botón `[🔒 AES-256-GCM · Ed25519 OK]` para auditar el vector de inicialización y proceso criptográfico específico.
+   - **Truncamiento de Hashes en Canal Seguro:** Las tarjetas de archivo adjunto truncan el hash a formato legible (`SHA-256: 9f83c21a...31a4f5`) con botón de copia al portapapeles.
+
+3. **Fusión e Integración de PR #15 (`feat/chat-ia-attachments-zero-trust`):**
+   - Incorporados al flujo de desarrollo el controlador `ChatController` en Litestar (`app/controllers/chat.py`), `pipeline/chat_attachments.py`, `pipeline/llm_adapter.py` (GeminiAdapter), esquemas msgspec (`ChatIAUploadRequest`, `ChatIAResponse`) y la suite de pruebas unitarias y de integración (`tests/test_chat_ia_attachments.py`).
+   - Todos los tests de backend (567 pruebas) y frontend (32 pruebas) pasan al 100% en verde.
+
+
