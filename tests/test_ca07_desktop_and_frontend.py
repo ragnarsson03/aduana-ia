@@ -108,7 +108,7 @@ def test_granian_subprocess_real_execution_and_token_auth() -> None:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=3) as resp:  # noqa: S310
             assert resp.status == 200
             html = resp.read().decode("utf-8")
-            assert "<div id=\"root\"></div>" in html
+            assert '<div id="root"></div>' in html
             assert "https://" not in html
 
         # 3. Ruta protegida sin token -> 401
@@ -137,7 +137,7 @@ def test_granian_subprocess_real_execution_and_token_auth() -> None:
 def test_desktop_main_wires_webview_private_mode_and_evaluate_js(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    loaded_callbacks: list[ Any ] = []
+    loaded_callbacks: list[Any] = []
 
     class _FakeEvents:
         def __init__(self) -> None:

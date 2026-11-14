@@ -7,11 +7,17 @@ import secrets
 from litestar import Controller, Request, post
 from litestar.params import JSONBody
 
-from app.controllers import pending
 from app.dependencies import AppState
-from app.schemas import GatewayProcessRequest, ShieldInspectRequest, ShieldInspectResponse
+from app.schemas import (
+    GatewayProcessRequest,
+    GatewayProcessResponse,
+    ShieldInspectRequest,
+    ShieldInspectResponse,
+)
 from app.security import api_guard
 from core.config import API_PREFIX
+from core.context import BlockedPacket
+from pipeline.orchestrator import GatewayInput
 from pipeline.stage1_shield import shield
 
 
@@ -19,9 +25,61 @@ class GatewayController(Controller):
     path = f"{API_PREFIX}/gateway"
     guards = [api_guard]
 
-    @post("/process", sync_to_thread=False)
-    def process(self, data: JSONBody[GatewayProcessRequest]) -> dict[str, str]:
-        raise pending("Gatillo 6: pipeline completo pendiente")
+    @post("/process")
+    async def process(
+        self, request: Request, data: JSONBody[GatewayProcessRequest]
+    ) -> GatewayProcessResponse:
+        state: AppState = request.app.state.aduana
+        gateway_in = GatewayInput(
+            raw_text=data.raw_text,
+            citizen_cedula=data.citizen_cedula,
+            consent_granted=data.consent.granted,
+            purpose_code=data.consent.purpose_code,
+            features=data.features,
+            human_decision=data.human_decision,
+            override_justification=data.override_justification,
+        )
+        packet = await state.pipeline.process(gateway_in)
+        if isinstance(packet, BlockedPacket):
+            return GatewayProcessResponse(
+                request_id=packet.request_id,
+                timestamp_utc=packet.timestamp_utc,
+                policy_status=packet.policy_status,
+                masked_text=None,
+                sanitized_response="",
+                ai_generated_notice=False,
+                model_recommendation="BLOQUEADO_SEGURIDAD",
+                human_decision="BLOQUEADO_SEGURIDAD",
+                human_override=False,
+                citizen_receipt_code=packet.ledger.citizen_receipt_code,
+                block_index=packet.ledger.block_index,
+                chain_verified=packet.ledger.chain_verified,
+                latency_ms=0.0,
+            )
+
+        total_latency = (
+            packet.shield.latency_ms
+            + packet.guard_in.latency_ms
+            + packet.llm.latency_ms
+            + packet.guard_out.latency_ms
+        )
+        return GatewayProcessResponse(
+            request_id=packet.request_id,
+            timestamp_utc=packet.timestamp_utc,
+            policy_status=packet.guard_out.policy_status,
+            masked_text=packet.masked_text,
+            sanitized_response=packet.guard_out.sanitized_response,
+            ai_generated_notice=packet.llm.ai_generated_notice,
+            model_recommendation=packet.explica.model_recommendation,
+            human_decision=packet.explica.human_decision,
+            human_override=packet.explica.human_override,
+            citizen_receipt_code=packet.ledger.citizen_receipt_code,
+            block_index=packet.ledger.block_index,
+            chain_verified=packet.ledger.chain_verified,
+            latency_ms=total_latency,
+            probability_score=packet.explica.probability_score,
+            linear_shap_values=dict(packet.explica.linear_shap_values),
+        )
 
 
 class ShieldController(Controller):

@@ -19,7 +19,7 @@ from app.controllers.gateway import GatewayController, ShieldController
 from app.controllers.health import HealthController
 from app.controllers.ledger import DemoLedgerController, LedgerController
 from app.controllers.metrics import MetricsController
-from app.dependencies import build_state
+from app.dependencies import AppState, build_state
 from core.config import (
     MAX_BODY_BYTES,
     Settings,
@@ -79,6 +79,12 @@ def _unhandled_error_handler(_: Request, exc: Exception) -> Response[dict[str, s
     return Response({"error": "INTERNAL_ERROR"}, status_code=500)
 
 
+def _shutdown_handler(app: Litestar) -> None:
+    state: AppState = app.state.aduana
+    state.vault.zeroize_all()
+    state.repo.close()
+
+
 def create_app(
     settings: Settings | None = None,
     keys: KeyRing | None = None,
@@ -117,6 +123,7 @@ def create_app(
         response_headers=SECURITY_HEADERS,
         request_max_body_size=MAX_BODY_BYTES,
         state=State({"aduana": state}),
+        on_shutdown=[_shutdown_handler],
         openapi_config=None,  # la UI de /schema carga JS de CDNs: viola Air-Gapped (RNF-04)
         debug=False,
     )

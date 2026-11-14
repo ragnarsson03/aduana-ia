@@ -96,13 +96,12 @@ def test_health_is_public_and_minimal(client: TestClient) -> None:
     assert set(response.json()) == {"status", "ledger_mode", "implemented_stages"}
 
 
-@pytest.mark.parametrize(
-    ("method", "path", "body"),
-    [
-        ("post", "/api/v1/gateway/process", GATEWAY_BODY),
-    ],
-)
-def test_pending_endpoints_return_501(client: TestClient, method: str, path: str, body) -> None:
-    kwargs = {"json": body} if body else {}
-    response = getattr(client, method)(path, headers=TOKEN_HEADERS, **kwargs)
-    assert response.status_code == 501
+def test_gateway_process_endpoint_is_implemented(client: TestClient) -> None:
+    body = {
+        "raw_text": "Solicitud institucional de prueba",
+        "citizen_cedula": "V-12345678",
+        "consent": {"granted": True, "purpose_code": "BECA"},
+        "features": {"f1": 0.0, "f2": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0},
+    }
+    response = client.post("/api/v1/gateway/process", headers=TOKEN_HEADERS, json=body)
+    assert response.status_code == 201
