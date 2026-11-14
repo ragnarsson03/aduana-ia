@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { NavTabId, NavTabItem } from '../../types';
 import { AuthUser } from '../../types/auth';
+import { ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from '../../constants/mockAuth';
 import logoImg from '../../assets/Logo.png';
 import logoWhiteImg from '../../assets/Logo-white.png';
 
@@ -51,13 +52,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navItems: NavTabItem[] = [
+  const allNavItems: NavTabItem[] = [
     { id: 'pasarela', label: 'Pasarela' },
     { id: 'chat', label: 'Chat IA', hasDot: true, dotColor: 'bg-indigo-500' },
     { id: 'ledger', label: 'Ledger' },
     { id: 'explicabilidad', label: 'Explicabilidad' },
     { id: 'canal', label: 'Canal Seguro', hasDot: true, dotColor: 'bg-emerald-500' },
   ];
+
+  // Filter based on user's authorized role tabs
+  const allowedTabs = currentUser ? ROLE_ALLOWED_TABS[currentUser.role] : allNavItems.map(i => i.id);
+  const navItems = allNavItems.filter(item => allowedTabs.includes(item.id));
+  const homeTab = currentUser ? ROLE_DEFAULT_TAB[currentUser.role] : 'pasarela';
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0b0f19]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
@@ -66,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Brand Logo and Live Status Indicator */}
         <div className="flex items-center space-x-3 shrink-0">
           <button 
-            onClick={() => onTabChange('pasarela')}
+            onClick={() => onTabChange(homeTab)}
             className="flex items-center focus:outline-hidden text-left group"
           >
             {/* Logo en Modo Claro */}

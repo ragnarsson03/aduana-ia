@@ -10,7 +10,7 @@ import { ProfileView } from './views/ProfileView';
 import { LoginView } from './views/LoginView';
 import { NavTabId } from './types';
 import { AuthUser } from './types/auth';
-import { MOCK_AUTH_USERS } from './constants/mockAuth';
+import { MOCK_AUTH_USERS, ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from './constants/mockAuth';
 import { CheckCircle2 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -24,7 +24,10 @@ export const App: React.FC = () => {
     return MOCK_AUTH_USERS.auditor; // Default session: Auditora Principal (Deykary González)
   });
 
-  const [activeTab, setActiveTab] = useState<NavTabId>('pasarela');
+  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
+    const role = currentUser ? currentUser.role : 'auditor';
+    return ROLE_DEFAULT_TAB[role] || 'ledger';
+  });
   const [profileSection, setProfileSection] = useState<'profile' | 'settings'>('profile');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -48,6 +51,16 @@ export const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Guard active tab based on role permissions
+  useEffect(() => {
+    if (currentUser && activeTab !== 'perfil') {
+      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab(ROLE_DEFAULT_TAB[currentUser.role] || 'ledger');
+      }
+    }
+  }, [currentUser, activeTab]);
+
   const showNotification = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -56,6 +69,16 @@ export const App: React.FC = () => {
   };
 
   const handleNavigate = (tab: NavTabId) => {
+    // If user attempts to navigate to unauthorized tab, redirect to default
+    if (currentUser && tab !== 'perfil') {
+      const allowed = ROLE_ALLOWED_TABS[currentUser.role] || [];
+      if (!allowed.includes(tab)) {
+        const fallback = ROLE_DEFAULT_TAB[currentUser.role] || 'ledger';
+        setActiveTab(fallback);
+        showNotification(`Acceso restringido: El rol ${currentUser.roleLabel} no tiene permisos para ese módulo.`);
+        return;
+      }
+    }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -69,8 +92,9 @@ export const App: React.FC = () => {
   const handleLogin = (user: AuthUser) => {
     setCurrentUser(user);
     localStorage.setItem('aduana_auth_role', user.role);
-    setActiveTab('pasarela');
-    showNotification(`Bienvenido(a), ${user.name}. Sesión segura iniciada como ${user.roleLabel}.`);
+    const initialTab = ROLE_DEFAULT_TAB[user.role] || 'ledger';
+    setActiveTab(initialTab);
+    showNotification(`Bienvenido(a), ${user.name}. Sesión iniciada con rol ${user.roleLabel}.`);
   };
 
   const handleLogout = () => {

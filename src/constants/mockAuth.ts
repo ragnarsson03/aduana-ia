@@ -1,5 +1,18 @@
-import { AuthUser, LoginCredentialPreset } from '../types/auth';
+import { AuthUser, LoginCredentialPreset, UserRole } from '../types/auth';
 import { ContactProfile, InstitutionalChannel, ChatMessage } from '../types/secure-channel';
+import { NavTabId } from '../types/navigation';
+
+export const ROLE_ALLOWED_TABS: Record<UserRole, NavTabId[]> = {
+  auditor: ['ledger', 'explicabilidad'],
+  analista: ['pasarela', 'chat', 'canal'],
+  admin: ['pasarela', 'chat', 'ledger', 'explicabilidad', 'canal'],
+};
+
+export const ROLE_DEFAULT_TAB: Record<UserRole, NavTabId> = {
+  auditor: 'ledger',
+  analista: 'pasarela',
+  admin: 'pasarela',
+};
 
 export const MOCK_AUTH_USERS: Record<string, AuthUser> = {
   auditor: {
@@ -92,7 +105,7 @@ export const LOGIN_PRESETS: LoginCredentialPreset[] = [
     user: MOCK_AUTH_USERS.auditor,
     defaultPass: 'auditor2026',
     badgeColor: 'border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300',
-    description: 'Auditoría de Ledger inalterable, verificación de firmas Ed25519 y trazabilidad algorítmica.'
+    description: 'Módulos asignados: Explicabilidad y Ledger inalterable SHA-256.'
   },
   {
     role: 'analista',
@@ -100,7 +113,7 @@ export const LOGIN_PRESETS: LoginCredentialPreset[] = [
     user: MOCK_AUTH_USERS.analista,
     defaultPass: 'analista2026',
     badgeColor: 'border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300',
-    description: 'Gestión de trámites aduaneros, sanitización de datos de identidad y supervisión de equidad.'
+    description: 'Módulos asignados: Pasarela, Chat IA y Canal Seguro E2EE.'
   },
   {
     role: 'admin',
@@ -108,7 +121,7 @@ export const LOGIN_PRESETS: LoginCredentialPreset[] = [
     user: MOCK_AUTH_USERS.admin,
     defaultPass: 'admin2026',
     badgeColor: 'border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300',
-    description: 'Custodio maestro de nodos locales, inyección de pruebas de integridad y control perimetral.'
+    description: 'Módulos asignados: Control total perimetral (Todos los módulos).'
   }
 ];
 

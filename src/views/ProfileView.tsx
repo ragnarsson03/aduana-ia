@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { AuthUser } from '../types/auth';
 import { NavTabId } from '../types/navigation';
+import { ROLE_ALLOWED_TABS, ROLE_DEFAULT_TAB } from '../constants/mockAuth';
 
 interface ProfileViewProps {
   user: AuthUser;
@@ -62,11 +63,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* Top Breadcrumb & Return Action */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => onNavigate('pasarela')}
+          onClick={() => onNavigate(ROLE_DEFAULT_TAB[user.role] || 'ledger')}
           className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel Principal</span>
+          <span>Volver al Panel Principal ({user.role === 'auditor' ? 'Ledger' : 'Pasarela'})</span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -298,13 +299,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div className="pt-2">
-                <button
-                  onClick={() => onNavigate('canal')}
-                  className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-primary hover:bg-indigo-700 text-white shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Ir al Canal Seguro E2EE</span>
-                </button>
+                {ROLE_ALLOWED_TABS[user.role].includes('canal') ? (
+                  <button
+                    onClick={() => onNavigate('canal')}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-primary hover:bg-indigo-700 text-white shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Ir al Canal Seguro E2EE</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onNavigate('ledger')}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-primary hover:bg-indigo-700 text-white shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Ir al Registro de Ledger</span>
+                  </button>
+                )}
               </div>
             </div>
 
