@@ -88,8 +88,7 @@ def test_settings_rejects_remote_host_without_opt_in() -> None:
 
 @pytest.mark.parametrize(
     "invisible",
-    ["­", "‎", "‏", "‪", "‮", "⁦", "⁩", "᠎", "؜", "͏", "⁡", "️", "ㅤ", "ᅟ",
-     "\U000e0041"],
+    ["­", "‎", "‏", "‪", "‮", "⁦", "⁩", "᠎", "؜", "͏", "⁡", "️", "ㅤ", "ᅟ", "\U000e0041"],
 )
 def test_normalize_text_strips_all_invisible_format_characters(invisible: str) -> None:
     assert normalize_text(f"V1{invisible}2345678") == "V12345678"

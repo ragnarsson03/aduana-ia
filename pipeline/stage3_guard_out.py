@@ -59,12 +59,11 @@ def guard_out(llm_response: str, *, canary_token: str) -> GuardOutResult:
             if hex_digest.lower() in normalized.lower() or hex_digest.upper() in normalized:
                 canary_leaked = True
             elif len(hex_digest) >= 8 and (
-                hex_digest[:8].lower() in normalized.lower()
-                or hex_digest[:8].upper() in normalized
+                hex_digest[:8].lower() in normalized.lower() or hex_digest[:8].upper() in normalized
             ):
                 canary_leaked = True
 
-    # 3. Detección de PII residual o alucinada (tokens [CEDULA_1] etc. son válidos y no disparan PII)
+    # 3. Detección de PII residual o alucinada (tokens [CEDULA_1] etc. son válidos)
     pii_matches = find_pii(normalized)
     residual_pii_detected = len(pii_matches) > 0
 

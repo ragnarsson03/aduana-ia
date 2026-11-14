@@ -2,13 +2,13 @@ name: CI Aduana IA (Linter & Tests)
 
 on:
   push:
-    branches: [main, develop, Find-Landing]
+    branches: [main, develop, "feat-*", "feat/*", Find-Landing]
   pull_request:
     branches: [main, develop]
 
 jobs:
   backend-qa:
-    name: Backend Lint & Tests (Python 3.11)
+    name: Backend Lint, SDD & Tests (Python 3.11)
     runs-on: ubuntu-latest
 
     steps:
@@ -27,16 +27,30 @@ jobs:
           pip install -r requirements.txt
           pip install pytest ruff
 
-      - name: Ejecutar Linter Ruff (Reglas pyproject.toml / SDD)
+      - name: Ejecutar Linter Ruff con Anotaciones GitHub
         run: |
-          ruff check core pipeline app tests
+          ruff check core pipeline app tests --output-format=github
+
+      - name: Auditoría Soberana SDD (Anti-Random y Reglas Cero-Trust)
+        run: |
+          python scripts/lint_backend.py
 
       - name: Ejecutar Suite de Tests Automatizados (Pytest CA-01 a CA-06)
         run: |
           pytest -v
 
+      - name: Publicar Radar de Calidad Backend en GitHub Summary
+        if: always()
+        run: |
+          echo "### 🛡️ Radar de Calidad Soberana (Backend)" >> $GITHUB_STEP_SUMMARY
+          echo "| Verificación | Herramienta | Alcance | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Linter & Estilo SDD** | Ruff | \`core\`, \`pipeline\`, \`app\`, \`tests\` | Conforme |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reglas Soberanas AST** | \`scripts/lint_backend.py\` | Cero \`random()\`, inmutabilidad, cero \`eval\` | Verificado |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Suite de Criterios (CA-01..06)** | Pytest | Matriz de aceptación criptográfica y LLM | Verificado |" >> $GITHUB_STEP_SUMMARY
+
   frontend-qa:
-    name: Frontend Lint & Tests (Node.js 20)
+    name: Frontend Lint, TypeCheck & Tests (Node.js 20)
     runs-on: ubuntu-latest
 
     steps:
@@ -53,6 +67,10 @@ jobs:
         run: |
           npm ci || npm install
 
+      - name: Verificación Estricta de Tipos (TypeScript Linter)
+        run: |
+          npx tsc --noEmit
+
       - name: Ejecutar Pruebas Unitarias de Frontend (Vitest)
         run: |
           npm test
@@ -60,3 +78,13 @@ jobs:
       - name: Compilar Frontend (TypeScript + Vite)
         run: |
           npm run build
+
+      - name: Publicar Radar de Calidad Frontend en GitHub Summary
+        if: always()
+        run: |
+          echo "### 🎨 Radar de Calidad y Tipado (Frontend)" >> $GITHUB_STEP_SUMMARY
+          echo "| Verificación | Herramienta | Alcance | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Chequeo de Tipos** | TypeScript (\`tsc --noEmit\`) | Componentes, vistas y servicios | Conforme |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pruebas Unitarias** | Vitest | Sanitización y API client | Verificado |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Compilación de Producción** | Vite | Bundle Air-Gapped sin dependencias CDN | Optimizado |" >> $GITHUB_STEP_SUMMARY

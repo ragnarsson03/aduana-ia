@@ -92,7 +92,9 @@ class EphemeralVault:
     def purge_expired(self) -> int:
         with self._lock:
             expired = [
-                rid for rid, (created, _) in list(self._sessions.items()) if self._is_expired(created)
+                rid
+                for rid, (created, _) in list(self._sessions.items())
+                if self._is_expired(created)
             ]
             for request_id in expired:
                 self.zeroize(request_id)

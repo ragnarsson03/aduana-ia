@@ -38,7 +38,8 @@ class SDDCodeAuditor(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module and (node.module == "random" or node.module.startswith("random.")):
             self.violations.append(
-                f"[{self.rel_path}:{node.lineno}] VIOLACIÓN CA-04: importación desde 'random' prohibida."
+                f"[{self.rel_path}:{node.lineno}] VIOLACIÓN CA-04: "
+                "importación desde 'random' prohibida."
             )
         self.generic_visit(node)
 
@@ -46,12 +47,14 @@ class SDDCodeAuditor(ast.NodeVisitor):
         # Detectar .random()
         if isinstance(node.func, ast.Attribute) and node.func.attr == "random":
             self.violations.append(
-                f"[{self.rel_path}:{node.lineno}] VIOLACIÓN CA-04: Invocación a función .random() prohibida."
+                f"[{self.rel_path}:{node.lineno}] VIOLACIÓN CA-04: "
+                "Invocación a función .random() prohibida."
             )
         # Detectar eval / exec
         if isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec"):
             self.violations.append(
-                f"[{self.rel_path}:{node.lineno}] VIOLACIÓN SEGURIDAD: Invocación a {node.func.id}() prohibida."
+                f"[{self.rel_path}:{node.lineno}] VIOLACIÓN SEGURIDAD: "
+                f"Invocación a {node.func.id}() prohibida."
             )
         self.generic_visit(node)
 
@@ -78,7 +81,9 @@ def test_no_random_allowed_in_backend() -> None:
         auditor.visit(tree)
         all_violations.extend(auditor.violations)
 
-    assert not all_violations, f"Se detectaron violaciones a la regla anti-random:\n" + "\n".join(all_violations)
+    assert not all_violations, "Se detectaron violaciones a la regla anti-random:\n" + "\n".join(
+        all_violations
+    )
 
 
 def test_no_unsafe_eval_or_exec() -> None:
@@ -95,7 +100,7 @@ def test_no_unsafe_eval_or_exec() -> None:
             if "SEGURIDAD" in v:
                 all_violations.append(v)
 
-    assert not all_violations, f"Se detectaron funciones inseguras:\n" + "\n".join(all_violations)
+    assert not all_violations, "Se detectaron funciones inseguras:\n" + "\n".join(all_violations)
 
 
 def test_context_dataclasses_declare_frozen_and_slots() -> None:
@@ -111,8 +116,13 @@ def test_context_dataclasses_declare_frozen_and_slots() -> None:
         if isinstance(node, ast.ClassDef):
             # Verificar si tiene decorador @dataclass
             for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Call) and getattr(decorator.func, "id", None) == "dataclass":
-                    keywords = {kw.arg: getattr(kw.value, "value", None) for kw in decorator.keywords}
+                if (
+                    isinstance(decorator, ast.Call)
+                    and getattr(decorator.func, "id", None) == "dataclass"
+                ):
+                    keywords = {
+                        kw.arg: getattr(kw.value, "value", None) for kw in decorator.keywords
+                    }
                     assert keywords.get("frozen") is True, f"{node.name} debe tener frozen=True"
                     assert keywords.get("slots") is True, f"{node.name} debe tener slots=True"
 
