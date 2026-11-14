@@ -295,7 +295,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 spellCheck={false}
                 value={cedulaInput}
                 onChange={(e) => setCedulaInput(e.target.value)}
-                placeholder="Correo (auditor@aduana.gob.ve) o Cédula (V-14220101)"
+                placeholder="Ingrese Correo Electronico"
                 required
                 className="w-full bg-[#090d16]/80 border border-white/15 pl-14 pr-4 py-3.5 rounded-full text-xs sm:text-sm text-[#dfe2f1] placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all font-mono"
               />
