@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { ContactList } from './components/ContactList';
-import { ChatThread } from './components/ChatThread';
-import { UserProfileCard } from './components/UserProfileCard';
+import { CanalHeader } from './components/CanalHeader';
+import { ContactDirectory } from './components/ContactDirectory';
+import { ConversationFeed } from './components/ConversationFeed';
+import { ClearanceCredentials } from './components/ClearanceCredentials';
+import { AVILA_MOUNTAIN_PATH } from '../../constants/theme';
 import { 
   CONTACT_PROFILES, 
   INITIAL_CHAT_MESSAGES, 
@@ -11,16 +12,21 @@ import {
 import { ChatMessage } from '../../types';
 
 interface CanalSeguroFeatureProps {
-  onBackToPasarela: () => void;
+  darkMode: boolean;
+  onToggleDarkMode: () => void;
+  onNavigateHome?: () => void;
   onNotify?: (msg: string) => void;
 }
 
 export const CanalSeguroFeature: React.FC<CanalSeguroFeatureProps> = ({
-  onBackToPasarela,
+  darkMode,
+  onToggleDarkMode,
+  onNavigateHome,
   onNotify,
 }) => {
   const [selectedContactId, setSelectedContactId] = useState('c1');
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
+  const [mobileActivePane, setMobileActivePane] = useState<'contacts' | 'chat' | 'profile'>('chat');
 
   const handleSendMessage = (text: string) => {
     const newMsg: ChatMessage = {
@@ -30,62 +36,110 @@ export const CanalSeguroFeature: React.FC<CanalSeguroFeatureProps> = ({
       isSystem: false,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content: text,
+      sentReceiptLabel: 'Enviado',
     };
     setMessages((prev) => [...prev, newMsg]);
     onNotify?.('Mensaje transmitido mediante túnel E2EE con sello Ed25519.');
   };
 
+  const handleSelectContact = (id: string) => {
+    setSelectedContactId(id);
+    setMobileActivePane('chat');
+    const contact = CONTACT_PROFILES.find(c => c.id === id);
+    if (contact && onNotify) {
+      onNotify(`Conectado al canal seguro de ${contact.name}`);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Top Banner for Secure Channel */}
-      <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs transition-colors">
-        <div className="flex items-center space-x-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Aduana IA — Canal Seguro Cifrado Punto a Punto (E2EE)
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Canal de auditoría confidencial con desidentificación dinámica y verificación biométrica
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={onBackToPasarela}
-          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors inline-flex items-center gap-1.5"
+    <div className="relative min-h-[720px] transition-colors">
+      
+      {/* Avila Mountain Subtle Silhouette Vector in Background */}
+      <div className="absolute inset-x-0 top-6 pointer-events-none opacity-20 dark:opacity-10 flex items-start justify-center overflow-hidden z-0">
+        <svg 
+          className="w-full h-44 min-w-[900px] text-slate-400 dark:text-slate-600" 
+          fill="currentColor" 
+          viewBox="0 0 1200 240"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Volver a Pasarela</span>
-        </button>
+          <path d={AVILA_MOUNTAIN_PATH} />
+        </svg>
       </div>
 
-      {/* Main 3-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Column Left: Contacts (3 cols) */}
-        <div className="lg:col-span-3">
-          <ContactList
-            contacts={CONTACT_PROFILES}
-            selectedContactId={selectedContactId}
-            onSelectContact={(id) => setSelectedContactId(id)}
-          />
+      {/* Content wrapper */}
+      <div className="relative z-10 space-y-4">
+        
+        {/* Top Header Bar with Title and Theme Switch */}
+        <CanalHeader
+          darkMode={darkMode}
+          onToggleDarkMode={onToggleDarkMode}
+          onNavigateHome={onNavigateHome}
+        />
+
+        {/* Mobile Navigation Tabs */}
+        <div className="flex lg:hidden items-center justify-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl max-w-sm mx-auto text-xs font-semibold">
+          <button
+            onClick={() => setMobileActivePane('contacts')}
+            className={`flex-1 py-1.5 rounded-lg transition-all ${
+              mobileActivePane === 'contacts'
+                ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500'
+            }`}
+          >
+            Contactos
+          </button>
+          <button
+            onClick={() => setMobileActivePane('chat')}
+            className={`flex-1 py-1.5 rounded-lg transition-all ${
+              mobileActivePane === 'chat'
+                ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500'
+            }`}
+          >
+            Conversación
+          </button>
+          <button
+            onClick={() => setMobileActivePane('profile')}
+            className={`flex-1 py-1.5 rounded-lg transition-all ${
+              mobileActivePane === 'profile'
+                ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500'
+            }`}
+          >
+            Credenciales
+          </button>
         </div>
 
-        {/* Column Center: Active Conversation Thread (6 cols) */}
-        <div className="lg:col-span-6">
-          <ChatThread
-            messages={messages}
-            onSendMessage={handleSendMessage}
-          />
+        {/* Main 3-Column Layout: Directory (3 cols) + Conversation Feed (6 cols) + Credentials (3 cols) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+          
+          {/* Column 1: Contacts Directory (3 cols) */}
+          <div className={`lg:col-span-3 ${mobileActivePane === 'contacts' ? 'block' : 'hidden lg:block'}`}>
+            <ContactDirectory
+              contacts={CONTACT_PROFILES}
+              selectedContactId={selectedContactId}
+              onSelectContact={handleSelectContact}
+            />
+          </div>
+
+          {/* Column 2: Conversation Feed (6 cols) */}
+          <div className={`lg:col-span-6 ${mobileActivePane === 'chat' ? 'block' : 'hidden lg:block'}`}>
+            <ConversationFeed
+              messages={messages}
+              onSendMessage={handleSendMessage}
+            />
+          </div>
+
+          {/* Column 3: Profile & Credentials (3 cols) */}
+          <div className={`lg:col-span-3 ${mobileActivePane === 'profile' ? 'block' : 'hidden lg:block'}`}>
+            <ClearanceCredentials
+              profile={AUDITOR_USER_PROFILE}
+            />
+          </div>
+
         </div>
 
-        {/* Column Right: User Profile & Security Clearance (3 cols) */}
-        <div className="lg:col-span-3">
-          <UserProfileCard
-            profile={AUDITOR_USER_PROFILE}
-          />
-        </div>
       </div>
+
     </div>
   );
 };

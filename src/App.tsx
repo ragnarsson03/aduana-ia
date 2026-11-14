@@ -77,6 +77,8 @@ export const App: React.FC = () => {
           <CanalSeguroView 
             onBackToPasarela={() => handleNavigate('pasarela')}
             onNotify={showNotification}
+            darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode(!darkMode)}
           />
         )}
       </main>

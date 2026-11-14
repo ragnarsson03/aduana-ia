@@ -6,6 +6,7 @@ export interface ContactProfile {
   isOnline: boolean;
   avatarBgColor?: string;
   badge?: string;
+  hasGreenDot?: boolean;
 }
 
 export interface ChatMessage {
@@ -18,9 +19,13 @@ export interface ChatMessage {
   attachment?: {
     title: string;
     description: string;
+    code?: string;
     isClassified: boolean;
   };
   maskedToken?: string;
+  tokenExampleLabel?: string;
+  secondTimestamp?: string;
+  sentReceiptLabel?: string;
 }
 
 export interface AuditorUserProfile {
@@ -32,4 +37,5 @@ export interface AuditorUserProfile {
   department: string;
   ed25519Status: string;
   permissionsSummary: string;
+  verifiedBadgeText?: string;
 }

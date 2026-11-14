@@ -89,11 +89,13 @@ export const SCHOLARSHIP_DOSSIER: ScholarshipEvaluationDossier = {
 };
 
 export const CONTACT_PROFILES: ContactProfile[] = [
-  { id: 'c1', name: 'Dra. Carmen R.', initials: 'DR', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300' },
-  { id: 'c2', name: 'Ing. Alejandro V.', initials: 'ING', role: 'Departamento y Control IA...', isOnline: true, avatarBgColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300' },
-  { id: 'c3', name: 'Ing. Alejandro T.', initials: 'II', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
-  { id: 'c4', name: 'Ing. Alejandro V.', initials: 'MG', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300' },
-  { id: 'c5', name: 'Dra. Madirin H.', initials: 'INI', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-300' },
+  { id: 'c1', name: 'Dra. Carmen R.', initials: 'DR', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-[#ebd8c3] text-[#6d4c26] dark:bg-[#543b1e] dark:text-[#ebd8c3]', hasGreenDot: true },
+  { id: 'c2', name: 'Ing. Alejandro V.', initials: 'ING', role: 'Departamento y Contaloame...', isOnline: true, avatarBgColor: 'bg-[#d1f2de] text-[#1b6b3e] dark:bg-[#1a4a2d] dark:text-[#a3e8bc]', hasGreenDot: true },
+  { id: 'c3', name: 'Ing. Alejandro T.', initials: 'II', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-[#e5e4c8] text-[#55531d] dark:bg-[#434117] dark:text-[#e5e4c8]', hasGreenDot: true },
+  { id: 'c4', name: 'Dra. Carmen R.', initials: 'DR', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-[#ebd8c3] text-[#6d4c26] dark:bg-[#543b1e] dark:text-[#ebd8c3]', hasGreenDot: true },
+  { id: 'c5', name: 'Ing. Alejandro V.', initials: 'MG', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-[#d6e0f5] text-[#2c478a] dark:bg-[#1f305c] dark:text-[#c4d4f7]', hasGreenDot: true },
+  { id: 'c6', name: 'Dra. Madirin H.', initials: 'INI', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-[#cdf0ea] text-[#1e6155] dark:bg-[#16473e] dark:text-[#b0eae0]', hasGreenDot: true },
+  { id: 'c7', name: 'Dra. Carmen R.', initials: 'DR', role: 'Departamento y Confidencial...', isOnline: true, avatarBgColor: 'bg-[#ebd8c3] text-[#6d4c26] dark:bg-[#543b1e] dark:text-[#ebd8c3]', hasGreenDot: true },
 ];
 
 export const AUDITOR_USER_PROFILE: AuditorUserProfile = {
@@ -104,7 +106,8 @@ export const AUDITOR_USER_PROFILE: AuditorUserProfile = {
   clearanceLevel: 'Nivel 4 — Confidencial Estatal',
   department: 'Ministerio de Tecnología e Innovación / UNETI',
   ed25519Status: 'Validada y Activa',
-  permissionsSummary: 'Desencriptación de PII autorizada, Auditoría de Ledger y Supervisión de Modelos Locales.',
+  permissionsSummary: 'Desencriptación de PII autorizada, Auditoría de Ledger',
+  verifiedBadgeText: 'Credenciales Verificadas por Aduana IA',
 };
 
 export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
@@ -113,10 +116,11 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
     senderName: 'Auditor_Sistema',
     isSystem: true,
     timestamp: '1:33 AM',
-    content: 'Documentación compartida para el análisis del expediente cónsono.',
+    content: 'Documentación compartido un documento de integración.',
     attachment: {
       title: '[DOCUMENTO CLASIFICADO — EXP-2026-99.pdf]',
-      description: 'Documento sensible protegido por Aduana IA',
+      description: 'Documento sensibles sensitivo.',
+      code: '-EXP-2026-99.pd',
       isClassified: true,
     },
   },
@@ -126,14 +130,17 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
     senderInitials: 'DR',
     isSystem: false,
     timestamp: '2:37 AM',
-    content: 'El expediente contiene datos protegidos bajo la ley de privacidad digital.',
+    content: 'El soporte el documento permanece como sensible.',
   },
   {
     id: 'm3',
     senderName: 'Auditor_Sistema',
     isSystem: true,
     timestamp: '2:37 AM',
-    content: 'Ejemplo de PII enmascarado automáticamente:',
+    content: 'Se ha cerrado la carga de las revisiones compartidas al seguir un documento sensible.',
+    tokenExampleLabel: 'Exemplo de PII enmascaramiento automático:',
     maskedToken: '[CÉDULA OCULTA]',
+    secondTimestamp: '3:37 AM',
+    sentReceiptLabel: 'Enviado',
   },
 ];
